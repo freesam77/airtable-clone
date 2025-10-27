@@ -14,16 +14,73 @@ datasource db {
     url      = env("DATABASE_URL")
 }
 
-model Post {
-    id        Int      @id @default(autoincrement())
-    name      String
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+model Table {
+    id          String   @id @default(cuid())
+    name        String
+    description String?
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
 
     createdBy   User   @relation(fields: [createdById], references: [id])
     createdById String
 
+    columns Column[]
+    rows    Row[]
+
     @@index([name])
+    @@index([createdById])
+}
+
+model Column {
+    id       String     @id @default(cuid())
+    name     String
+    type     ColumnType
+    required Boolean    @default(false)
+    position Int
+
+    tableId String
+    table   Table  @relation(fields: [tableId], references: [id], onDelete: Cascade)
+
+    cellValues CellValue[]
+
+    @@unique([tableId, name])
+    @@index([tableId, position])
+}
+
+model Row {
+    id        String   @id @default(cuid())
+    position  Int
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    tableId String
+    table   Table  @relation(fields: [tableId], references: [id], onDelete: Cascade)
+
+    cellValues CellValue[]
+
+    @@index([tableId, position])
+}
+
+model CellValue {
+    id String @id @default(cuid())
+
+    textValue   String?
+    numberValue Float?
+
+    columnId String
+    column   Column @relation(fields: [columnId], references: [id], onDelete: Cascade)
+
+    rowId String
+    row   Row    @relation(fields: [rowId], references: [id], onDelete: Cascade)
+
+    @@unique([columnId, rowId])
+    @@index([columnId])
+    @@index([rowId])
+}
+
+enum ColumnType {
+    TEXT
+    NUMBER
 }
 
 // Necessary for Next auth
@@ -62,7 +119,7 @@ model User {
     image         String?
     accounts      Account[]
     sessions      Session[]
-    posts         Post[]
+    tables        Table[]
 }
 
 model VerificationToken {
