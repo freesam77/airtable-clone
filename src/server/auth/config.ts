@@ -38,6 +38,9 @@ export const authConfig = {
 		}),
 	],
 	adapter: PrismaAdapter(db),
+	pages: {
+		signOut: "/",
+	},
 	callbacks: {
 		session: ({ session, user }) => ({
 			...session,
