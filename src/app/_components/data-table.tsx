@@ -6,7 +6,7 @@ import {
 	getCoreRowModel,
 	useReactTable,
 } from "@tanstack/react-table";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
 	ContextMenu,
 	ContextMenuContent,
@@ -67,11 +67,12 @@ interface DataTableProps {
 export function DataTable({ tableId, data, columns }: DataTableProps) {
 	const [isAddingRow, setIsAddingRow] = useState(false);
 	const [newRowData, setNewRowData] = useState<Record<string, string>>({});
+	const addRowRef = useRef<HTMLTableRowElement | null>(null);
 
 	const utils = api.useUtils();
 	const addRowMutation = api.table.addRow.useMutation({
 		onSuccess: () => {
-			utils.table.getAll.invalidate();
+			utils.base.invalidate();
 			setIsAddingRow(false);
 			setNewRowData({});
 		},
@@ -79,13 +80,13 @@ export function DataTable({ tableId, data, columns }: DataTableProps) {
 
 	const addColumnMutation = api.table.addColumn.useMutation({
 		onSuccess: () => {
-			utils.table.getAll.invalidate();
+			utils.base.invalidate();
 		},
 	});
 
 	const deleteRowMutation = api.table.deleteRow.useMutation({
 		onSuccess: () => {
-			utils.table.getAll.invalidate();
+			utils.base.invalidate();
 		},
 	});
 
@@ -161,26 +162,29 @@ export function DataTable({ tableId, data, columns }: DataTableProps) {
 		},
 	});
 
+	const submitNewRow = () => {
+		const cellValues = columns.map((col) => ({
+			columnId: col.id,
+			textValue: col.type === "TEXT" ? newRowData[col.id] : undefined,
+			numberValue:
+				col.type === "NUMBER" && newRowData[col.id]
+					? Number.parseFloat(newRowData[col.id] ?? "0")
+					: undefined,
+		}));
+
+		addRowMutation.mutate({
+			tableId,
+			cellValues,
+		});
+	};
+
 	const handleAddRow = () => {
 		if (isAddingRow) {
-			// Submit the new row
-			const cellValues = columns.map((col) => ({
-				columnId: col.id,
-				textValue: col.type === "TEXT" ? newRowData[col.id] : undefined,
-				numberValue:
-					col.type === "NUMBER" && newRowData[col.id]
-						? Number.parseFloat(newRowData[col.id] ?? "0")
-						: undefined,
-			}));
-
-			addRowMutation.mutate({
-				tableId,
-				cellValues,
-			});
-		} else {
-			// Start adding a new row
-			setIsAddingRow(true);
+			submitNewRow();
+			return;
 		}
+		// Start adding a new row
+		setIsAddingRow(true);
 	};
 
 	const handleAddColumn = (name: string, type: "TEXT" | "NUMBER") => {
@@ -271,7 +275,7 @@ export function DataTable({ tableId, data, columns }: DataTableProps) {
 							</ContextMenu>
 						))}
 						{isAddingRow && (
-							<tr className="bg-blue-50">
+						<tr className="bg-blue-50" ref={addRowRef}>
 								{columns
 									.sort((a, b) => a.position - b.position)
 									.map((col) => (
@@ -285,6 +289,28 @@ export function DataTable({ tableId, data, columns }: DataTableProps) {
 												onChange={(e) =>
 													handleInputChange(col.id, e.target.value)
 												}
+											onKeyDown={(e) => {
+												if (e.key === "Enter") {
+													e.preventDefault();
+													submitNewRow();
+												}
+												if (e.key === "Escape") {
+													e.preventDefault();
+													handleCancelAdd();
+												}
+											}}
+											onBlur={() => {
+												// Delay to allow focus to move to another input inside the same row
+												setTimeout(() => {
+													const container = addRowRef.current;
+													if (!container) return;
+													const active = document.activeElement;
+													if (active && container.contains(active)) {
+														return; // still within row inputs
+													}
+													submitNewRow();
+												}, 0);
+											}}
 												className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none"
 												placeholder={`Enter ${col.name.toLowerCase()}`}
 											/>

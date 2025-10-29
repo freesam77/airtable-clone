@@ -1,35 +1,48 @@
 "use client";
 
-import { ArrowUpDown, Filter, Group, Palette, Plus } from "lucide-react";
+import Image from "next/image";
+import { Plus, Home, Database } from "lucide-react";
 import type { Session } from "next-auth";
 import { signOut } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { Button } from "~/components/ui/button";
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+	DialogFooter,
+} from "~/components/ui/dialog";
+import { Input } from "~/components/ui/input";
+import { Label } from "~/components/ui/label";
+import { Textarea } from "~/components/ui/textarea";
 import { api } from "~/trpc/react";
-import { DataTable } from "./data-table";
-import { Sidebar } from "./sidebar";
 
 interface DashboardLayoutProps {
 	user: Session["user"];
 }
 
 export function DashboardLayout({ user }: DashboardLayoutProps) {
-	const [rowCount, setRowCount] = useState(5);
-	const {
-		data: tables,
-		isLoading,
-		refetch,
-	} = api.table.getAll.useQuery(undefined, {
-		retry: (failureCount, error) => {
-			// Don't retry if it's an auth error
-			if (error?.data?.code === "UNAUTHORIZED") {
-				return false;
-			}
-			return failureCount < 3;
-		},
-	});
-	const generateRows = api.table.generateRows.useMutation({
-		onSuccess: () => {
+	const router = useRouter();
+	const [showCreateBase, setShowCreateBase] = useState(false);
+	const [newBaseName, setNewBaseName] = useState("");
+	const [newBaseDescription, setNewBaseDescription] = useState("");
+
+	const { data: bases, refetch } = api.base.getAll.useQuery();
+	const createBase = api.base.create.useMutation({
+		onSuccess: (newBase) => {
 			void refetch();
+			setShowCreateBase(false);
+			setNewBaseName("");
+			setNewBaseDescription("");
+			// Navigate to the new base
+			const newBaseId = newBase?.id;
+			const firstNewTableId = Array.isArray(newBase?.tables) ? newBase?.tables[0]?.id : undefined;
+			if (!newBaseId || !firstNewTableId) {
+				return;
+			}
+			router.push(`/${newBaseId}/${firstNewTableId}`);
 		},
 	});
 
@@ -43,14 +56,11 @@ export function DashboardLayout({ user }: DashboardLayoutProps) {
 			.slice(0, 2);
 	};
 
-	// Get the first table for now (in a real app, you'd have table selection)
-	const currentTable = tables?.[0];
-
-	const handleGenerateRows = () => {
-		if (currentTable) {
-			generateRows.mutate({
-				tableId: currentTable.id,
-				count: rowCount,
+	const handleCreateBase = () => {
+		if (newBaseName.trim()) {
+			createBase.mutate({
+				name: newBaseName.trim(),
+				description: newBaseDescription.trim() || undefined,
 			});
 		}
 	};
@@ -59,132 +69,174 @@ export function DashboardLayout({ user }: DashboardLayoutProps) {
 		signOut({ callbackUrl: "/" });
 	};
 
-	if (isLoading) {
-		return (
-			<div className="flex h-screen bg-gray-50">
-				<Sidebar user={user} />
-				<div className="flex flex-1 items-center justify-center">
-					<div className="text-gray-500">Loading...</div>
-				</div>
-			</div>
-		);
-	}
-
-	if (!currentTable) {
-		return (
-			<div className="flex h-screen bg-gray-50">
-				<Sidebar user={user} />
-				<div className="flex flex-1 items-center justify-center">
-					<div className="text-gray-500">No tables found.</div>
-				</div>
-			</div>
-		);
-	}
+	const handleBaseClick = (baseId: string) => {
+		const base = bases?.find(b => b.id === baseId);
+		if (!base) {
+			return;
+		}
+		const firstTableId = Array.isArray(base.tables) ? base.tables[0]?.id : undefined;
+		if (!firstTableId) {
+			return;
+		}
+		router.push(`/${baseId}/${firstTableId}`);
+	};
 
 	return (
-		<div className="flex h-screen bg-gray-50">
-			<Sidebar user={user} />
-
-			<div className="flex flex-1 flex-col">
-				{/* Top Navigation Bar */}
-				<div className="border-gray-200 border-b bg-white px-6 py-3">
-					<div className="flex items-center justify-between">
-						<div>
-							<h1 className="font-semibold text-gray-900 text-xl">
-								{currentTable.name}
-							</h1>
-							{currentTable.description && (
-								<p className="text-gray-500 text-sm">
-									{currentTable.description}
-								</p>
-							)}
-						</div>
-						<div className="flex items-center gap-3">
-							<div className="flex items-center gap-2">
-								<input
-									type="number"
-									value={rowCount}
-									onChange={(e) =>
-										setRowCount(
-											Math.max(
-												1,
-												Math.min(100, Number.parseInt(e.target.value) || 1),
-											),
-										)
-									}
-									className="w-16 rounded border border-gray-300 px-2 py-1 text-sm"
-									min="1"
-									max="100"
+		<div className="min-h-screen bg-gray-50">
+			{/* Top Navigation */}
+			<header className="border-gray-200 border-b bg-white px-6 py-4">
+				<div className="flex items-center justify-between">
+					<div className="flex items-center gap-4">
+						<Image
+							src="/airtable-logo.png"
+							alt="Airtable"
+							width={100}
+							height={100}
+							priority
+						/>
+					</div>
+					<div className="flex items-center gap-3">
+						<div className="flex items-center gap-2">
+							{user?.image ? (
+								<img
+									src={user.image}
+									alt={user.name || "User"}
+									className="h-8 w-8 rounded-full"
 								/>
-								<button
-									type="button"
-									onClick={handleGenerateRows}
-									disabled={generateRows.isPending}
-									className="flex items-center gap-2 rounded bg-green-600 px-4 py-2 font-medium text-sm text-white hover:bg-green-700 disabled:opacity-50"
-								>
-									<Plus size={16} />
-									{generateRows.isPending ? "Generating..." : "Generate Rows"}
-								</button>
-							</div>
-							<button
-								type="button"
-								onClick={handleSignOut}
-								className="flex items-center gap-2 rounded bg-blue-600 px-4 py-2 font-medium text-sm text-white hover:bg-blue-700"
-							>
+							) : (
+								<div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600">
+									<span className="font-semibold text-sm text-white">
+										{getUserInitials(user?.name)}
+									</span>
+								</div>
+							)}
+							<Button variant="default" size="sm" onClick={handleSignOut}>
 								Log out
-							</button>
+							</Button>
+
 						</div>
 					</div>
 				</div>
+			</header>
+
+			{/* Sidebar */}
+			<div className="flex">
+				<aside className="w-64 border-gray-200 border-r bg-white">
+					<nav className="p-4">
+						<div className="space-y-2">
+							<div className="rounded-lg bg-blue-50 px-3 py-2">
+								<div className="flex items-center gap-2 text-blue-700 text-sm font-medium">
+									<Home size={16} />
+									Home
+								</div>
+							</div>
+						</div>
+					</nav>
+				</aside>
 
 				{/* Main Content */}
-				<div className="flex-1 p-6">
-					<div className="mb-4 flex items-center justify-between">
-						<div className="flex items-center gap-4">
-							<button
-								type="button"
-								className="flex items-center gap-2 rounded border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50"
-							>
-								<Filter size={16} />
-								Hide fields
-							</button>
-							<button
-								type="button"
-								className="flex items-center gap-2 rounded border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50"
-							>
-								<Filter size={16} />
-								Filter
-							</button>
-							<button
-								type="button"
-								className="flex items-center gap-2 rounded border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50"
-							>
-								<Group size={16} />
-								Group
-							</button>
-							<button
-								type="button"
-								className="flex items-center gap-2 rounded border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50"
-							>
-								<ArrowUpDown size={16} />
-								Sort
-							</button>
-							<button
-								type="button"
-								className="flex items-center gap-2 rounded border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50"
-							>
-								<Palette size={16} />
-								Color
-							</button>
-						</div>
+				<main className="flex-1 p-8">
+					<div className="mb-8 flex items-center justify-between">
+						<h2 className="font-semibold text-3xl text-gray-900">Home</h2>
+						<Button
+							onClick={() => setShowCreateBase(true)}
+							className="bg-blue-600 hover:bg-blue-700"
+						>
+							<Plus size={16} className="mr-2" />
+							Create a workspace
+						</Button>
 					</div>
 
-					<DataTable
-						tableId={currentTable.id}
-						data={currentTable.rows}
-						columns={currentTable.columns}
-					/>
-				</div>
+					{/* Bases Grid */}
+					<div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+						{bases?.map((base) => (
+							<button
+								key={base.id}
+								onClick={() => handleBaseClick(base.id)}
+								type="button"
+								className="flex gap-3 cursor-pointer rounded-lg border border-gray-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-md text-left"
+							>
+								<div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-gray-100">
+									<Database size={24} className="text-gray-600" />
+								</div>
+								<div>
+
+									<h3 className="mb-2 font-semibold text-gray-900 text-lg">
+										{base.name}
+									</h3>
+									{base.description && (
+										<p className="mb-3 text-gray-600 text-sm">{base.description}</p>
+									)}
+								</div>
+							</button>
+						))}
+
+						{/* Create New Base Card */}
+						<button
+							onClick={() => setShowCreateBase(true)}
+							type="button"
+							className="group flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 p-6 transition-colors hover:border-gray-400 hover:bg-gray-100"
+						>
+							<div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-white">
+								<Plus size={24} className="text-gray-400" />
+							</div>
+							<span className="font-medium text-gray-600 text-sm">
+								Create new workspace
+							</span>
+						</button>
+					</div>
+
+					{/* Create Base Dialog */}
+					<Dialog open={showCreateBase} onOpenChange={setShowCreateBase}>
+						<DialogContent className="sm:max-w-md">
+							<DialogHeader>
+								<DialogTitle>Create new workspace</DialogTitle>
+							</DialogHeader>
+							<div className="space-y-4">
+								<div className="space-y-2">
+									<Label htmlFor="workspace-name">Workspace name</Label>
+									<Input
+										id="workspace-name"
+										type="text"
+										value={newBaseName}
+										onChange={(e) => setNewBaseName(e.target.value)}
+										placeholder="Enter workspace name"
+										autoFocus
+									/>
+								</div>
+								<div className="space-y-2">
+									<Label htmlFor="workspace-description">Description (optional)</Label>
+									<Textarea
+										id="workspace-description"
+										value={newBaseDescription}
+										onChange={(e) => setNewBaseDescription(e.target.value)}
+										placeholder="What is this workspace for?"
+										rows={3}
+									/>
+								</div>
+							</div>
+							<DialogFooter>
+								<Button
+									variant="ghost"
+									onClick={() => {
+										setShowCreateBase(false);
+										setNewBaseName("");
+										setNewBaseDescription("");
+									}}
+								>
+									Cancel
+								</Button>
+								<Button
+									onClick={handleCreateBase}
+									disabled={!newBaseName.trim() || createBase.isPending}
+									className="bg-blue-600 hover:bg-blue-700"
+								>
+									{createBase.isPending ? "Creating..." : "Create workspace"}
+								</Button>
+							</DialogFooter>
+						</DialogContent>
+					</Dialog>
+				</main>
 			</div>
 		</div>
 	);

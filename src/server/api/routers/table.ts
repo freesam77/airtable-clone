@@ -2,46 +2,24 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 
 export const tableRouter = createTRPCRouter({
-	// Get all tables for the current user
-	getAll: protectedProcedure.query(async ({ ctx }) => {
-		const tables = await ctx.db.table.findMany({
-			where: { createdById: ctx.session.user.id },
-			include: {
-				columns: {
-					orderBy: { position: "asc" },
-				},
-				rows: {
-					include: {
-						cellValues: {
-							include: {
-								column: true,
-							},
-						},
-					},
-					orderBy: { position: "asc" },
-				},
-			},
-		});
-
-		// If no tables exist, create a default empty table
-		if (tables.length === 0) {
-			await ctx.db.table.create({
-				data: {
-					name: "My First Table",
-					description: "A sample table to get you started",
+	// Get all tables for a specific base
+	getByBaseId: protectedProcedure
+		.input(z.object({ baseId: z.string() }))
+		.query(async ({ ctx, input }) => {
+			// First verify the base belongs to the user
+			const base = await ctx.db.base.findFirst({
+				where: {
+					id: input.baseId,
 					createdById: ctx.session.user.id,
-					columns: {
-						create: [
-							{ name: "Name", type: "TEXT", position: 0, required: false },
-							{ name: "Age", type: "NUMBER", position: 1, required: false },
-							{ name: "Email", type: "TEXT", position: 2, required: false },
-						],
-					},
 				},
 			});
-			// Return the created table
+
+			if (!base) {
+				throw new Error("Base not found or access denied");
+			}
+
 			return ctx.db.table.findMany({
-				where: { createdById: ctx.session.user.id },
+				where: { baseId: input.baseId },
 				include: {
 					columns: {
 						orderBy: { position: "asc" },
@@ -58,10 +36,7 @@ export const tableRouter = createTRPCRouter({
 					},
 				},
 			});
-		}
-
-		return tables;
-	}),
+		}),
 
 	// Get a specific table with its data
 	getById: protectedProcedure
@@ -70,7 +45,9 @@ export const tableRouter = createTRPCRouter({
 			return ctx.db.table.findFirst({
 				where: {
 					id: input.id,
-					createdById: ctx.session.user.id,
+					base: {
+						createdById: ctx.session.user.id,
+					},
 				},
 				include: {
 					columns: {
@@ -90,10 +67,11 @@ export const tableRouter = createTRPCRouter({
 			});
 		}),
 
-	// Create a new table
+	// Create a new table (now handled by base router createTable)
 	create: protectedProcedure
 		.input(
 			z.object({
+				baseId: z.string(),
 				name: z.string().min(1),
 				description: z.string().optional(),
 				columns: z.array(
@@ -107,11 +85,23 @@ export const tableRouter = createTRPCRouter({
 			}),
 		)
 		.mutation(async ({ ctx, input }) => {
+			// First verify the base belongs to the user
+			const base = await ctx.db.base.findFirst({
+				where: {
+					id: input.baseId,
+					createdById: ctx.session.user.id,
+				},
+			});
+
+			if (!base) {
+				throw new Error("Base not found or access denied");
+			}
+
 			return ctx.db.table.create({
 				data: {
 					name: input.name,
 					description: input.description,
-					createdById: ctx.session.user.id,
+					baseId: input.baseId,
 					columns: {
 						create: input.columns,
 					},
@@ -144,7 +134,9 @@ export const tableRouter = createTRPCRouter({
 			const table = await ctx.db.table.findFirst({
 				where: {
 					id: input.tableId,
-					createdById: ctx.session.user.id,
+					base: {
+						createdById: ctx.session.user.id,
+					},
 				},
 				include: {
 					rows: true,
@@ -193,7 +185,9 @@ export const tableRouter = createTRPCRouter({
 			const table = await ctx.db.table.findFirst({
 				where: {
 					id: input.tableId,
-					createdById: ctx.session.user.id,
+					base: {
+						createdById: ctx.session.user.id,
+					},
 				},
 				include: {
 					columns: true,
@@ -236,7 +230,9 @@ export const tableRouter = createTRPCRouter({
 				where: {
 					id: input.rowId,
 					table: {
-						createdById: ctx.session.user.id,
+						base: {
+							createdById: ctx.session.user.id,
+						},
 					},
 				},
 			});
@@ -274,7 +270,9 @@ export const tableRouter = createTRPCRouter({
 				where: {
 					id: input.rowId,
 					table: {
-						createdById: ctx.session.user.id,
+						base: {
+							createdById: ctx.session.user.id,
+						},
 					},
 				},
 			});
@@ -315,7 +313,9 @@ export const tableRouter = createTRPCRouter({
 			const table = await ctx.db.table.findFirst({
 				where: {
 					id: input.tableId,
-					createdById: ctx.session.user.id,
+					base: {
+						createdById: ctx.session.user.id,
+					},
 				},
 				include: {
 					columns: true,
@@ -366,37 +366,38 @@ export const tableRouter = createTRPCRouter({
 						return Math.floor(Math.random() * 80) + 18; // Age between 18-98
 					}
 					return Math.floor(Math.random() * 1000) + 1; // Random number 1-1000
-				} else {
-					// TEXT type
-					if (column.name.toLowerCase().includes("name")) {
-						return (
-							randomNames[Math.floor(Math.random() * randomNames.length)] ||
-							"User"
-						);
-					}
-					if (column.name.toLowerCase().includes("email")) {
-						const name =
-							randomNames[
-								Math.floor(Math.random() * randomNames.length)
-							]?.toLowerCase() || "user";
-						const domain =
-							randomEmails[Math.floor(Math.random() * randomEmails.length)] ||
-							"example.com";
-						return `${name}@${domain}`;
-					}
-					// Generic text
-					const words = [
-						"Lorem",
-						"ipsum",
-						"dolor",
-						"sit",
-						"amet",
-						"consectetur",
-						"adipiscing",
-						"elit",
-					];
-					return words[Math.floor(Math.random() * words.length)] || "Lorem";
-				}
+				} 
+
+                // TEXT type
+                if (column.name.toLowerCase().includes("name")) {
+                    return (
+                        randomNames[Math.floor(Math.random() * randomNames.length)] ||
+                        "User"
+                    );
+                }
+                if (column.name.toLowerCase().includes("email")) {
+                    const name =
+                        randomNames[
+                            Math.floor(Math.random() * randomNames.length)
+                        ]?.toLowerCase() || "user";
+                    const domain =
+                        randomEmails[Math.floor(Math.random() * randomEmails.length)] ||
+                        "example.com";
+                    return `${name}@${domain}`;
+                }
+                // Generic text
+                const words = [
+                    "Lorem",
+                    "ipsum",
+                    "dolor",
+                    "sit",
+                    "amet",
+                    "consectetur",
+                    "adipiscing",
+                    "elit",
+                ];
+                return words[Math.floor(Math.random() * words.length)] || "Lorem";
+				
 			};
 
 			// Create rows with random data

@@ -111,7 +111,7 @@ export function AddColumnDropdown({
 							Cancel
 						</Button>
 						<Button
-							variant="primary"
+							variant="default"
 							size="sm"
 							onClick={handleCreate}
 							disabled={!columnName.trim() || isLoading}
