@@ -44,11 +44,13 @@ export function TRPCReactProvider(props: { children: React.ReactNode }) {
 	const [trpcClient] = useState(() =>
 		api.createClient({
 			links: [
+				// this is for logging tRPC operations for debugging and monitoring
 				loggerLink({
 					enabled: (op) =>
 						process.env.NODE_ENV === "development" ||
 						(op.direction === "down" && op.result instanceof Error),
 				}),
+				// for actual data transport
 				httpBatchStreamLink({
 					transformer: SuperJSON,
 					url: `${getBaseUrl()}/api/trpc`,

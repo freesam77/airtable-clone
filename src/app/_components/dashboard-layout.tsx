@@ -14,7 +14,11 @@ interface DashboardLayoutProps {
 
 export function DashboardLayout({ user }: DashboardLayoutProps) {
 	const [rowCount, setRowCount] = useState(5);
-	const { data: tables, isLoading, refetch } = api.table.getAll.useQuery(undefined, {
+	const {
+		data: tables,
+		isLoading,
+		refetch,
+	} = api.table.getAll.useQuery(undefined, {
 		retry: (failureCount, error) => {
 			// Don't retry if it's an auth error
 			if (error?.data?.code === "UNAUTHORIZED") {
@@ -86,11 +90,13 @@ export function DashboardLayout({ user }: DashboardLayoutProps) {
 				<div className="border-gray-200 border-b bg-white px-6 py-3">
 					<div className="flex items-center justify-between">
 						<div>
-							<h1 className="text-xl font-semibold text-gray-900">
+							<h1 className="font-semibold text-gray-900 text-xl">
 								{currentTable.name}
 							</h1>
 							{currentTable.description && (
-								<p className="text-sm text-gray-500">{currentTable.description}</p>
+								<p className="text-gray-500 text-sm">
+									{currentTable.description}
+								</p>
 							)}
 						</div>
 						<div className="flex items-center gap-3">
@@ -98,7 +104,14 @@ export function DashboardLayout({ user }: DashboardLayoutProps) {
 								<input
 									type="number"
 									value={rowCount}
-									onChange={(e) => setRowCount(Math.max(1, Math.min(100, parseInt(e.target.value) || 1)))}
+									onChange={(e) =>
+										setRowCount(
+											Math.max(
+												1,
+												Math.min(100, Number.parseInt(e.target.value) || 1),
+											),
+										)
+									}
 									className="w-16 rounded border border-gray-300 px-2 py-1 text-sm"
 									min="1"
 									max="100"
@@ -128,23 +141,38 @@ export function DashboardLayout({ user }: DashboardLayoutProps) {
 				<div className="flex-1 p-6">
 					<div className="mb-4 flex items-center justify-between">
 						<div className="flex items-center gap-4">
-							<button type="button" className="flex items-center gap-2 rounded border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50">
+							<button
+								type="button"
+								className="flex items-center gap-2 rounded border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50"
+							>
 								<Filter size={16} />
 								Hide fields
 							</button>
-							<button type="button" className="flex items-center gap-2 rounded border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50">
+							<button
+								type="button"
+								className="flex items-center gap-2 rounded border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50"
+							>
 								<Filter size={16} />
 								Filter
 							</button>
-							<button type="button" className="flex items-center gap-2 rounded border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50">
+							<button
+								type="button"
+								className="flex items-center gap-2 rounded border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50"
+							>
 								<Group size={16} />
 								Group
 							</button>
-							<button type="button" className="flex items-center gap-2 rounded border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50">
+							<button
+								type="button"
+								className="flex items-center gap-2 rounded border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50"
+							>
 								<ArrowUpDown size={16} />
 								Sort
 							</button>
-							<button type="button" className="flex items-center gap-2 rounded border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50">
+							<button
+								type="button"
+								className="flex items-center gap-2 rounded border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50"
+							>
 								<Palette size={16} />
 								Color
 							</button>
