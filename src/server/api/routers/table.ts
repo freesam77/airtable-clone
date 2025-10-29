@@ -1,9 +1,5 @@
 import { z } from "zod";
-import {
-	createTRPCRouter,
-	protectedProcedure,
-	publicProcedure,
-} from "~/server/api/trpc";
+import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 
 export const tableRouter = createTRPCRouter({
 	// Get all tables for the current user
@@ -183,6 +179,47 @@ export const tableRouter = createTRPCRouter({
 			return row;
 		}),
 
+	// Add a new column to a table
+	addColumn: protectedProcedure
+		.input(
+			z.object({
+				tableId: z.string(),
+				name: z.string().min(1),
+				type: z.enum(["TEXT", "NUMBER"]),
+			}),
+		)
+		.mutation(async ({ ctx, input }) => {
+			// First, verify the table belongs to the user
+			const table = await ctx.db.table.findFirst({
+				where: {
+					id: input.tableId,
+					createdById: ctx.session.user.id,
+				},
+				include: {
+					columns: true,
+				},
+			});
+
+			if (!table) {
+				throw new Error("Table not found or access denied");
+			}
+
+			// Get the next position for the new column
+			const nextPosition = table.columns.length;
+
+			// Create the column
+			const column = await ctx.db.column.create({
+				data: {
+					tableId: input.tableId,
+					name: input.name,
+					type: input.type,
+					position: nextPosition,
+				},
+			});
+
+			return column;
+		}),
+
 	// Update cell values
 	updateCellValue: protectedProcedure
 		.input(
@@ -291,10 +328,39 @@ export const tableRouter = createTRPCRouter({
 			}
 
 			// Helper functions for random data generation
-			const randomNames = ["Alice", "Bob", "Charlie", "Diana", "Eve", "Frank", "Grace", "Henry", "Ivy", "Jack", "Kate", "Liam", "Mia", "Noah", "Olivia", "Paul", "Quinn", "Ruby", "Sam", "Tina"];
-			const randomEmails = ["gmail.com", "yahoo.com", "outlook.com", "hotmail.com", "icloud.com"];
+			const randomNames = [
+				"Alice",
+				"Bob",
+				"Charlie",
+				"Diana",
+				"Eve",
+				"Frank",
+				"Grace",
+				"Henry",
+				"Ivy",
+				"Jack",
+				"Kate",
+				"Liam",
+				"Mia",
+				"Noah",
+				"Olivia",
+				"Paul",
+				"Quinn",
+				"Ruby",
+				"Sam",
+				"Tina",
+			];
+			const randomEmails = [
+				"gmail.com",
+				"yahoo.com",
+				"outlook.com",
+				"hotmail.com",
+				"icloud.com",
+			];
 
-			const generateRandomValue = (column: { type: string; name: string }): string | number => {
+			const generateRandomValue = (column: { type: string; name: string }):
+				| string
+				| number => {
 				if (column.type === "NUMBER") {
 					if (column.name.toLowerCase().includes("age")) {
 						return Math.floor(Math.random() * 80) + 18; // Age between 18-98
@@ -303,15 +369,32 @@ export const tableRouter = createTRPCRouter({
 				} else {
 					// TEXT type
 					if (column.name.toLowerCase().includes("name")) {
-						return randomNames[Math.floor(Math.random() * randomNames.length)] || "User";
+						return (
+							randomNames[Math.floor(Math.random() * randomNames.length)] ||
+							"User"
+						);
 					}
 					if (column.name.toLowerCase().includes("email")) {
-						const name = randomNames[Math.floor(Math.random() * randomNames.length)]?.toLowerCase() || "user";
-						const domain = randomEmails[Math.floor(Math.random() * randomEmails.length)] || "example.com";
+						const name =
+							randomNames[
+								Math.floor(Math.random() * randomNames.length)
+							]?.toLowerCase() || "user";
+						const domain =
+							randomEmails[Math.floor(Math.random() * randomEmails.length)] ||
+							"example.com";
 						return `${name}@${domain}`;
 					}
 					// Generic text
-					const words = ["Lorem", "ipsum", "dolor", "sit", "amet", "consectetur", "adipiscing", "elit"];
+					const words = [
+						"Lorem",
+						"ipsum",
+						"dolor",
+						"sit",
+						"amet",
+						"consectetur",
+						"adipiscing",
+						"elit",
+					];
 					return words[Math.floor(Math.random() * words.length)] || "Lorem";
 				}
 			};
@@ -328,7 +411,8 @@ export const tableRouter = createTRPCRouter({
 							return {
 								columnId: column.id,
 								textValue: column.type === "TEXT" ? (value as string) : null,
-								numberValue: column.type === "NUMBER" ? (value as number) : null,
+								numberValue:
+									column.type === "NUMBER" ? (value as number) : null,
 							};
 						}),
 					},
@@ -347,8 +431,8 @@ export const tableRouter = createTRPCRouter({
 								},
 							},
 						},
-					})
-				)
+					}),
+				),
 			);
 
 			return createdRows;

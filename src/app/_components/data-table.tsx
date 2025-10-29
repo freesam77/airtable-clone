@@ -5,7 +5,6 @@ import {
 	flexRender,
 	getCoreRowModel,
 	useReactTable,
-	createColumnHelper,
 } from "@tanstack/react-table";
 import { useState } from "react";
 import {
@@ -22,6 +21,15 @@ import {
 } from "~/components/ui/tooltip";
 import { cn } from "~/lib/utils";
 import { api } from "~/trpc/react";
+import { AddColumnDropdown } from "./add-column-dropdown";
+
+const getColumnTypeIcon = (type: "TEXT" | "NUMBER") => {
+	return type === "TEXT" ? "A" : "#";
+};
+
+const getColumnTypeLabel = (type: "TEXT" | "NUMBER") => {
+	return type === "TEXT" ? "Single line text" : "Number";
+};
 
 // Extend the column meta type to include className
 declare module "@tanstack/react-table" {
@@ -58,7 +66,6 @@ interface DataTableProps {
 
 export function DataTable({ tableId, data, columns }: DataTableProps) {
 	const [isAddingRow, setIsAddingRow] = useState(false);
-	const [isAddingColumn, setIsAddingColumn] = useState(false);
 	const [newRowData, setNewRowData] = useState<Record<string, string>>({});
 
 	const utils = api.useUtils();
@@ -70,14 +77,18 @@ export function DataTable({ tableId, data, columns }: DataTableProps) {
 		},
 	});
 
+	const addColumnMutation = api.table.addColumn.useMutation({
+		onSuccess: () => {
+			utils.table.getAll.invalidate();
+		},
+	});
+
 	const deleteRowMutation = api.table.deleteRow.useMutation({
 		onSuccess: () => {
 			utils.table.getAll.invalidate();
 		},
 	});
 
-	// Create column helper for type safety
-	const columnHelper = createColumnHelper<TableData>();
 
 	// Create column definitions dynamically based on the table structure
 	const columnDefs: ColumnDef<TableData>[] = [
@@ -87,7 +98,23 @@ export function DataTable({ tableId, data, columns }: DataTableProps) {
 			.map((col) => ({
 				id: col.id,
 				accessorKey: col.id,
-				header: col.name,
+				header: () => (
+					<div className="flex items-center gap-2">
+						<TooltipProvider>
+							<Tooltip>
+								<TooltipTrigger asChild>
+									<span className="flex items-center justify-center w-4 h-4 text-xs text-muted-foreground bg-muted rounded">
+										{getColumnTypeIcon(col.type)}
+									</span>
+								</TooltipTrigger>
+								<TooltipContent>
+									<p>{getColumnTypeLabel(col.type)}</p>
+								</TooltipContent>
+							</Tooltip>
+						</TooltipProvider>
+						<span className="font-medium">{col.name}</span>
+					</div>
+				),
 				cell: ({ row }: { row: { original: TableData } }) => {
 					const cellValue = row.original.cellValues.find(
 						(cv: { column: { id: string } }) => cv.column.id === col.id,
@@ -100,15 +127,18 @@ export function DataTable({ tableId, data, columns }: DataTableProps) {
 		{
 			id: "add-column",
 			header: () => (
-				<button
-					type="button"
-					onClick={() => {
-						/* Add column functionality */
-					}}
-					className="cursor-pointer w-full h-full"
-				>
-					+
-				</button>
+				<AddColumnDropdown
+					onCreate={handleAddColumn}
+					isLoading={addColumnMutation.isPending}
+					trigger={
+						<button
+							type="button"
+							className="cursor-pointer w-full h-full hover:bg-gray-100 transition-colors"
+						>
+							+
+						</button>
+					}
+				/>
 			),
 			cell: () => null, // Empty cell for data rows
 			enablePinning: true,
@@ -152,6 +182,15 @@ export function DataTable({ tableId, data, columns }: DataTableProps) {
 			setIsAddingRow(true);
 		}
 	};
+
+	const handleAddColumn = (name: string, type: "TEXT" | "NUMBER") => {
+		addColumnMutation.mutate({
+			tableId,
+			name,
+			type,
+		});
+	};
+
 
 	const handleCancelAdd = () => {
 		setIsAddingRow(false);
