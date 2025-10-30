@@ -1,17 +1,12 @@
 "use client";
 
-import {
-	Database,
-} from "lucide-react";
+import { Database } from "lucide-react";
 import type { Session } from "next-auth";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { api } from "~/trpc/react";
-import {
-	Sidebar,
-	SidebarHeader,
-} from "~/components/ui/sidebar";
 import { Button } from "~/components/ui/button";
+import { Sidebar, SidebarHeader } from "~/components/ui/sidebar";
+import { api } from "~/trpc/react";
 
 interface AppSidebarProps {
 	user?: Session["user"];
@@ -56,7 +51,10 @@ export function AppSidebar({
 	return (
 		<Sidebar>
 			<SidebarHeader>
-				<Button className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground" onClick={() => router.push("/dashboard")}>
+				<Button
+					className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground"
+					onClick={() => router.push("/dashboard")}
+				>
 					<Database className="h-4 w-4 cursor-pointer" />
 				</Button>
 			</SidebarHeader>

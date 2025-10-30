@@ -90,7 +90,6 @@ export function DataTable({ tableId, data, columns }: DataTableProps) {
 		},
 	});
 
-
 	// Create column definitions dynamically based on the table structure
 	const columnDefs: ColumnDef<TableData>[] = [
 		// Data columns
@@ -104,7 +103,7 @@ export function DataTable({ tableId, data, columns }: DataTableProps) {
 						<TooltipProvider>
 							<Tooltip>
 								<TooltipTrigger asChild>
-									<span className="flex items-center justify-center w-4 h-4 text-xs text-muted-foreground bg-muted rounded">
+									<span className="flex h-4 w-4 items-center justify-center rounded bg-muted text-muted-foreground text-xs">
 										{getColumnTypeIcon(col.type)}
 									</span>
 								</TooltipTrigger>
@@ -134,7 +133,7 @@ export function DataTable({ tableId, data, columns }: DataTableProps) {
 					trigger={
 						<button
 							type="button"
-							className="cursor-pointer w-full h-full hover:bg-gray-100 transition-colors"
+							className="h-full w-full cursor-pointer transition-colors hover:bg-gray-100"
 						>
 							+
 						</button>
@@ -144,11 +143,11 @@ export function DataTable({ tableId, data, columns }: DataTableProps) {
 			cell: () => null, // Empty cell for data rows
 			enablePinning: true,
 			meta: {
-				className: "sticky right-0 z-10 bg-gray-50 p-0 text-center font-medium text-gray-700 text-sm transition-colors hover:bg-gray-100 items-center justify-center text-xl",
+				className:
+					"sticky right-0 z-10 bg-gray-50 p-0 text-center font-medium text-gray-700 text-sm transition-colors hover:bg-gray-100 items-center justify-center text-xl",
 			},
 		},
 	];
-
 
 	const table = useReactTable({
 		data,
@@ -195,7 +194,6 @@ export function DataTable({ tableId, data, columns }: DataTableProps) {
 		});
 	};
 
-
 	const handleCancelAdd = () => {
 		setIsAddingRow(false);
 		setNewRowData({});
@@ -224,15 +222,15 @@ export function DataTable({ tableId, data, columns }: DataTableProps) {
 										key={header.id}
 										className={cn(
 											"border-gray-200 border-r px-4 py-3 text-left font-medium text-gray-700 text-sm last:border-r-0",
-											header.column.columnDef.meta?.className
+											header.column.columnDef.meta?.className,
 										)}
 									>
 										{header.isPlaceholder
 											? null
 											: flexRender(
-												header.column.columnDef.header,
-												header.getContext(),
-											)}
+													header.column.columnDef.header,
+													header.getContext(),
+												)}
 									</th>
 								))}
 							</tr>
@@ -253,7 +251,7 @@ export function DataTable({ tableId, data, columns }: DataTableProps) {
 												key={cell.id}
 												className={cn(
 													"border-gray-200 border-r px-4 py-3 text-gray-900 text-sm last:border-r-0",
-													cell.column.columnDef.meta?.className
+													cell.column.columnDef.meta?.className,
 												)}
 											>
 												{flexRender(
@@ -275,7 +273,7 @@ export function DataTable({ tableId, data, columns }: DataTableProps) {
 							</ContextMenu>
 						))}
 						{isAddingRow && (
-						<tr className="bg-blue-50" ref={addRowRef}>
+							<tr className="bg-blue-50" ref={addRowRef}>
 								{columns
 									.sort((a, b) => a.position - b.position)
 									.map((col) => (
@@ -289,28 +287,28 @@ export function DataTable({ tableId, data, columns }: DataTableProps) {
 												onChange={(e) =>
 													handleInputChange(col.id, e.target.value)
 												}
-											onKeyDown={(e) => {
-												if (e.key === "Enter") {
-													e.preventDefault();
-													submitNewRow();
-												}
-												if (e.key === "Escape") {
-													e.preventDefault();
-													handleCancelAdd();
-												}
-											}}
-											onBlur={() => {
-												// Delay to allow focus to move to another input inside the same row
-												setTimeout(() => {
-													const container = addRowRef.current;
-													if (!container) return;
-													const active = document.activeElement;
-													if (active && container.contains(active)) {
-														return; // still within row inputs
+												onKeyDown={(e) => {
+													if (e.key === "Enter") {
+														e.preventDefault();
+														submitNewRow();
 													}
-													submitNewRow();
-												}, 0);
-											}}
+													if (e.key === "Escape") {
+														e.preventDefault();
+														handleCancelAdd();
+													}
+												}}
+												onBlur={() => {
+													// Delay to allow focus to move to another input inside the same row
+													setTimeout(() => {
+														const container = addRowRef.current;
+														if (!container) return;
+														const active = document.activeElement;
+														if (active && container.contains(active)) {
+															return; // still within row inputs
+														}
+														submitNewRow();
+													}, 0);
+												}}
 												className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none"
 												placeholder={`Enter ${col.name.toLowerCase()}`}
 											/>
@@ -324,7 +322,7 @@ export function DataTable({ tableId, data, columns }: DataTableProps) {
 						)}
 					</tbody>
 					{/* Add Row button row */}
-					<tr className="border-t border-gray-200 bg-white">
+					<tr className="border-gray-200 border-t bg-white">
 						{columns
 							.sort((a, b) => a.position - b.position)
 							.map((col, index) => (
@@ -332,7 +330,7 @@ export function DataTable({ tableId, data, columns }: DataTableProps) {
 									key={col.id}
 									className={cn(
 										"border-gray-200 border-r px-4 py-3 text-gray-900 text-sm last:border-r-0",
-										index === 0 && "border-b-0" // Remove bottom border for first cell
+										index === 0 && "border-b-0", // Remove bottom border for first cell
 									)}
 								>
 									{index === 0 ? (
@@ -342,13 +340,16 @@ export function DataTable({ tableId, data, columns }: DataTableProps) {
 													<button
 														type="button"
 														onClick={handleAddRow}
-														className="flex h-8 w-8 items-center justify-center text-xl text-gray-600 hover:bg-gray-50 hover:text-gray-800 cursor-pointer"
+														className="flex h-8 w-8 cursor-pointer items-center justify-center text-gray-600 text-xl hover:bg-gray-50 hover:text-gray-800"
 													>
 														+
 													</button>
 												</TooltipTrigger>
 												<TooltipContent>
-													<p>You can also insert a new record anywhere by pressing Shift-Enter</p>
+													<p>
+														You can also insert a new record anywhere by
+														pressing Shift-Enter
+													</p>
 												</TooltipContent>
 											</Tooltip>
 										</TooltipProvider>
@@ -356,7 +357,7 @@ export function DataTable({ tableId, data, columns }: DataTableProps) {
 								</td>
 							))}
 						{/* Add Column cell */}
-						<td className="sticky right-0 z-10 w-[50px] border border-gray-200 border-l-0 border-b-0 bg-white px-4 py-3 text-center">
+						<td className="sticky right-0 z-10 w-[50px] border border-gray-200 border-b-0 border-l-0 bg-white px-4 py-3 text-center">
 							{/* Empty cell to match header */}
 						</td>
 					</tr>

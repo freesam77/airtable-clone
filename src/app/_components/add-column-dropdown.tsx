@@ -1,15 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { cn } from "~/lib/utils";
+import { Button } from "~/components/ui/button";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
 	DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
-import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
+import { cn } from "~/lib/utils";
 
 interface AddColumnDropdownProps {
 	onCreate: (name: string, type: "TEXT" | "NUMBER") => void;
@@ -58,13 +58,11 @@ export function AddColumnDropdown({
 
 	return (
 		<DropdownMenu open={open} onOpenChange={setOpen}>
-			<DropdownMenuTrigger asChild>
-				{trigger}
-			</DropdownMenuTrigger>
+			<DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
 			<DropdownMenuContent align="end" className="w-80 bg-white">
 				<div className="p-4">
 					<div className="mb-4">
-						<Label htmlFor="column-name" className="text-foreground mb-2">
+						<Label htmlFor="column-name" className="mb-2 text-foreground">
 							Column Name
 						</Label>
 						<Input
@@ -79,35 +77,33 @@ export function AddColumnDropdown({
 					</div>
 
 					<div className="mb-4">
-						<Label className="text-foreground mb-2">
-							Field Type
-						</Label>
-						<div className="space-y-2 mt-2">
+						<Label className="mb-2 text-foreground">Field Type</Label>
+						<div className="mt-2 space-y-2">
 							{columnTypes.map((type) => (
 								<button
 									key={type.value}
 									type="button"
 									onClick={() => setColumnType(type.value)}
 									className={cn(
-										"w-full flex items-center p-3 text-left transition-colors cursor-pointer flex gap-3 items-center hover:bg-gray-100",
+										"flex flex w-full cursor-pointer items-center items-center gap-3 p-3 text-left transition-colors hover:bg-gray-100",
 										columnType === type.value
 											? "border-primary bg-accent"
-											: "border-border"
+											: "border-border",
 									)}
 								>
-									<span className="text-sm text-muted-foreground">{type.icon}</span>
-									<div className="font-medium text-foreground text-sm">{type.title}</div>
+									<span className="text-muted-foreground text-sm">
+										{type.icon}
+									</span>
+									<div className="font-medium text-foreground text-sm">
+										{type.title}
+									</div>
 								</button>
 							))}
 						</div>
 					</div>
 
 					<div className="flex items-center justify-end gap-2">
-						<Button
-							variant="outline"
-							size="sm"
-							onClick={handleCancel}
-						>
+						<Button variant="outline" size="sm" onClick={handleCancel}>
 							Cancel
 						</Button>
 						<Button

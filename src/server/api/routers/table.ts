@@ -366,38 +366,37 @@ export const tableRouter = createTRPCRouter({
 						return Math.floor(Math.random() * 80) + 18; // Age between 18-98
 					}
 					return Math.floor(Math.random() * 1000) + 1; // Random number 1-1000
-				} 
+				}
 
-                // TEXT type
-                if (column.name.toLowerCase().includes("name")) {
-                    return (
-                        randomNames[Math.floor(Math.random() * randomNames.length)] ||
-                        "User"
-                    );
-                }
-                if (column.name.toLowerCase().includes("email")) {
-                    const name =
-                        randomNames[
-                            Math.floor(Math.random() * randomNames.length)
-                        ]?.toLowerCase() || "user";
-                    const domain =
-                        randomEmails[Math.floor(Math.random() * randomEmails.length)] ||
-                        "example.com";
-                    return `${name}@${domain}`;
-                }
-                // Generic text
-                const words = [
-                    "Lorem",
-                    "ipsum",
-                    "dolor",
-                    "sit",
-                    "amet",
-                    "consectetur",
-                    "adipiscing",
-                    "elit",
-                ];
-                return words[Math.floor(Math.random() * words.length)] || "Lorem";
-				
+				// TEXT type
+				if (column.name.toLowerCase().includes("name")) {
+					return (
+						randomNames[Math.floor(Math.random() * randomNames.length)] ||
+						"User"
+					);
+				}
+				if (column.name.toLowerCase().includes("email")) {
+					const name =
+						randomNames[
+							Math.floor(Math.random() * randomNames.length)
+						]?.toLowerCase() || "user";
+					const domain =
+						randomEmails[Math.floor(Math.random() * randomEmails.length)] ||
+						"example.com";
+					return `${name}@${domain}`;
+				}
+				// Generic text
+				const words = [
+					"Lorem",
+					"ipsum",
+					"dolor",
+					"sit",
+					"amet",
+					"consectetur",
+					"adipiscing",
+					"elit",
+				];
+				return words[Math.floor(Math.random() * words.length)] || "Lorem";
 			};
 
 			// Create rows with random data

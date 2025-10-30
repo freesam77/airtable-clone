@@ -41,7 +41,12 @@ export const baseRouter = createTRPCRouter({
 							description: "this becomes the Base name",
 							columns: {
 								create: [
-									{ name: "Full Name", type: "TEXT", position: 0, required: false },
+									{
+										name: "Full Name",
+										type: "TEXT",
+										position: 0,
+										required: false,
+									},
 									{ name: "Email", type: "TEXT", position: 1, required: false },
 									{ name: "Phone", type: "TEXT", position: 2, required: false },
 									{ name: "Age", type: "NUMBER", position: 3, required: false },

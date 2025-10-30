@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { auth } from "~/server/auth";
-import { BaseLayout } from "../../_components/base-layout";
+import { BaseLayout } from "../../_components/baseLayout";
 
 interface BaseTablePageProps {
 	params: Promise<{
@@ -18,8 +18,8 @@ export default async function BaseTablePage({ params }: BaseTablePageProps) {
 	}
 
 	return (
-		<BaseLayout 
-			user={session.user} 
+		<BaseLayout
+			user={session.user}
 			initialBaseId={baseId}
 			initialTableId={tableId}
 		/>
