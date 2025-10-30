@@ -1,6 +1,7 @@
 "use client";
 
 import {
+	type CellContext,
 	type ColumnDef,
 	flexRender,
 	getCoreRowModel,
@@ -22,6 +23,7 @@ import {
 import { cn } from "~/lib/utils";
 import { api } from "~/trpc/react";
 import { AddColumnDropdown } from "./add-column-dropdown";
+import { EditableCell } from "./editable-cell";
 
 const getColumnTypeIcon = (type: "TEXT" | "NUMBER") => {
 	return type === "TEXT" ? "A" : "#";
@@ -38,19 +40,21 @@ declare module "@tanstack/react-table" {
 	}
 }
 
+type CellValue = {
+	id: string;
+	textValue: string | null;
+	numberValue: number | null;
+	column: {
+		id: string;
+		name: string;
+		type: "TEXT" | "NUMBER";
+	};
+};
+
 type TableData = {
 	id: string;
 	position: number;
-	cellValues: Array<{
-		id: string;
-		textValue: string | null;
-		numberValue: number | null;
-		column: {
-			id: string;
-			name: string;
-			type: "TEXT" | "NUMBER";
-		};
-	}>;
+	cellValues: Array<CellValue>;
 };
 
 interface DataTableProps {
@@ -90,6 +94,44 @@ export function DataTable({ tableId, data, columns }: DataTableProps) {
 		},
 	});
 
+	// Handle cell value updates
+	const handleCellUpdate = (
+		rowId: string,
+		columnId: string,
+		value: string | number,
+	) => {
+		// Find the column to determine the type
+		const column = columns.find((col) => col.id === columnId);
+		if (!column) return;
+
+		// Prepare the mutation input based on column type
+		const mutationInput: {
+			rowId: string;
+			columnId: string;
+			textValue?: string;
+			numberValue?: number;
+		} = {
+			rowId,
+			columnId,
+		};
+
+		if (column.type === "TEXT") {
+			mutationInput.textValue = String(value);
+			mutationInput.numberValue = undefined;
+		} else if (column.type === "NUMBER") {
+			mutationInput.numberValue = Number(value);
+			mutationInput.textValue = undefined;
+		}
+
+		updateCellValueMutation.mutate(mutationInput);
+	};
+
+	const updateCellValueMutation = api.table.updateCellValue.useMutation({
+		onSuccess: () => {
+			utils.base.invalidate();
+		},
+	});
+
 	// Create column definitions dynamically based on the table structure
 	const columnDefs: ColumnDef<TableData>[] = [
 		// Data columns
@@ -97,7 +139,6 @@ export function DataTable({ tableId, data, columns }: DataTableProps) {
 			.sort((a, b) => a.position - b.position)
 			.map((col) => ({
 				id: col.id,
-				accessorKey: col.id,
 				header: () => (
 					<div className="flex items-center gap-2">
 						<TooltipProvider>
@@ -115,13 +156,29 @@ export function DataTable({ tableId, data, columns }: DataTableProps) {
 						<span className="font-medium">{col.name}</span>
 					</div>
 				),
-				cell: ({ row }: { row: { original: TableData } }) => {
-					const cellValue = row.original.cellValues.find(
-						(cv: { column: { id: string } }) => cv.column.id === col.id,
-					);
+				cell: ({ getValue, row, column, table }: CellContext<TableData, unknown>) => {
+					const cellValue = getValue() as CellValue | undefined;
 					const value = cellValue?.textValue ?? cellValue?.numberValue ?? "";
-					return <span>{String(value)}</span>;
+
+					return (
+						<EditableCell
+							value={value}
+							row={row}
+							column={{
+								...column,
+								columnDef: {
+									...column.columnDef,
+									meta: { ...column.columnDef.meta, type: col.type },
+								},
+							}}
+							handleCellUpdate={handleCellUpdate}
+						/>
+					);
 				},
+				accessorFn: (row: TableData) =>
+					row.cellValues.find(
+						(cv: { column: { id: string } }) => cv.column.id === col.id,
+					),
 			})),
 		// Add Column button - pinned to right
 		{

@@ -3,11 +3,12 @@
 import { Plus } from "lucide-react";
 import type { Session } from "next-auth";
 import { useRouter } from "next/navigation";
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useState } from "react";
+import { SidebarInset, SidebarProvider } from "~/components/ui/sidebar";
 import { api } from "~/trpc/react";
-import { DataTable } from "./data-table";
-import { AppSidebar } from "./app-sidebar";
-import { SidebarProvider, SidebarInset } from "~/components/ui/sidebar";
+import { AppSidebar } from "../app-sidebar";
+import { DataTable } from "../data-table";
+import { TopNav } from "./topNav";
 
 interface DashboardLayoutProps {
 	user: Session["user"];
@@ -15,16 +16,19 @@ interface DashboardLayoutProps {
 	initialTableId?: string;
 }
 
-export function BaseLayout({ user, initialBaseId, initialTableId }: DashboardLayoutProps) {
+export function BaseLayout({
+	user,
+	initialBaseId,
+	initialTableId,
+}: DashboardLayoutProps) {
 	const router = useRouter();
 	const [rowCount, setRowCount] = useState(5);
 	const [selectedBaseId, setSelectedBaseId] = useState<string | null>(null);
 	const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
 	const [showCreateTable, setShowCreateTable] = useState(false);
 	const [newTableName, setNewTableName] = useState("");
-	const createInputRef = useRef<HTMLInputElement>(null);
 
-    const {base, table} = api
+	const { base, table } = api;
 
 	const {
 		data: bases,
@@ -63,21 +67,23 @@ export function BaseLayout({ user, initialBaseId, initialTableId }: DashboardLay
 		if (bases && bases.length > 0) {
 			// If URL params are provided, use them
 			if (initialBaseId && !selectedBaseId) {
-				const baseFromUrl = bases.find(base => base.id === initialBaseId);
+				const baseFromUrl = bases.find((base) => base.id === initialBaseId);
 				if (baseFromUrl) {
 					setSelectedBaseId(baseFromUrl.id);
 
 					if (initialTableId) {
-						const tableFromUrl = baseFromUrl.tables.find(table => table.id === initialTableId);
+						const tableFromUrl = baseFromUrl.tables.find(
+							(table) => table.id === initialTableId,
+						);
 						if (tableFromUrl) {
 							setSelectedTableId(tableFromUrl.id);
-					} else if (baseFromUrl.tables.length > 0) {
-						// Fallback to first table if specified table not found
-						const firstTable = baseFromUrl.tables[0];
-						if (firstTable) {
-							setSelectedTableId(firstTable.id);
+						} else if (baseFromUrl.tables.length > 0) {
+							// Fallback to first table if specified table not found
+							const firstTable = baseFromUrl.tables[0];
+							if (firstTable) {
+								setSelectedTableId(firstTable.id);
+							}
 						}
-					}
 					} else if (baseFromUrl.tables.length > 0) {
 						// No table specified, use first table
 						const firstTable = baseFromUrl.tables[0];
@@ -101,10 +107,11 @@ export function BaseLayout({ user, initialBaseId, initialTableId }: DashboardLay
 		}
 	}, [bases, selectedBaseId, initialBaseId, initialTableId]);
 
-
 	// Get the selected table
-	const selectedBase = bases?.find(base => base.id === selectedBaseId);
-	const currentTable = selectedBase?.tables.find(table => table.id === selectedTableId);
+	const selectedBase = bases?.find((base) => base.id === selectedBaseId);
+	const currentTable = selectedBase?.tables.find(
+		(table) => table.id === selectedTableId,
+	);
 
 	const handleGenerateRows = () => {
 		if (currentTable) {
@@ -117,7 +124,7 @@ export function BaseLayout({ user, initialBaseId, initialTableId }: DashboardLay
 
 	const handleBaseSelect = (baseId: string) => {
 		setSelectedBaseId(baseId);
-		const base = bases?.find(b => b.id === baseId);
+		const base = bases?.find((b) => b.id === baseId);
 		if (base && base.tables.length > 0) {
 			const firstTable = base.tables[0];
 			if (firstTable) {
@@ -149,18 +156,16 @@ export function BaseLayout({ user, initialBaseId, initialTableId }: DashboardLay
 				description: `Table in ${selectedBase?.name}`,
 				columns: [
 					{ name: "Name", type: "TEXT" as const, position: 0, required: false },
-					{ name: "Notes", type: "TEXT" as const, position: 1, required: false },
+					{
+						name: "Notes",
+						type: "TEXT" as const,
+						position: 1,
+						required: false,
+					},
 				],
 			});
 		}
 	};
-
-	useEffect(() => {
-		if (showCreateTable) {
-			createInputRef.current?.focus();
-		}
-	}, [showCreateTable]);
-
 
 	if (basesLoading) {
 		return (
@@ -212,7 +217,9 @@ export function BaseLayout({ user, initialBaseId, initialTableId }: DashboardLay
 				/>
 				<SidebarInset>
 					<div className="flex h-screen flex-1 items-center justify-center">
-						<div className="text-gray-500">No table selected. Please select a table from the sidebar.</div>
+						<div className="text-gray-500">
+							No table selected. Please select a table from the sidebar.
+						</div>
 					</div>
 				</SidebarInset>
 			</SidebarProvider>
@@ -263,7 +270,9 @@ export function BaseLayout({ user, initialBaseId, initialTableId }: DashboardLay
 											className="flex items-center gap-2 rounded bg-green-600 px-4 py-2 font-medium text-sm text-white hover:bg-green-700 disabled:opacity-50"
 										>
 											<Plus size={16} />
-											{generateRows.isPending ? "Generating..." : "Generate Rows"}
+											{generateRows.isPending
+												? "Generating..."
+												: "Generate Rows"}
 										</button>
 									</div>
 								</div>
@@ -275,13 +284,14 @@ export function BaseLayout({ user, initialBaseId, initialTableId }: DashboardLay
 							<div className="flex items-center gap-1">
 								{selectedBase.tables.map((table) => (
 									<button
-                                    type="button"
+										type="button"
 										key={table.id}
 										onClick={() => handleTableSelect(table.id)}
-										className={`rounded-t border-x border-t px-3 py-2 text-sm font-medium ${selectedTableId === table.id
-											? "border-gray-300 bg-white text-gray-900"
-											: "border-transparent bg-transparent text-gray-600 hover:text-gray-900"
-											}`}
+										className={`rounded-t border-x border-t px-3 py-2 font-medium text-sm ${
+											selectedTableId === table.id
+												? "border-gray-300 bg-white text-gray-900"
+												: "border-transparent bg-transparent text-gray-600 hover:text-gray-900"
+										}`}
 									>
 										{table.name}
 									</button>
@@ -302,18 +312,18 @@ export function BaseLayout({ user, initialBaseId, initialTableId }: DashboardLay
 													setNewTableName("");
 												}
 											}}
-											ref={createInputRef}
+											autoFocus
 										/>
 										<button
-                                        type="button"
+											type="button"
 											onClick={handleCreateTable}
 											disabled={!newTableName.trim() || createTable.isPending}
-											className="rounded bg-blue-600 px-2 py-1 text-white text-sm hover:bg-blue-700 disabled:opacity-50"
+											className="rounded bg-blue-600 px-2 py-1 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
 										>
 											Add
 										</button>
 										<button
-                                        type="button"
+											type="button"
 											onClick={() => {
 												setShowCreateTable(false);
 												setNewTableName("");
@@ -325,7 +335,7 @@ export function BaseLayout({ user, initialBaseId, initialTableId }: DashboardLay
 									</div>
 								) : (
 									<button
-                                    type="button"
+										type="button"
 										onClick={() => setShowCreateTable(true)}
 										className="ml-2 rounded border border-gray-300 bg-white px-2 py-1 text-gray-600 text-sm hover:bg-gray-50"
 									>
