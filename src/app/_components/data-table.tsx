@@ -42,56 +42,221 @@ declare module "@tanstack/react-table" {
 
 type CellValue = {
 	id: string;
+	columnId: string;
 	textValue: string | null;
 	numberValue: number | null;
+	rowId: string;
 	column: {
 		id: string;
 		name: string;
 		type: "TEXT" | "NUMBER";
+		required: boolean;
+		position: number;
+		tableId: string;
 	};
 };
 
 type TableData = {
 	id: string;
 	position: number;
+	createdAt: Date;
+	updatedAt: Date;
+	tableId: string;
 	cellValues: Array<CellValue>;
 };
 
 interface DataTableProps {
 	tableId: string;
-	data: TableData[];
-	columns: Array<{
-		id: string;
-		name: string;
-		type: "TEXT" | "NUMBER";
-		position: number;
-	}>;
 }
 
-export function DataTable({ tableId, data, columns }: DataTableProps) {
+export function DataTable({ tableId }: DataTableProps) {
 	const [isAddingRow, setIsAddingRow] = useState(false);
 	const [newRowData, setNewRowData] = useState<Record<string, string>>({});
 	const addRowRef = useRef<HTMLTableRowElement | null>(null);
 
+	// Fetch table data directly in this component for optimistic updates
+	const {
+		data: tableData,
+		isLoading: tableLoading,
+	} = api.table.getById.useQuery(
+		{ id: tableId },
+		{
+			retry: (failureCount, error) => {
+				if (error?.data?.code === "UNAUTHORIZED") {
+					return false;
+				}
+				return failureCount < 3;
+			},
+		}
+	);
+
+	// Extract data and columns from the fetched table data
+	const data = tableData?.rows || [];
+	const columns = tableData?.columns || [];
+
 	const utils = api.useUtils();
 	const addRowMutation = api.table.addRow.useMutation({
-		onSuccess: () => {
-			utils.base.invalidate();
+		onMutate: async (variables) => {
+			await utils.table.getById.cancel({ id: tableId });
+			const previousData = utils.table.getById.getData({ id: tableId });
+
+			// Immediately hide the editing state and clear input data
 			setIsAddingRow(false);
 			setNewRowData({});
+
+			// Create optimistic row
+			const optimisticRowId = `temp-${Date.now()}`;
+			const now = new Date();
+			const optimisticRow: TableData = {
+				id: optimisticRowId,
+				position: (previousData?.rows.length || 0),
+				createdAt: now,
+				updatedAt: now,
+				tableId: tableId,
+				cellValues: variables.cellValues.map(cv => {
+					const column = previousData?.columns.find(col => col.id === cv.columnId);
+					return {
+						id: `temp-cell-${Date.now()}-${cv.columnId}`,
+						columnId: cv.columnId,
+						rowId: optimisticRowId,
+						textValue: cv.textValue || null,
+						numberValue: cv.numberValue || null,
+						column: column || {
+							id: cv.columnId,
+							name: 'Unknown',
+							type: 'TEXT' as const,
+							required: false,
+							position: 0,
+							tableId: tableId
+						}
+					};
+				})
+			};
+
+			utils.table.getById.setData({ id: tableId }, (old) => {
+				if (!old) return old;
+				return {
+					...old,
+					rows: [...old.rows, optimisticRow]
+				};
+			});
+
+			return { previousData, optimisticRow };
 		},
+		onSuccess: (result, variables, context) => {
+			// Replace optimistic row with server result
+			utils.table.getById.setData({ id: tableId }, (old) => {
+				if (!old) return old;
+				return {
+					...old,
+					rows: old.rows.map(row => 
+						row.id === context?.optimisticRow.id ? result : row
+					)
+				};
+			});
+		},
+		onError: (err, variables, context) => {
+			if (context?.previousData) {
+				utils.table.getById.setData({ id: tableId }, context.previousData);
+			}
+			// Show the editing state again on error
+			setIsAddingRow(true);
+		},
+		onSettled: () => {
+			utils.table.getById.invalidate({ id: tableId });
+		}
 	});
 
 	const addColumnMutation = api.table.addColumn.useMutation({
-		onSuccess: () => {
-			utils.base.invalidate();
+		onMutate: async (variables) => {
+			await utils.table.getById.cancel({ id: tableId });
+			const previousData = utils.table.getById.getData({ id: tableId });
+
+			// Create optimistic column with all required fields
+			const optimisticColumn = {
+				id: `temp-col-${Date.now()}`,
+				name: variables.name,
+				type: variables.type,
+				position: previousData?.columns.length || 0,
+				required: false,
+				tableId: tableId
+			};
+
+			utils.table.getById.setData({ id: tableId }, (old) => {
+				if (!old) return old;
+				return {
+					...old,
+					columns: [...old.columns, optimisticColumn],
+					// Add empty cell values for existing rows
+					rows: old.rows.map(row => ({
+						...row,
+						cellValues: [...row.cellValues, {
+							id: `temp-cell-${Date.now()}-${row.id}`,
+							columnId: optimisticColumn.id,
+							rowId: row.id,
+							textValue: null,
+							numberValue: null,
+							column: optimisticColumn
+						}]
+					}))
+				};
+			});
+
+			return { previousData, optimisticColumn };
 		},
+		onSuccess: (result, variables, context) => {
+			// Replace optimistic column with server result and update all related cell values
+			utils.table.getById.setData({ id: tableId }, (old) => {
+				if (!old) return old;
+				return {
+					...old,
+					columns: old.columns.map(col => 
+						col.id === context?.optimisticColumn.id ? result : col
+					),
+					rows: old.rows.map(row => ({
+						...row,
+						cellValues: row.cellValues.map(cell =>
+							cell.column.id === context?.optimisticColumn.id
+								? { ...cell, column: result }
+								: cell
+						)
+					}))
+				};
+			});
+		},
+		onError: (err, variables, context) => {
+			if (context?.previousData) {
+				utils.table.getById.setData({ id: tableId }, context.previousData);
+			}
+		},
+		onSettled: () => {
+			utils.table.getById.invalidate({ id: tableId });
+		}
 	});
 
 	const deleteRowMutation = api.table.deleteRow.useMutation({
-		onSuccess: () => {
-			utils.base.invalidate();
+		onMutate: async (variables) => {
+			await utils.table.getById.cancel({ id: tableId });
+			const previousData = utils.table.getById.getData({ id: tableId });
+
+			utils.table.getById.setData({ id: tableId }, (old) => {
+				if (!old) return old;
+				return {
+					...old,
+					rows: old.rows.filter(row => row.id !== variables.rowId)
+				};
+			});
+
+			return { previousData };
 		},
+		onError: (err, variables, context) => {
+			if (context?.previousData) {
+				utils.table.getById.setData({ id: tableId }, context.previousData);
+			}
+		},
+		onSettled: () => {
+			utils.table.getById.invalidate({ id: tableId });
+		}
 	});
 
 	// Handle cell value updates
@@ -127,12 +292,54 @@ export function DataTable({ tableId, data, columns }: DataTableProps) {
 	};
 
 	const updateCellValueMutation = api.table.updateCellValue.useMutation({
-		onSuccess: () => {
-			utils.base.invalidate();
+		onMutate: async (variables) => {
+			// Cancel any outgoing refetches
+			await utils.table.getById.cancel({ id: tableId });
+
+			// Snapshot the previous value
+			const previousData = utils.table.getById.getData({ id: tableId });
+
+			// Optimistically update the cache
+			utils.table.getById.setData({ id: tableId }, (old) => {
+				if (!old) return old;
+				
+				return {
+					...old,
+					rows: old.rows.map(row => 
+						row.id === variables.rowId 
+							? {
+								...row,
+								cellValues: row.cellValues.map(cell =>
+									cell.column.id === variables.columnId
+										? {
+											...cell,
+											textValue: variables.textValue ?? null,
+											numberValue: variables.numberValue ?? null
+										}
+										: cell
+								)
+							}
+							: row
+					)
+				};
+			});
+
+			return { previousData };
 		},
+		onError: (err, variables, context) => {
+			// Rollback optimistic update on error
+			if (context?.previousData) {
+				utils.table.getById.setData({ id: tableId }, context.previousData);
+			}
+		},
+		onSettled: () => {
+			// Refetch to ensure server state consistency
+			utils.table.getById.invalidate({ id: tableId });
+		}
 	});
 
-	// Create column definitions dynamically based on the table structure
+	// Create column definitions dynamically based on the table structure  
+	// Force re-render when columns change by including columns length in dependency
 	const columnDefs: ColumnDef<TableData>[] = [
 		// Data columns
 		...columns
@@ -219,9 +426,18 @@ export function DataTable({ tableId, data, columns }: DataTableProps) {
 	});
 
 	const submitNewRow = () => {
+		// Check if there's any data to submit
+		const hasData = Object.values(newRowData).some(value => value.trim() !== "");
+		
+		if (!hasData) {
+			// If no data, just cancel the add operation
+			handleCancelAdd();
+			return;
+		}
+
 		const cellValues = columns.map((col) => ({
 			columnId: col.id,
-			textValue: col.type === "TEXT" ? newRowData[col.id] : undefined,
+			textValue: col.type === "TEXT" ? (newRowData[col.id] || "") : undefined,
 			numberValue:
 				col.type === "NUMBER" && newRowData[col.id]
 					? Number.parseFloat(newRowData[col.id] ?? "0")
@@ -267,10 +483,26 @@ export function DataTable({ tableId, data, columns }: DataTableProps) {
 		deleteRowMutation.mutate({ rowId });
 	};
 
+	if (tableLoading) {
+		return (
+			<div className="flex h-64 items-center justify-center">
+				<div className="text-gray-500">Loading table...</div>
+			</div>
+		);
+	}
+
+	if (!tableData) {
+		return (
+			<div className="flex h-64 items-center justify-center">
+				<div className="text-gray-500">Table not found.</div>
+			</div>
+		);
+	}
+
 	return (
 		<div className="flex-1 bg-white">
 			<div className="relative overflow-hidden rounded-lg border border-gray-200">
-				<table className="w-full">
+				<table className="w-full" key={`table-${columns.length}-${columns.map(c => c.id).join('-')}`}>
 					<thead className="border-gray-200 border-b bg-gray-50">
 						{table.getHeaderGroups().map((headerGroup) => (
 							<tr key={headerGroup.id}>

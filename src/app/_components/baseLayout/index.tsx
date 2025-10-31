@@ -170,13 +170,7 @@ export function BaseLayout({
 	if (basesLoading) {
 		return (
 			<SidebarProvider>
-				<AppSidebar
-					user={user}
-					selectedBaseId={selectedBaseId ?? undefined}
-					selectedTableId={selectedTableId ?? undefined}
-					onBaseSelect={handleBaseSelect}
-					onTableSelect={handleTableSelect}
-				/>
+				<AppSidebar />
 				<SidebarInset>
 					<div className="flex h-screen flex-1 items-center justify-center">
 						<div className="text-gray-500">Loading...</div>
@@ -189,13 +183,7 @@ export function BaseLayout({
 	if (!selectedBase) {
 		return (
 			<SidebarProvider>
-				<AppSidebar
-					user={user}
-					selectedBaseId={selectedBaseId ?? undefined}
-					selectedTableId={selectedTableId ?? undefined}
-					onBaseSelect={handleBaseSelect}
-					onTableSelect={handleTableSelect}
-				/>
+				<AppSidebar />
 				<SidebarInset>
 					<div className="flex h-screen flex-1 items-center justify-center">
 						<div className="text-gray-500">No bases found.</div>
@@ -208,13 +196,7 @@ export function BaseLayout({
 	if (!currentTable) {
 		return (
 			<SidebarProvider>
-				<AppSidebar
-					user={user}
-					selectedBaseId={selectedBaseId ?? undefined}
-					selectedTableId={selectedTableId ?? undefined}
-					onBaseSelect={handleBaseSelect}
-					onTableSelect={handleTableSelect}
-				/>
+				<AppSidebar />
 				<SidebarInset>
 					<div className="flex h-screen flex-1 items-center justify-center">
 						<div className="text-gray-500">
@@ -350,8 +332,6 @@ export function BaseLayout({
 					<div className="flex-1 p-6">
 						<DataTable
 							tableId={currentTable.id}
-							data={currentTable.rows}
-							columns={currentTable.columns}
 						/>
 					</div>
 				</div>
