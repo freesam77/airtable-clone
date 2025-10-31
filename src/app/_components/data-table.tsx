@@ -7,7 +7,7 @@ import {
 	getCoreRowModel,
 	useReactTable,
 } from "@tanstack/react-table";
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
 	ContextMenu,
 	ContextMenuContent,
@@ -22,6 +22,7 @@ import {
 } from "~/components/ui/tooltip";
 import { cn } from "~/lib/utils";
 import { api } from "~/trpc/react";
+import { useCellUpdateQueue } from "~/hooks/useCellUpdateQueue";
 import { AddColumnDropdown } from "./add-column-dropdown";
 import { EditableCell } from "./editable-cell";
 
@@ -95,6 +96,64 @@ export function DataTable({ tableId }: DataTableProps) {
 	const columns = tableData?.columns || [];
 
 	const utils = api.useUtils();
+
+	// Optimistic update function for immediate UI feedback
+	const handleOptimisticUpdate = useCallback(
+		(
+			rowId: string,
+			columnId: string,
+			textValue?: string,
+			numberValue?: number,
+		) => {
+			utils.table.getById.setData({ id: tableId }, (old) => {
+				if (!old) return old;
+				
+				return {
+					...old,
+					rows: old.rows.map(row => 
+						row.id === rowId 
+							? {
+								...row,
+								cellValues: row.cellValues.map(cell =>
+									cell.column.id === columnId
+										? {
+											...cell,
+											textValue: textValue ?? null,
+											numberValue: numberValue ?? null
+										}
+										: cell
+								)
+							}
+							: row
+					)
+				};
+			});
+		},
+		[utils.table.getById, tableId],
+	);
+
+	// Initialize the cell update queue
+	const { queueCellUpdate, flushPendingUpdates, pendingUpdatesCount, isProcessing } = 
+		useCellUpdateQueue({
+			tableId,
+			onOptimisticUpdate: handleOptimisticUpdate,
+		});
+
+	// Flush pending updates before page unload
+	useEffect(() => {
+		const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+			if (pendingUpdatesCount > 0) {
+				// Attempt to flush pending updates
+				flushPendingUpdates();
+				// Show browser warning about unsaved changes
+				event.preventDefault();
+				event.returnValue = '';
+			}
+		};
+
+		window.addEventListener('beforeunload', handleBeforeUnload);
+		return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+	}, [pendingUpdatesCount, flushPendingUpdates]);
 	const addRowMutation = api.table.addRow.useMutation({
 		onMutate: async (variables) => {
 			await utils.table.getById.cancel({ id: tableId });
@@ -259,84 +318,26 @@ export function DataTable({ tableId }: DataTableProps) {
 		}
 	});
 
-	// Handle cell value updates
-	const handleCellUpdate = (
-		rowId: string,
-		columnId: string,
-		value: string | number,
-	) => {
-		// Find the column to determine the type
-		const column = columns.find((col) => col.id === columnId);
-		if (!column) return;
+	// Handle cell value updates using the queue
+	const handleCellUpdate = useCallback(
+		(
+			rowId: string,
+			columnId: string,
+			value: string | number,
+		) => {
+			// Find the column to determine the type
+			const column = columns.find((col) => col.id === columnId);
+			if (!column) return;
 
-		// Prepare the mutation input based on column type
-		const mutationInput: {
-			rowId: string;
-			columnId: string;
-			textValue?: string;
-			numberValue?: number;
-		} = {
-			rowId,
-			columnId,
-		};
-
-		if (column.type === "TEXT") {
-			mutationInput.textValue = String(value);
-			mutationInput.numberValue = undefined;
-		} else if (column.type === "NUMBER") {
-			mutationInput.numberValue = Number(value);
-			mutationInput.textValue = undefined;
-		}
-
-		updateCellValueMutation.mutate(mutationInput);
-	};
-
-	const updateCellValueMutation = api.table.updateCellValue.useMutation({
-		onMutate: async (variables) => {
-			// Cancel any outgoing refetches
-			await utils.table.getById.cancel({ id: tableId });
-
-			// Snapshot the previous value
-			const previousData = utils.table.getById.getData({ id: tableId });
-
-			// Optimistically update the cache
-			utils.table.getById.setData({ id: tableId }, (old) => {
-				if (!old) return old;
-				
-				return {
-					...old,
-					rows: old.rows.map(row => 
-						row.id === variables.rowId 
-							? {
-								...row,
-								cellValues: row.cellValues.map(cell =>
-									cell.column.id === variables.columnId
-										? {
-											...cell,
-											textValue: variables.textValue ?? null,
-											numberValue: variables.numberValue ?? null
-										}
-										: cell
-								)
-							}
-							: row
-					)
-				};
-			});
-
-			return { previousData };
-		},
-		onError: (err, variables, context) => {
-			// Rollback optimistic update on error
-			if (context?.previousData) {
-				utils.table.getById.setData({ id: tableId }, context.previousData);
+			// Queue the update with proper typing
+			if (column.type === "TEXT") {
+				queueCellUpdate(rowId, columnId, String(value), undefined);
+			} else if (column.type === "NUMBER") {
+				queueCellUpdate(rowId, columnId, undefined, Number(value));
 			}
 		},
-		onSettled: () => {
-			// Refetch to ensure server state consistency
-			utils.table.getById.invalidate({ id: tableId });
-		}
-	});
+		[columns, queueCellUpdate],
+	);
 
 	// Create column definitions dynamically based on the table structure  
 	// Force re-render when columns change by including columns length in dependency
