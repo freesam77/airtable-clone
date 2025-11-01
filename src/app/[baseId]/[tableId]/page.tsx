@@ -19,7 +19,6 @@ export default async function BaseTablePage({ params }: BaseTablePageProps) {
 
 	return (
 		<BaseLayout
-			user={session.user}
 			initialBaseId={baseId}
 			initialTableId={tableId}
 		/>
