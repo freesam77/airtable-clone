@@ -1,5 +1,4 @@
 "use client";
-import type { Session } from "next-auth";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { SidebarInset, SidebarProvider } from "~/components/ui/sidebar";
@@ -9,12 +8,14 @@ import { DataTable } from "../data-table";
 import { TopNav } from "./topNav";
 
 interface DashboardLayoutProps {
-	user: Session["user"];
 	initialBaseId?: string;
 	initialTableId?: string;
 }
 
-export function BaseLayout({ user, initialBaseId, initialTableId }: DashboardLayoutProps) {
+export function BaseLayout({
+	initialBaseId,
+	initialTableId,
+}: DashboardLayoutProps) {
 	const router = useRouter();
 	const [rowCount, setRowCount] = useState(5);
 	const [selectedBaseId, setSelectedBaseId] = useState<string | null>(null);
@@ -116,7 +117,7 @@ export function BaseLayout({ user, initialBaseId, initialTableId }: DashboardLay
 		}
 	};
 
-    // Base selection handled via URL params and sidebar
+	// Base selection handled via URL params and sidebar
 
 	const handleTableSelect = (tableId: string) => {
 		setSelectedTableId(tableId);
@@ -209,10 +210,7 @@ export function BaseLayout({ user, initialBaseId, initialTableId }: DashboardLay
 
 					{/* Main Content */}
 					<div className="flex-1 p-6">
-
-						<DataTable
-							tableId={currentTable.id}
-						/>
+						<DataTable tableId={currentTable.id} />
 					</div>
 				</div>
 			</SidebarInset>

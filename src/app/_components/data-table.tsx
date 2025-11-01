@@ -5,9 +5,10 @@ import {
 	type ColumnDef,
 	flexRender,
 	getCoreRowModel,
+	getFilteredRowModel,
 	useReactTable,
 } from "@tanstack/react-table";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
 	ContextMenu,
 	ContextMenuContent,
@@ -25,6 +26,15 @@ import { api } from "~/trpc/react";
 import { useCellUpdateQueue } from "~/hooks/useCellUpdateQueue";
 import { AddColumnDropdown } from "./add-column-dropdown";
 import { EditableCell } from "./editable-cell";
+import { useTableSearchNavigation } from "~/hooks/useTableSearchNavigation";
+import { Search, X, ChevronUp, ChevronDown } from "lucide-react";
+import { Button } from "~/components/ui/button";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuTrigger,
+} from "~/components/ui/dropdown-menu";
+import { Input } from "~/components/ui/input";
 
 const getColumnTypeIcon = (type: "TEXT" | "NUMBER") => {
 	return type === "TEXT" ? "A" : "#";
@@ -74,22 +84,22 @@ export function DataTable({ tableId }: DataTableProps) {
 	const [isAddingRow, setIsAddingRow] = useState(false);
 	const [newRowData, setNewRowData] = useState<Record<string, string>>({});
 	const addRowRef = useRef<HTMLTableRowElement | null>(null);
+	const [searchOpen, setSearchOpen] = useState(false);
+	const [searchValue, setSearchValue] = useState("");
 
 	// Fetch table data directly in this component for optimistic updates
-	const {
-		data: tableData,
-		isLoading: tableLoading,
-	} = api.table.getById.useQuery(
-		{ id: tableId },
-		{
-			retry: (failureCount, error) => {
-				if (error?.data?.code === "UNAUTHORIZED") {
-					return false;
-				}
-				return failureCount < 3;
+	const { data: tableData, isLoading: tableLoading } =
+		api.table.getById.useQuery(
+			{ id: tableId },
+			{
+				retry: (failureCount, error) => {
+					if (error?.data?.code === "UNAUTHORIZED") {
+						return false;
+					}
+					return failureCount < 3;
+				},
 			},
-		}
-	);
+		);
 
 	// Extract data and columns from the fetched table data
 	const data = tableData?.rows || [];
@@ -107,25 +117,25 @@ export function DataTable({ tableId }: DataTableProps) {
 		) => {
 			utils.table.getById.setData({ id: tableId }, (old) => {
 				if (!old) return old;
-				
+
 				return {
 					...old,
-					rows: old.rows.map(row => 
-						row.id === rowId 
+					rows: old.rows.map((row) =>
+						row.id === rowId
 							? {
-								...row,
-								cellValues: row.cellValues.map(cell =>
-									cell.column.id === columnId
-										? {
-											...cell,
-											textValue: textValue ?? null,
-											numberValue: numberValue ?? null
-										}
-										: cell
-								)
-							}
-							: row
-					)
+									...row,
+									cellValues: row.cellValues.map((cell) =>
+										cell.column.id === columnId
+											? {
+													...cell,
+													textValue: textValue ?? null,
+													numberValue: numberValue ?? null,
+												}
+											: cell,
+									),
+								}
+							: row,
+					),
 				};
 			});
 		},
@@ -133,7 +143,7 @@ export function DataTable({ tableId }: DataTableProps) {
 	);
 
 	// Initialize the cell update queue
-	const { queueCellUpdate, flushPendingUpdates, pendingUpdatesCount } = 
+	const { queueCellUpdate, flushPendingUpdates, pendingUpdatesCount } =
 		useCellUpdateQueue({
 			tableId,
 			onOptimisticUpdate: handleOptimisticUpdate,
@@ -147,12 +157,12 @@ export function DataTable({ tableId }: DataTableProps) {
 				flushPendingUpdates();
 				// Show browser warning about unsaved changes
 				event.preventDefault();
-				event.returnValue = '';
+				event.returnValue = "";
 			}
 		};
 
-		window.addEventListener('beforeunload', handleBeforeUnload);
-		return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+		window.addEventListener("beforeunload", handleBeforeUnload);
+		return () => window.removeEventListener("beforeunload", handleBeforeUnload);
 	}, [pendingUpdatesCount, flushPendingUpdates]);
 	const addRowMutation = api.table.addRow.useMutation({
 		onMutate: async (variables) => {
@@ -168,12 +178,14 @@ export function DataTable({ tableId }: DataTableProps) {
 			const now = new Date();
 			const optimisticRow: TableData = {
 				id: optimisticRowId,
-				position: (previousData?.rows.length || 0),
+				position: previousData?.rows.length || 0,
 				createdAt: now,
 				updatedAt: now,
 				tableId: tableId,
-				cellValues: variables.cellValues.map(cv => {
-					const column = previousData?.columns.find(col => col.id === cv.columnId);
+				cellValues: variables.cellValues.map((cv) => {
+					const column = previousData?.columns.find(
+						(col) => col.id === cv.columnId,
+					);
 					return {
 						id: `temp-cell-${Date.now()}-${cv.columnId}`,
 						columnId: cv.columnId,
@@ -182,21 +194,21 @@ export function DataTable({ tableId }: DataTableProps) {
 						numberValue: cv.numberValue || null,
 						column: column || {
 							id: cv.columnId,
-							name: 'Unknown',
-							type: 'TEXT' as const,
+							name: "Unknown",
+							type: "TEXT" as const,
 							required: false,
 							position: 0,
-							tableId: tableId
-						}
+							tableId: tableId,
+						},
 					};
-				})
+				}),
 			};
 
 			utils.table.getById.setData({ id: tableId }, (old) => {
 				if (!old) return old;
 				return {
 					...old,
-					rows: [...old.rows, optimisticRow]
+					rows: [...old.rows, optimisticRow],
 				};
 			});
 
@@ -208,23 +220,24 @@ export function DataTable({ tableId }: DataTableProps) {
 				if (!old) return old;
 				return {
 					...old,
-					rows: old.rows.map(row => 
-						row.id === context?.optimisticRow.id ? result : row
-					)
+					rows: old.rows.map((row) =>
+						row.id === context?.optimisticRow.id ? result : row,
+					),
 				};
 			});
 		},
-			onError: (err, variables, context) => {
-				void err; void variables;
-				if (context?.previousData) {
-					utils.table.getById.setData({ id: tableId }, context.previousData);
-				}
-				// Show the editing state again on error
-				setIsAddingRow(true);
-			},
+		onError: (err, variables, context) => {
+			void err;
+			void variables;
+			if (context?.previousData) {
+				utils.table.getById.setData({ id: tableId }, context.previousData);
+			}
+			// Show the editing state again on error
+			setIsAddingRow(true);
+		},
 		onSettled: () => {
 			utils.table.getById.invalidate({ id: tableId });
-		}
+		},
 	});
 
 	const addColumnMutation = api.table.addColumn.useMutation({
@@ -239,7 +252,7 @@ export function DataTable({ tableId }: DataTableProps) {
 				type: variables.type,
 				position: previousData?.columns.length || 0,
 				required: false,
-				tableId: tableId
+				tableId: tableId,
 			};
 
 			utils.table.getById.setData({ id: tableId }, (old) => {
@@ -248,17 +261,20 @@ export function DataTable({ tableId }: DataTableProps) {
 					...old,
 					columns: [...old.columns, optimisticColumn],
 					// Add empty cell values for existing rows
-					rows: old.rows.map(row => ({
+					rows: old.rows.map((row) => ({
 						...row,
-						cellValues: [...row.cellValues, {
-							id: `temp-cell-${Date.now()}-${row.id}`,
-							columnId: optimisticColumn.id,
-							rowId: row.id,
-							textValue: null,
-							numberValue: null,
-							column: optimisticColumn
-						}]
-					}))
+						cellValues: [
+							...row.cellValues,
+							{
+								id: `temp-cell-${Date.now()}-${row.id}`,
+								columnId: optimisticColumn.id,
+								rowId: row.id,
+								textValue: null,
+								numberValue: null,
+								column: optimisticColumn,
+							},
+						],
+					})),
 				};
 			});
 
@@ -270,29 +286,30 @@ export function DataTable({ tableId }: DataTableProps) {
 				if (!old) return old;
 				return {
 					...old,
-					columns: old.columns.map(col => 
-						col.id === context?.optimisticColumn.id ? result : col
+					columns: old.columns.map((col) =>
+						col.id === context?.optimisticColumn.id ? result : col,
 					),
-					rows: old.rows.map(row => ({
+					rows: old.rows.map((row) => ({
 						...row,
-						cellValues: row.cellValues.map(cell =>
+						cellValues: row.cellValues.map((cell) =>
 							cell.column.id === context?.optimisticColumn.id
 								? { ...cell, column: result }
-								: cell
-						)
-					}))
+								: cell,
+						),
+					})),
 				};
 			});
 		},
-			onError: (err, variables, context) => {
-				void err; void variables;
-				if (context?.previousData) {
-					utils.table.getById.setData({ id: tableId }, context.previousData);
-				}
-			},
+		onError: (err, variables, context) => {
+			void err;
+			void variables;
+			if (context?.previousData) {
+				utils.table.getById.setData({ id: tableId }, context.previousData);
+			}
+		},
 		onSettled: () => {
 			utils.table.getById.invalidate({ id: tableId });
-		}
+		},
 	});
 
 	const deleteRowMutation = api.table.deleteRow.useMutation({
@@ -304,30 +321,27 @@ export function DataTable({ tableId }: DataTableProps) {
 				if (!old) return old;
 				return {
 					...old,
-					rows: old.rows.filter(row => row.id !== variables.rowId)
+					rows: old.rows.filter((row) => row.id !== variables.rowId),
 				};
 			});
 
 			return { previousData };
 		},
-			onError: (err, variables, context) => {
-				void err; void variables;
-				if (context?.previousData) {
-					utils.table.getById.setData({ id: tableId }, context.previousData);
-				}
-			},
+		onError: (err, variables, context) => {
+			void err;
+			void variables;
+			if (context?.previousData) {
+				utils.table.getById.setData({ id: tableId }, context.previousData);
+			}
+		},
 		onSettled: () => {
 			utils.table.getById.invalidate({ id: tableId });
-		}
+		},
 	});
 
 	// Handle cell value updates using the queue
 	const handleCellUpdate = useCallback(
-		(
-			rowId: string,
-			columnId: string,
-			value: string | number,
-		) => {
+		(rowId: string, columnId: string, value: string | number) => {
 			// Find the column to determine the type
 			const column = columns.find((col) => col.id === columnId);
 			if (!column) return;
@@ -342,7 +356,7 @@ export function DataTable({ tableId }: DataTableProps) {
 		[columns, queueCellUpdate],
 	);
 
-	// Create column definitions dynamically based on the table structure  
+	// Create column definitions dynamically based on the table structure
 	// Force re-render when columns change by including columns length in dependency
 	const columnDefs: ColumnDef<TableData>[] = [
 		// Data columns
@@ -409,6 +423,7 @@ export function DataTable({ tableId }: DataTableProps) {
 				/>
 			),
 			cell: () => null, // Empty cell for data rows
+			enableGlobalFilter: false,
 			enablePinning: true,
 			meta: {
 				className:
@@ -421,6 +436,19 @@ export function DataTable({ tableId }: DataTableProps) {
 		data,
 		columns: columnDefs,
 		getCoreRowModel: getCoreRowModel(),
+		getFilteredRowModel: getFilteredRowModel(),
+		state: { globalFilter: searchValue },
+		onGlobalFilterChange: setSearchValue,
+		globalFilterFn: (row, columnId, filterValue) => {
+			const cell = row.getValue(columnId) as CellValue | undefined;
+			const query = String(filterValue ?? "").toLowerCase();
+			if (!query) return true;
+			if (!cell) return false;
+			const textCell = (cell.textValue ?? "").toLowerCase();
+			const numberCell =
+				cell.numberValue != null ? String(cell.numberValue) : "";
+			return textCell.includes(query) || numberCell.includes(query);
+		},
 		enableColumnPinning: true,
 		initialState: {
 			columnPinning: {
@@ -429,10 +457,33 @@ export function DataTable({ tableId }: DataTableProps) {
 		},
 	});
 
+	// Use filtered rows for match nav/highlight
+	const filteredRows = table.getRowModel().rows.map((r) => r.original);
+	const orderedColumns = useMemo(
+		() => [...columns].sort((a, b) => a.position - b.position),
+		[columns],
+	);
+
+	const {
+		matches,
+		matchKeys,
+		activeMatchIndex,
+		activeMatch,
+		gotoNextMatch,
+		gotoPrevMatch,
+		getCellKey,
+	} = useTableSearchNavigation({
+		rows: filteredRows,
+		columns: orderedColumns,
+		searchValue,
+	});
+
 	const submitNewRow = () => {
 		// Check if there's any data to submit
-		const hasData = Object.values(newRowData).some(value => value.trim() !== "");
-		
+		const hasData = Object.values(newRowData).some(
+			(value) => value.trim() !== "",
+		);
+
 		if (!hasData) {
 			// If no data, just cancel the add operation
 			handleCancelAdd();
@@ -441,7 +492,7 @@ export function DataTable({ tableId }: DataTableProps) {
 
 		const cellValues = columns.map((col) => ({
 			columnId: col.id,
-			textValue: col.type === "TEXT" ? (newRowData[col.id] || "") : undefined,
+			textValue: col.type === "TEXT" ? newRowData[col.id] || "" : undefined,
 			numberValue:
 				col.type === "NUMBER" && newRowData[col.id]
 					? Number.parseFloat(newRowData[col.id] ?? "0")
@@ -505,8 +556,75 @@ export function DataTable({ tableId }: DataTableProps) {
 
 	return (
 		<div className="flex-1 bg-white">
+			<div className="flex justify-end border-b bg-white p-2">
+				<DropdownMenu open={searchOpen} onOpenChange={setSearchOpen}>
+					<DropdownMenuTrigger asChild>
+						<Button variant="ghost" className="cursor-pointer">
+							<Search />
+						</Button>
+					</DropdownMenuTrigger>
+					<DropdownMenuContent align="end" className="w-full bg-white">
+						<div className="flex items-center gap-3">
+							<Input
+								id="table-search"
+								type="text"
+								value={String(table.getState().globalFilter ?? "")}
+								onChange={(e) => table.setGlobalFilter(e.target.value)}
+								onKeyDown={(e) => {
+									if (e.key === "Enter" || e.key === "NumpadEnter") {
+										// Prevent the dropdown from handling Enter and possibly closing
+										e.preventDefault();
+										e.stopPropagation();
+										if (e.shiftKey) {
+											gotoPrevMatch();
+										} else {
+											gotoNextMatch();
+										}
+									}
+								}}
+								placeholder="Find in view"
+								autoFocus
+							/>
+							<div className="min-w-20 text-center text-gray-500 text-xs">
+								{matches.length > 0 &&
+									`${activeMatchIndex + 1} / ${matches.length}`}
+							</div>
+							<div className="flex gap-1">
+								<Button
+									variant="outline"
+									size="icon"
+									onClick={gotoPrevMatch}
+									disabled={matches.length === 0}
+									aria-label="Previous match"
+								>
+									<ChevronUp className="h-4 w-4" />
+								</Button>
+								<Button
+									variant="outline"
+									size="icon"
+									onClick={gotoNextMatch}
+									disabled={matches.length === 0}
+									aria-label="Next match"
+								>
+									<ChevronDown className="h-4 w-4" />
+								</Button>
+							</div>
+							<Button
+								variant="ghost"
+								className="cursor-pointer"
+								onClick={() => setSearchOpen(false)}
+							>
+								<X />
+							</Button>
+						</div>
+					</DropdownMenuContent>
+				</DropdownMenu>
+			</div>
 			<div className="relative overflow-hidden rounded-lg border border-gray-200">
-				<table className="w-full" key={`table-${columns.length}-${columns.map(c => c.id).join('-')}`}>
+				<table
+					className="w-full"
+					key={`table-${columns.length}-${columns.map((c) => c.id).join("-")}`}
+				>
 					<thead className="border-gray-200 border-b bg-gray-50">
 						{table.getHeaderGroups().map((headerGroup) => (
 							<tr key={headerGroup.id}>
@@ -545,7 +663,26 @@ export function DataTable({ tableId }: DataTableProps) {
 												className={cn(
 													"border-gray-200 border-r px-4 py-3 text-gray-900 text-sm last:border-r-0",
 													cell.column.columnDef.meta?.className,
+													(() => {
+														const key = getCellKey(
+															row.original.id,
+															cell.column.id,
+														);
+														const isMatch =
+															Boolean(searchValue) && matchKeys.has(key);
+														const isActiveCell =
+															Boolean(activeMatch) &&
+															activeMatch?.rowId === row.original.id &&
+															activeMatch?.columnId === cell.column.id;
+														// Darker bg for active cell; lighter bg for other matched cells
+														return isActiveCell
+															? "bg-yellow-200"
+															: isMatch
+																? "bg-yellow-100"
+																: "";
+													})(),
 												)}
+												data-cell={getCellKey(row.original.id, cell.column.id)}
 											>
 												{flexRender(
 													cell.column.columnDef.cell,
@@ -659,7 +796,7 @@ export function DataTable({ tableId }: DataTableProps) {
 			{/* Footer with record count */}
 			<div className="flex items-center justify-end border-gray-200 border-t p-4 text-gray-500 text-sm">
 				<div className="flex items-center gap-2">
-					<span className="font-medium">{data.length}</span>
+					<span className="font-medium">{table.getRowModel().rows.length}</span>
 					<span>records</span>
 				</div>
 			</div>
