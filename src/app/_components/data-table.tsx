@@ -133,7 +133,7 @@ export function DataTable({ tableId }: DataTableProps) {
 	);
 
 	// Initialize the cell update queue
-	const { queueCellUpdate, flushPendingUpdates, pendingUpdatesCount, isProcessing } = 
+	const { queueCellUpdate, flushPendingUpdates, pendingUpdatesCount } = 
 		useCellUpdateQueue({
 			tableId,
 			onOptimisticUpdate: handleOptimisticUpdate,
@@ -214,13 +214,14 @@ export function DataTable({ tableId }: DataTableProps) {
 				};
 			});
 		},
-		onError: (err, variables, context) => {
-			if (context?.previousData) {
-				utils.table.getById.setData({ id: tableId }, context.previousData);
-			}
-			// Show the editing state again on error
-			setIsAddingRow(true);
-		},
+			onError: (err, variables, context) => {
+				void err; void variables;
+				if (context?.previousData) {
+					utils.table.getById.setData({ id: tableId }, context.previousData);
+				}
+				// Show the editing state again on error
+				setIsAddingRow(true);
+			},
 		onSettled: () => {
 			utils.table.getById.invalidate({ id: tableId });
 		}
@@ -283,11 +284,12 @@ export function DataTable({ tableId }: DataTableProps) {
 				};
 			});
 		},
-		onError: (err, variables, context) => {
-			if (context?.previousData) {
-				utils.table.getById.setData({ id: tableId }, context.previousData);
-			}
-		},
+			onError: (err, variables, context) => {
+				void err; void variables;
+				if (context?.previousData) {
+					utils.table.getById.setData({ id: tableId }, context.previousData);
+				}
+			},
 		onSettled: () => {
 			utils.table.getById.invalidate({ id: tableId });
 		}
@@ -308,11 +310,12 @@ export function DataTable({ tableId }: DataTableProps) {
 
 			return { previousData };
 		},
-		onError: (err, variables, context) => {
-			if (context?.previousData) {
-				utils.table.getById.setData({ id: tableId }, context.previousData);
-			}
-		},
+			onError: (err, variables, context) => {
+				void err; void variables;
+				if (context?.previousData) {
+					utils.table.getById.setData({ id: tableId }, context.previousData);
+				}
+			},
 		onSettled: () => {
 			utils.table.getById.invalidate({ id: tableId });
 		}
@@ -364,7 +367,7 @@ export function DataTable({ tableId }: DataTableProps) {
 						<span className="font-medium">{col.name}</span>
 					</div>
 				),
-				cell: ({ getValue, row, column, table }: CellContext<TableData, unknown>) => {
+				cell: ({ getValue, row, column }: CellContext<TableData, unknown>) => {
 					const cellValue = getValue() as CellValue | undefined;
 					const value = cellValue?.textValue ?? cellValue?.numberValue ?? "";
 

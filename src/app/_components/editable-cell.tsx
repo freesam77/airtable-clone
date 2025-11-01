@@ -1,4 +1,3 @@
-import type { Table } from "@tanstack/react-table";
 import { useEffect, useRef, useState } from "react";
 
 type TableData = {
