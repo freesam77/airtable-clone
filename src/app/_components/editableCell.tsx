@@ -39,12 +39,12 @@ export function EditableCell({
 		}
 	}, [isEditing]);
 
-	const onBlur = () => {
-		setIsEditing(false);
-		if (cell !== initialValue) {
-			handleCellUpdate(rowId, column.id, cell);
-		}
-	};
+    const onBlur = () => {
+        setIsEditing(false);
+        if (cell !== initialValue) {
+            handleCellUpdate(rowId, column.id, cell);
+        }
+    };
 
 	const onKeyDown = (e: React.KeyboardEvent) => {
 		if (e.key === "Enter") {
@@ -59,29 +59,33 @@ export function EditableCell({
 
 	if (isEditing) {
 		return (
-			<input
-				ref={inputRef}
-				type={columnType === "NUMBER" ? "number" : "text"}
-				value={cell as string}
-				onChange={(e) => {
-					const newValue =
-						columnType === "NUMBER" ? Number(e.target.value) : e.target.value;
-					setCell(newValue);
-				}}
-				onBlur={onBlur}
-				onKeyDown={onKeyDown}
-				className="w-full rounded border-none bg-transparent px-1 py-0.5 outline-none focus:bg-blue-50"
-			/>
-		);
+            <input
+                ref={inputRef}
+                type={columnType === "NUMBER" ? "number" : "text"}
+                value={String(cell ?? "")}
+                onChange={(e) => {
+                    const raw = e.target.value;
+                    // For numbers, keep empty string as empty (means clear)
+                    if (columnType === "NUMBER") {
+                        setCell(raw === "" ? "" : Number(raw));
+                    } else {
+                        setCell(raw);
+                    }
+                }}
+                onBlur={onBlur}
+                onKeyDown={onKeyDown}
+                className="w-full rounded border-none bg-transparent px-1 py-0.5 outline-none focus:bg-blue-50"
+            />
+        );
 	}
 
-	return (
-		<input
-			type="text"
-			readOnly
-			onFocus={() => setIsEditing(true)}
-			value={String(cell || "")}
-			className="h-full min-h-[20px] w-full cursor-text rounded border-none bg-transparent px-1 py-0.5 hover:bg-gray-50 focus:outline-none"
-		/>
-	);
+    return (
+        <input
+            type="text"
+            readOnly
+            onFocus={() => setIsEditing(true)}
+            value={String(cell ?? "")}
+            className="h-full min-h-[20px] w-full cursor-text rounded border-none bg-transparent px-1 py-0.5 hover:bg-gray-50 focus:outline-none"
+        />
+    );
 }

@@ -36,6 +36,7 @@ import {
 } from "~/components/ui/dropdown-menu";
 import { Input } from "~/components/ui/input";
 import { detectOS } from "~/lib/detectOS";
+import { filterRowsByQuery, rowMatchesQuery } from "~/lib/tableFilter";
 
 const getColumnTypeIcon = (type: "TEXT" | "NUMBER") => {
 	return type === "TEXT" ? "A" : "#";
@@ -101,48 +102,55 @@ export function DataTable({ tableId }: DataTableProps) {
 			},
 		);
 
-	// Extract data and columns from the fetched table data
-	const data = tableData?.rows || [];
-	const columns = tableData?.columns || [];
+    // Extract data and columns from the fetched table data
+    const data = tableData?.rows || [];
+    const columns = tableData?.columns || [];
+
+    // Stable ordered columns list used for filtering and match navigation
+    const orderedColumns = useMemo(
+        () => [...columns].sort((a, b) => a.position - b.position),
+        [columns],
+    );
 
 	const utils = api.useUtils();
 
 	// Optimistic update function for immediate UI feedback
-	const handleOptimisticUpdate = useCallback(
-		(rowId: string, columnId: string, value?: string | number) => {
-			const stringValue = typeof value === "number" ? String(value) : value;
-			utils.table.getById.setData({ id: tableId }, (old) => {
-				if (!old) return old;
+    const handleOptimisticUpdate = useCallback(
+        (rowId: string, columnId: string, value?: string | number) => {
+            const stringValue = typeof value === "number" ? String(value) : value;
+            const normalized = stringValue === "" ? null : stringValue;
+            utils.table.getById.setData({ id: tableId }, (old) => {
+                if (!old) return old;
 
-				return {
-					...old,
-					rows: old.rows.map((row) =>
-						row.id === rowId
-							? {
-									...row,
-									cells: row.cells.map((cell) =>
-										cell.column.id === columnId
-											? {
-													...cell,
-													value: stringValue ?? null,
-												}
-											: cell,
-									),
-								}
-							: row,
-					),
-				};
-			});
-		},
-		[utils.table.getById, tableId],
-	);
+                return {
+                    ...old,
+                    rows: old.rows.map((row) =>
+                        row.id === rowId
+                            ? {
+                                ...row,
+                                cells: row.cells.map((cell) =>
+                                    cell.column.id === columnId
+                                        ? {
+                                            ...cell,
+                                            value: normalized ?? null,
+                                          }
+                                        : cell,
+                                  ),
+                              }
+                            : row,
+                    ),
+                };
+            });
+        },
+        [utils.table.getById, tableId],
+    );
 
 	// Initialize the cell update queue
-	const { queueCellUpdate, flushPendingUpdates, pendingUpdatesCount } =
-		useCellUpdateQueue({
-			tableId,
-			onOptimisticUpdate: handleOptimisticUpdate,
-		});
+    const { queueCellUpdate, flushPendingUpdates, pendingUpdatesCount, remapRowId } =
+        useCellUpdateQueue({
+            tableId,
+            onOptimisticUpdate: handleOptimisticUpdate,
+        });
 
 	// Flush pending updates before page unload
 	useEffect(() => {
@@ -208,18 +216,21 @@ export function DataTable({ tableId }: DataTableProps) {
 
 			return { previousData, optimisticRow };
 		},
-		onSuccess: (result, variables, context) => {
-			// Replace optimistic row with server result
-			utils.table.getById.setData({ id: tableId }, (old) => {
-				if (!old) return old;
-				return {
-					...old,
-					rows: old.rows.map((row) =>
-						row.id === context?.optimisticRow.id ? result : row,
-					),
-				};
-			});
-		},
+        onSuccess: (result, _variables, context) => {
+            // Replace optimistic row with server result
+            if (context?.optimisticRow?.id && result?.id) {
+                remapRowId(context.optimisticRow.id, result.id);
+            }
+            utils.table.getById.setData({ id: tableId }, (old) => {
+                if (!old) return old;
+                return {
+                    ...old,
+                    rows: old.rows.map((row) =>
+                        row.id === context?.optimisticRow.id ? result : row,
+                    ),
+                };
+            });
+        },
 		onError: (err, variables, context) => {
 			void err;
 			void variables;
@@ -333,19 +344,18 @@ export function DataTable({ tableId }: DataTableProps) {
 	});
 
 	// Handle cell value updates using the queue
-	const handleCellUpdate = useCallback(
-		(rowId: string, columnId: string, value: string | number) => {
-			// Find the column to determine the type
-			const column = columns.find((col) => col.id === columnId);
-			if (!column) return;
+    const handleCellUpdate = useCallback(
+        (rowId: string, columnId: string, value: string | number) => {
+            // Find the column to determine the type
+            const column = columns.find((col) => col.id === columnId);
+            if (!column) return;
 
-			// Queue the update with proper typing
-			if (value) {
-				queueCellUpdate(rowId, columnId, value);
-			}
-		},
-		[columns, queueCellUpdate],
-	);
+            // Queue the update with proper typing
+            // Always queue. Empty string means clear the cell
+            queueCellUpdate(rowId, columnId, value);
+        },
+        [columns, queueCellUpdate],
+    );
 
 	// Create column definitions dynamically based on the table structure
 	// Force re-render when columns change by including columns length in dependency
@@ -423,35 +433,33 @@ export function DataTable({ tableId }: DataTableProps) {
 		},
 	];
 
-	const table = useReactTable({
-		data,
-		columns: columnDefs,
-		getCoreRowModel: getCoreRowModel(),
-		getFilteredRowModel: getFilteredRowModel(),
-		state: { globalFilter: searchValue },
-		onGlobalFilterChange: setSearchValue,
-		globalFilterFn: (row, columnId, filterValue) => {
-			const cell = row.getValue(columnId) as Cell | undefined;
-			const query = String(filterValue ?? "").toLowerCase();
-			if (!query) return true;
-			if (!cell) return false;
-			const val = (cell.value ?? "").toLowerCase();
-			return val.includes(query);
-		},
-		enableColumnPinning: true,
-		initialState: {
-			columnPinning: {
-				right: ["add-column"],
-			},
-		},
-	});
+    // Pre-filter rows using the same logic as the global filter so non-matching rows are hidden at the data level too
+    const displayData = useMemo(
+        () => filterRowsByQuery(data, orderedColumns, searchValue),
+        [data, orderedColumns, searchValue],
+    );
 
-	// Use filtered rows for match nav/highlight
-	const filteredRows = table.getRowModel().rows.map((r) => r.original);
-	const orderedColumns = useMemo(
-		() => [...columns].sort((a, b) => a.position - b.position),
-		[columns],
-	);
+    const table = useReactTable({
+        data: displayData,
+        columns: columnDefs,
+        getCoreRowModel: getCoreRowModel(),
+        getFilteredRowModel: getFilteredRowModel(),
+        // Drive TanStack's global filter from our searchValue state
+        state: { globalFilter: searchValue },
+        onGlobalFilterChange: setSearchValue,
+        // Use a custom global filter that hides rows with no matching cells
+        globalFilterFn: (row, _columnId, filterValue) =>
+            rowMatchesQuery(row.original as any, orderedColumns, String(filterValue ?? "")),
+        enableColumnPinning: true,
+        initialState: {
+            columnPinning: {
+                right: ["add-column"],
+            },
+        },
+    });
+
+    // Use filtered rows for match nav/highlight (already reflects search filtering)
+    const filteredRows = table.getRowModel().rows.map((r) => r.original);
 
 	const { 
 		matches,
@@ -571,16 +579,16 @@ export function DataTable({ tableId }: DataTableProps) {
 					</DropdownMenuTrigger>
 					<DropdownMenuContent align="end" className="w-full bg-white">
 						<div className="flex items-center gap-3">
-							<Input
-								id="table-search"
-								type="text"
-								value={String(table.getState().globalFilter ?? "")}
-								onChange={(e) => table.setGlobalFilter(e.target.value)}
-								onKeyDown={(e) => {
-									if (e.key === "Enter" || e.key === "NumpadEnter") {
-										// Prevent the dropdown from handling Enter and possibly closing
-										e.preventDefault();
-										e.stopPropagation();
+            <Input
+                id="table-search"
+                type="text"
+                value={String(table.getState().globalFilter ?? "")}
+                onChange={(e) => table.setGlobalFilter(e.target.value)}
+                onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === "NumpadEnter") {
+                        // Prevent the dropdown from handling Enter and possibly closing
+                        e.preventDefault();
+                        e.stopPropagation();
 										if (e.shiftKey) {
 											gotoPrevMatch();
 										} else {

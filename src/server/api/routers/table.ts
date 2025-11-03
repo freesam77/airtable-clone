@@ -214,15 +214,15 @@ export const tableRouter = createTRPCRouter({
 		}),
 
 	// Update cell values
-	updateCell: protectedProcedure
-		.input(
-			z.object({
-				rowId: z.string(),
-				columnId: z.string(),
-				value: z.string().optional(),
-			}),
-		)
-		.mutation(async ({ ctx, input }) => {
+    updateCell: protectedProcedure
+        .input(
+            z.object({
+                rowId: z.string(),
+                columnId: z.string(),
+                value: z.string().nullable().optional(),
+            }),
+        )
+        .mutation(async ({ ctx, input }) => {
 			// First verify the row belongs to a table owned by the user
 			const row = await ctx.db.row.findFirst({
 				where: {
@@ -239,23 +239,26 @@ export const tableRouter = createTRPCRouter({
 				throw new Error("Row not found or access denied");
 			}
 
-			return ctx.db.cell.upsert({
-				where: {
-					columnId_rowId: {
-						columnId: input.columnId,
-						rowId: input.rowId,
-					},
-				},
-				update: {
-					value: input.value,
-				},
-				create: {
-					columnId: input.columnId,
-					rowId: input.rowId,
-					value: input.value,
-				},
-			});
-		}),
+            // Normalize empty string to null so clearing a cell truly clears it
+            const normalizedValue = input.value === "" ? null : input.value ?? null;
+
+            return ctx.db.cell.upsert({
+                where: {
+                    columnId_rowId: {
+                        columnId: input.columnId,
+                        rowId: input.rowId,
+                    },
+                },
+                update: {
+                    value: normalizedValue,
+                },
+                create: {
+                    columnId: input.columnId,
+                    rowId: input.rowId,
+                    value: normalizedValue,
+                },
+            });
+        }),
 
 	// Delete a row
 	deleteRow: protectedProcedure
