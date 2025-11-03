@@ -35,6 +35,7 @@ import {
 	DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
 import { Input } from "~/components/ui/input";
+import { detectOS } from "~/lib/detectOS";
 
 const getColumnTypeIcon = (type: "TEXT" | "NUMBER") => {
 	return type === "TEXT" ? "A" : "#";
@@ -375,8 +376,6 @@ export function DataTable({ tableId }: DataTableProps) {
 					const cells = getValue() as Cell | undefined;
 					const value = cells?.value || "";
 
-					console.log({ getValue, row, column });
-
 					return (
 						<EditableCell
 							value={value}
@@ -454,7 +453,7 @@ export function DataTable({ tableId }: DataTableProps) {
 		[columns],
 	);
 
-	const {
+	const { 
 		matches,
 		matchKeys,
 		activeMatchIndex,
@@ -467,6 +466,27 @@ export function DataTable({ tableId }: DataTableProps) {
 		columns: orderedColumns,
 		searchValue,
 	});
+
+	// Keyboard shortcut: Ctrl/Cmd+F opens the table search
+	useEffect(() => {
+		const handler = (e: KeyboardEvent) => {
+			const os = detectOS();
+			const useMeta = os === "macOS" || os === "iOS";
+			const mod = useMeta ? e.metaKey : e.ctrlKey;
+			const key = e.key.toLowerCase();
+			if (mod && key === "f") {
+				e.preventDefault();
+				setSearchOpen(true);
+				setTimeout(() => {
+					const input = document.getElementById("table-search") as HTMLInputElement | null;
+					input?.focus();
+					input?.select();
+				}, 0);
+			}
+		};
+		window.addEventListener("keydown", handler);
+		return () => window.removeEventListener("keydown", handler);
+	}, []);
 
 	const submitNewRow = () => {
 		// Check if there's any data to submit
