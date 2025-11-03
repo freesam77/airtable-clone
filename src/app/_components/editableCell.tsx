@@ -1,19 +1,5 @@
+import type { StringColorFormat } from "@faker-js/faker";
 import { useEffect, useRef, useState } from "react";
-
-type TableData = {
-	id: string;
-	position: number;
-	cellValues: Array<{
-		id: string;
-		textValue: string | null;
-		numberValue: number | null;
-		column: {
-			id: string;
-			name: string;
-			type: "TEXT" | "NUMBER";
-		};
-	}>;
-};
 
 interface EditableCellProps {
 	handleCellUpdate: (
@@ -22,18 +8,18 @@ interface EditableCellProps {
 		value: string | number,
 	) => void;
 	value: string | number;
-	row: { original: TableData };
+	rowId: string;
 	column: { id: string; columnDef: { meta?: { type: "TEXT" | "NUMBER" } } };
 }
 
 export function EditableCell({
 	handleCellUpdate,
 	value,
-	row,
+	rowId,
 	column,
 }: EditableCellProps) {
 	const initialValue = value;
-	const [cellValue, setCellValue] = useState(initialValue);
+	const [cell, setCell] = useState(initialValue);
 	const [isEditing, setIsEditing] = useState(false);
 	const inputRef = useRef<HTMLInputElement>(null);
 
@@ -42,7 +28,7 @@ export function EditableCell({
 
 	// Sync with external changes
 	useEffect(() => {
-		setCellValue(initialValue);
+		setCell(initialValue);
 	}, [initialValue]);
 
 	// Focus input when editing starts
@@ -55,8 +41,8 @@ export function EditableCell({
 
 	const onBlur = () => {
 		setIsEditing(false);
-		if (cellValue !== initialValue) {
-			handleCellUpdate(row.original.id, column.id, cellValue);
+		if (cell !== initialValue) {
+			handleCellUpdate(rowId, column.id, cell);
 		}
 	};
 
@@ -66,7 +52,7 @@ export function EditableCell({
 			onBlur();
 		} else if (e.key === "Escape") {
 			e.preventDefault();
-			setCellValue(initialValue);
+			setCell(initialValue);
 			setIsEditing(false);
 		}
 	};
@@ -76,11 +62,11 @@ export function EditableCell({
 			<input
 				ref={inputRef}
 				type={columnType === "NUMBER" ? "number" : "text"}
-				value={cellValue as string}
+				value={cell as string}
 				onChange={(e) => {
 					const newValue =
 						columnType === "NUMBER" ? Number(e.target.value) : e.target.value;
-					setCellValue(newValue);
+					setCell(newValue);
 				}}
 				onBlur={onBlur}
 				onKeyDown={onKeyDown}
@@ -94,7 +80,7 @@ export function EditableCell({
 			type="text"
 			readOnly
 			onFocus={() => setIsEditing(true)}
-			value={String(cellValue || "")}
+			value={String(cell || "")}
 			className="h-full min-h-[20px] w-full cursor-text rounded border-none bg-transparent px-1 py-0.5 hover:bg-gray-50 focus:outline-none"
 		/>
 	);

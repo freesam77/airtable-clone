@@ -26,7 +26,7 @@ export const tableRouter = createTRPCRouter({
 					},
 					rows: {
 						include: {
-							cellValues: {
+							cells: {
 								include: {
 									column: true,
 								},
@@ -55,7 +55,7 @@ export const tableRouter = createTRPCRouter({
 					},
 					rows: {
 						include: {
-							cellValues: {
+							cells: {
 								include: {
 									column: true,
 								},
@@ -120,11 +120,10 @@ export const tableRouter = createTRPCRouter({
 		.input(
 			z.object({
 				tableId: z.string(),
-				cellValues: z.array(
+				cells: z.array(
 					z.object({
 						columnId: z.string(),
-						textValue: z.string().optional(),
-						numberValue: z.number().optional(),
+						value: z.string().optional(),
 					}),
 				),
 			}),
@@ -155,12 +154,12 @@ export const tableRouter = createTRPCRouter({
 				data: {
 					tableId: input.tableId,
 					position: nextPosition,
-					cellValues: {
-						create: input.cellValues,
+					cells: {
+						create: input.cells,
 					},
 				},
 				include: {
-					cellValues: {
+					cells: {
 						include: {
 							column: true,
 						},
@@ -215,13 +214,12 @@ export const tableRouter = createTRPCRouter({
 		}),
 
 	// Update cell values
-	updateCellValue: protectedProcedure
+	updateCell: protectedProcedure
 		.input(
 			z.object({
 				rowId: z.string(),
 				columnId: z.string(),
-				textValue: z.string().optional(),
-				numberValue: z.number().optional(),
+				value: z.string().optional(),
 			}),
 		)
 		.mutation(async ({ ctx, input }) => {
@@ -241,7 +239,7 @@ export const tableRouter = createTRPCRouter({
 				throw new Error("Row not found or access denied");
 			}
 
-			return ctx.db.cellValue.upsert({
+			return ctx.db.cell.upsert({
 				where: {
 					columnId_rowId: {
 						columnId: input.columnId,
@@ -249,14 +247,12 @@ export const tableRouter = createTRPCRouter({
 					},
 				},
 				update: {
-					textValue: input.textValue,
-					numberValue: input.numberValue,
+					value: input.value,
 				},
 				create: {
 					columnId: input.columnId,
 					rowId: input.rowId,
-					textValue: input.textValue,
-					numberValue: input.numberValue,
+					value: input.value,
 				},
 			});
 		}),
@@ -400,24 +396,22 @@ export const tableRouter = createTRPCRouter({
 			};
 
 			// Create rows with random data
-			const rowsToCreate = Array.from({ length: input.count }, (_, index) => {
-				const position = table.rows.length + index;
-				return {
-					tableId: input.tableId,
-					position,
-					cellValues: {
-						create: table.columns.map((column) => {
-							const value = generateRandomValue(column);
-							return {
-								columnId: column.id,
-								textValue: column.type === "TEXT" ? (value as string) : null,
-								numberValue:
-									column.type === "NUMBER" ? (value as number) : null,
-							};
-						}),
-					},
-				};
-			});
+            const rowsToCreate = Array.from({ length: input.count }, (_, index) => {
+                const position = table.rows.length + index;
+                return {
+                    tableId: input.tableId,
+                    position,
+                    cells: {
+                        create: table.columns.map((column) => {
+                            const value = String(generateRandomValue(column));
+                            return {
+                                columnId: column.id,
+                                value,
+                            };
+                        }),
+                    },
+                };
+            });
 
 			// Create all rows in a transaction
 			const createdRows = await ctx.db.$transaction(
@@ -425,7 +419,7 @@ export const tableRouter = createTRPCRouter({
 					ctx.db.row.create({
 						data: rowData,
 						include: {
-							cellValues: {
+							cells: {
 								include: {
 									column: true,
 								},

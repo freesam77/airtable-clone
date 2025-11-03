@@ -46,39 +46,38 @@ model Table {
 }
 
 model Column {
-    id         String      @id @default(cuid())
-    name       String
-    type       ColumnType
-    required   Boolean     @default(false)
-    position   Int
-    tableId    String
-    cellValues CellValue[]
-    table      Table       @relation(fields: [tableId], references: [id], onDelete: Cascade)
+    id       String     @id @default(cuid())
+    name     String
+    type     ColumnType
+    required Boolean    @default(false)
+    position Int
+    tableId  String
+    cells     Cell[]
+    table    Table      @relation(fields: [tableId], references: [id], onDelete: Cascade)
 
     @@unique([tableId, name])
     @@index([tableId, position])
 }
 
 model Row {
-    id         String      @id @default(cuid())
-    position   Int
-    createdAt  DateTime    @default(now())
-    updatedAt  DateTime    @updatedAt
-    tableId    String
-    cellValues CellValue[]
-    table      Table       @relation(fields: [tableId], references: [id], onDelete: Cascade)
+    id        String   @id @default(cuid())
+    position  Int
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+    tableId   String
+    cells      Cell[]
+    table     Table    @relation(fields: [tableId], references: [id], onDelete: Cascade)
 
     @@index([tableId, position])
 }
 
-model CellValue {
-    id          String  @id @default(cuid())
-    textValue   String?
-    numberValue Float?
-    columnId    String
-    rowId       String
-    column      Column  @relation(fields: [columnId], references: [id], onDelete: Cascade)
-    row         Row     @relation(fields: [rowId], references: [id], onDelete: Cascade)
+model Cell {
+    id       String  @id @default(cuid())
+    value    String?
+    row      Row     @relation(fields: [rowId], references: [id], onDelete: Cascade)
+    rowId    String
+    column   Column  @relation(fields: [columnId], references: [id], onDelete: Cascade)
+    columnId String
 
     @@unique([columnId, rowId])
     @@index([columnId])

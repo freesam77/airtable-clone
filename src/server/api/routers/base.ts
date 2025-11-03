@@ -14,7 +14,7 @@ export const baseRouter = createTRPCRouter({
 						},
 						rows: {
 							include: {
-								cellValues: {
+								cells: {
 									include: {
 										column: true,
 									},
@@ -68,7 +68,7 @@ export const baseRouter = createTRPCRouter({
 							},
 							rows: {
 								include: {
-									cellValues: {
+									cells: {
 										include: {
 											column: true,
 										},
@@ -103,7 +103,7 @@ export const baseRouter = createTRPCRouter({
 							},
 							rows: {
 								include: {
-									cellValues: {
+									cells: {
 										include: {
 											column: true,
 										},

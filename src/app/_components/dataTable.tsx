@@ -24,8 +24,8 @@ import {
 import { cn } from "~/lib/utils";
 import { api } from "~/trpc/react";
 import { useCellUpdateQueue } from "~/hooks/useCellUpdateQueue";
-import { AddColumnDropdown } from "./add-column-dropdown";
-import { EditableCell } from "./editable-cell";
+import { AddColumnDropdown } from "./addColumnDropdown";
+import { EditableCell } from "./editableCell";
 import { useTableSearchNavigation } from "~/hooks/useTableSearchNavigation";
 import { Search, X, ChevronUp, ChevronDown } from "lucide-react";
 import { Button } from "~/components/ui/button";
@@ -51,11 +51,10 @@ declare module "@tanstack/react-table" {
 	}
 }
 
-type CellValue = {
+type Cell = {
 	id: string;
 	columnId: string;
-	textValue: string | null;
-	numberValue: number | null;
+	value: string | null;
 	rowId: string;
 	column: {
 		id: string;
@@ -73,7 +72,7 @@ type TableData = {
 	createdAt: Date;
 	updatedAt: Date;
 	tableId: string;
-	cellValues: Array<CellValue>;
+	cells: Array<Cell>;
 };
 
 interface DataTableProps {
@@ -109,12 +108,8 @@ export function DataTable({ tableId }: DataTableProps) {
 
 	// Optimistic update function for immediate UI feedback
 	const handleOptimisticUpdate = useCallback(
-		(
-			rowId: string,
-			columnId: string,
-			textValue?: string,
-			numberValue?: number,
-		) => {
+		(rowId: string, columnId: string, value?: string | number) => {
+			const stringValue = typeof value === "number" ? String(value) : value;
 			utils.table.getById.setData({ id: tableId }, (old) => {
 				if (!old) return old;
 
@@ -124,12 +119,11 @@ export function DataTable({ tableId }: DataTableProps) {
 						row.id === rowId
 							? {
 									...row,
-									cellValues: row.cellValues.map((cell) =>
+									cells: row.cells.map((cell) =>
 										cell.column.id === columnId
 											? {
 													...cell,
-													textValue: textValue ?? null,
-													numberValue: numberValue ?? null,
+													value: stringValue ?? null,
 												}
 											: cell,
 									),
@@ -182,7 +176,7 @@ export function DataTable({ tableId }: DataTableProps) {
 				createdAt: now,
 				updatedAt: now,
 				tableId: tableId,
-				cellValues: variables.cellValues.map((cv) => {
+				cells: variables.cells.map((cv) => {
 					const column = previousData?.columns.find(
 						(col) => col.id === cv.columnId,
 					);
@@ -190,8 +184,7 @@ export function DataTable({ tableId }: DataTableProps) {
 						id: `temp-cell-${Date.now()}-${cv.columnId}`,
 						columnId: cv.columnId,
 						rowId: optimisticRowId,
-						textValue: cv.textValue || null,
-						numberValue: cv.numberValue || null,
+						value: cv.value || null,
 						column: column || {
 							id: cv.columnId,
 							name: "Unknown",
@@ -263,14 +256,13 @@ export function DataTable({ tableId }: DataTableProps) {
 					// Add empty cell values for existing rows
 					rows: old.rows.map((row) => ({
 						...row,
-						cellValues: [
-							...row.cellValues,
+						cells: [
+							...row.cells,
 							{
 								id: `temp-cell-${Date.now()}-${row.id}`,
 								columnId: optimisticColumn.id,
 								rowId: row.id,
-								textValue: null,
-								numberValue: null,
+								value: null,
 								column: optimisticColumn,
 							},
 						],
@@ -291,7 +283,7 @@ export function DataTable({ tableId }: DataTableProps) {
 					),
 					rows: old.rows.map((row) => ({
 						...row,
-						cellValues: row.cellValues.map((cell) =>
+						cells: row.cells.map((cell) =>
 							cell.column.id === context?.optimisticColumn.id
 								? { ...cell, column: result }
 								: cell,
@@ -347,10 +339,8 @@ export function DataTable({ tableId }: DataTableProps) {
 			if (!column) return;
 
 			// Queue the update with proper typing
-			if (column.type === "TEXT") {
-				queueCellUpdate(rowId, columnId, String(value), undefined);
-			} else if (column.type === "NUMBER") {
-				queueCellUpdate(rowId, columnId, undefined, Number(value));
+			if (value) {
+				queueCellUpdate(rowId, columnId, value);
 			}
 		},
 		[columns, queueCellUpdate],
@@ -382,13 +372,15 @@ export function DataTable({ tableId }: DataTableProps) {
 					</div>
 				),
 				cell: ({ getValue, row, column }: CellContext<TableData, unknown>) => {
-					const cellValue = getValue() as CellValue | undefined;
-					const value = cellValue?.textValue ?? cellValue?.numberValue ?? "";
+					const cells = getValue() as Cell | undefined;
+					const value = cells?.value || "";
+
+					console.log({ getValue, row, column });
 
 					return (
 						<EditableCell
 							value={value}
-							row={row}
+							rowId={row.original.id}
 							column={{
 								...column,
 								columnDef: {
@@ -401,7 +393,7 @@ export function DataTable({ tableId }: DataTableProps) {
 					);
 				},
 				accessorFn: (row: TableData) =>
-					row.cellValues.find(
+					row.cells.find(
 						(cv: { column: { id: string } }) => cv.column.id === col.id,
 					),
 			})),
@@ -440,14 +432,12 @@ export function DataTable({ tableId }: DataTableProps) {
 		state: { globalFilter: searchValue },
 		onGlobalFilterChange: setSearchValue,
 		globalFilterFn: (row, columnId, filterValue) => {
-			const cell = row.getValue(columnId) as CellValue | undefined;
+			const cell = row.getValue(columnId) as Cell | undefined;
 			const query = String(filterValue ?? "").toLowerCase();
 			if (!query) return true;
 			if (!cell) return false;
-			const textCell = (cell.textValue ?? "").toLowerCase();
-			const numberCell =
-				cell.numberValue != null ? String(cell.numberValue) : "";
-			return textCell.includes(query) || numberCell.includes(query);
+			const val = (cell.value ?? "").toLowerCase();
+			return val.includes(query);
 		},
 		enableColumnPinning: true,
 		initialState: {
@@ -490,18 +480,14 @@ export function DataTable({ tableId }: DataTableProps) {
 			return;
 		}
 
-		const cellValues = columns.map((col) => ({
+		const cells = columns.map((col) => ({
 			columnId: col.id,
-			textValue: col.type === "TEXT" ? newRowData[col.id] || "" : undefined,
-			numberValue:
-				col.type === "NUMBER" && newRowData[col.id]
-					? Number.parseFloat(newRowData[col.id] ?? "0")
-					: undefined,
+			value: newRowData[col.id] || "",
 		}));
 
 		addRowMutation.mutate({
 			tableId,
-			cellValues,
+			cells: cells,
 		});
 	};
 

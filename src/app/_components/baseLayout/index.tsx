@@ -3,8 +3,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { SidebarInset, SidebarProvider } from "~/components/ui/sidebar";
 import { api } from "~/trpc/react";
-import { AppSidebar } from "../app-sidebar";
-import { DataTable } from "../data-table";
+import { AppSidebar } from "../appSidebar";
+import { DataTable } from "../dataTable";
 import { TopNav } from "./topNav";
 
 interface DashboardLayoutProps {
@@ -20,8 +20,8 @@ export function BaseLayout({
 	const [rowCount, setRowCount] = useState(5);
 	const [selectedBaseId, setSelectedBaseId] = useState<string | null>(null);
 	const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
-	const [showCreateTable, setShowCreateTable] = useState(false);
-	const [newTableName, setNewTableName] = useState("");
+    const [showCreateTable, setShowCreateTable] = useState(false);
+    const [newTableName, setNewTableName] = useState("");
 
 	const { base, table } = api;
 
@@ -57,50 +57,32 @@ export function BaseLayout({
 		},
 	});
 
-	// Auto-select base and table from URL params or fallback to first available
+	// Auto-select base/table from URL or fallbacks
 	useEffect(() => {
-		if (bases && bases.length > 0) {
-			// If URL params are provided, use them
-			if (initialBaseId && !selectedBaseId) {
-				const baseFromUrl = bases.find((base) => base.id === initialBaseId);
-				if (baseFromUrl) {
-					setSelectedBaseId(baseFromUrl.id);
-
-					if (initialTableId) {
-						const tableFromUrl = baseFromUrl.tables.find(
-							(table) => table.id === initialTableId,
-						);
-						if (tableFromUrl) {
-							setSelectedTableId(tableFromUrl.id);
-						} else if (baseFromUrl.tables.length > 0) {
-							// Fallback to first table if specified table not found
-							const firstTable = baseFromUrl.tables[0];
-							if (firstTable) {
-								setSelectedTableId(firstTable.id);
-							}
-						}
-					} else if (baseFromUrl.tables.length > 0) {
-						// No table specified, use first table
-						const firstTable = baseFromUrl.tables[0];
-						if (firstTable) {
-							setSelectedTableId(firstTable.id);
-						}
-					}
-				}
-			}
-			// Fallback to first base if no URL params or base not found
-			else if (!selectedBaseId && bases.length > 0) {
-				const firstBase = bases[0];
-				if (firstBase) {
-					setSelectedBaseId(firstBase.id);
-					const firstTable = firstBase.tables[0];
-					if (firstTable) {
-						setSelectedTableId(firstTable.id);
-					}
-				}
-			}
+		// Respect URL params directly
+		if (initialBaseId && !selectedBaseId) {
+			setSelectedBaseId(initialBaseId);
 		}
-	}, [bases, selectedBaseId, initialBaseId, initialTableId]);
+		if (initialTableId && !selectedTableId) {
+			setSelectedTableId(initialTableId);
+		}
+
+		if (!bases || bases.length === 0) return;
+
+		// If no initial base provided, pick the first base available
+		if (!initialBaseId && !selectedBaseId) {
+			const firstBase = bases[0];
+			if (firstBase) setSelectedBaseId(firstBase.id);
+		}
+
+		// If no initial table provided, and we have a selected/initial base, pick its first table
+		const activeBaseId = selectedBaseId ?? initialBaseId ?? null;
+		if (!initialTableId && !selectedTableId && activeBaseId) {
+			const baseObj = bases.find((b) => b.id === activeBaseId);
+			const firstTable = baseObj?.tables[0];
+			if (firstTable) setSelectedTableId(firstTable.id);
+		}
+	}, [bases, selectedBaseId, selectedTableId, initialBaseId, initialTableId]);
 
 	// Get the selected table
 	const selectedBase = bases?.find((base) => base.id === selectedBaseId);
@@ -172,20 +154,22 @@ export function BaseLayout({
 		);
 	}
 
-	if (!currentTable) {
-		return (
-			<SidebarProvider>
-				<AppSidebar />
-				<SidebarInset>
-					<div className="flex h-screen flex-1 items-center justify-center">
-						<div className="text-gray-500">
-							No table selected. Please select a table from the sidebar.
-						</div>
-					</div>
-				</SidebarInset>
-			</SidebarProvider>
-		);
-	}
+    if (!currentTable) {
+        return (
+            <SidebarProvider>
+                <AppSidebar />
+                <SidebarInset>
+                    <div className="flex h-screen flex-1 items-center justify-center">
+                        <div className="text-gray-500">
+                            {initialTableId
+                                ? "Preparing your table…"
+                                : "No table selected. Please select a table from the sidebar."}
+                        </div>
+                    </div>
+                </SidebarInset>
+            </SidebarProvider>
+        );
+    }
 
 	return (
 		<SidebarProvider>

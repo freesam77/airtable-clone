@@ -2,12 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 // Minimal shapes needed by the hook (keeps it reusable and typed)
 type RowLike = {
-	id: string;
-	cellValues: Array<{
-		column: { id: string };
-		textValue: string | null;
-		numberValue: number | null;
-	}>;
+    id: string;
+    cells: Array<{
+        column: { id: string };
+        value?: string | null;
+    }>;
 };
 
 type ColumnLike = { id: string };
@@ -54,11 +53,10 @@ export function useTableSearchNavigation({
 			// Iterate columns in the provided order to respect visual left→right
 			for (const col of columns) {
 				if (!columnIdSet.has(col.id)) continue;
-				const cv = row.cellValues.find((c) => c.column.id === col.id);
+				const cv = row.cells.find((c) => c.column.id === col.id);
 				if (!cv) continue;
-				const t = (cv.textValue ?? "").toLowerCase();
-				const n = cv.numberValue != null ? String(cv.numberValue) : "";
-				if (t.includes(query) || n.includes(query)) {
+				const t = (cv.value ?? "").toLowerCase();
+				if (t.includes(query)) {
 					found.push({ rowId: row.id, columnId: col.id });
 				}
 			}
