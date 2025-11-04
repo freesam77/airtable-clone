@@ -1,11 +1,11 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { SidebarInset, SidebarProvider } from "~/components/ui/sidebar";
 import { api } from "~/trpc/react";
-import { AppSidebar } from "../appSidebar";
 import { DataTable } from "../dataTable";
 import { TopNav } from "./topNav";
+import { Database } from "lucide-react";
+import { Button } from "~/components/ui/button";
 
 interface DashboardLayoutProps {
 	initialBaseId?: string;
@@ -47,35 +47,35 @@ export function BaseLayout({
 	const createTable = base.createTable.useMutation({
 		onSuccess: (newTable) => {
 			void refetchBases();
-			setSelectedTableId(newTable.id);
+			if (newTable?.id) setSelectedTableId(newTable.id);
 			setShowCreateTable(false);
 			setNewTableName("");
 			// Navigate to the new table
 			if (selectedBaseId) {
-				router.push(`/${selectedBaseId}/${newTable.id}`);
+				if (newTable?.id) router.push(`/${selectedBaseId}/${newTable.id}`);
 			}
 		},
 	});
 
-	// Auto-select base/table from URL or fallbacks
+	// Sync selected base/table with URL params, and fall back sensibly
 	useEffect(() => {
-		// Respect URL params directly
-		if (initialBaseId && !selectedBaseId) {
+		// 1) Keep state in sync with route params when they change
+		if (initialBaseId && selectedBaseId !== initialBaseId) {
 			setSelectedBaseId(initialBaseId);
 		}
-		if (initialTableId && !selectedTableId) {
+		if (initialTableId && selectedTableId !== initialTableId) {
 			setSelectedTableId(initialTableId);
 		}
 
 		if (!bases || bases.length === 0) return;
 
-		// If no initial base provided, pick the first base available
+		// 2) If base still unset, pick the first available
 		if (!initialBaseId && !selectedBaseId) {
 			const firstBase = bases[0];
 			if (firstBase) setSelectedBaseId(firstBase.id);
 		}
 
-		// If no initial table provided, and we have a selected/initial base, pick its first table
+		// 3) If table still unset (no param and no selection), pick the first in active base
 		const activeBaseId = selectedBaseId ?? initialBaseId ?? null;
 		if (!initialTableId && !selectedTableId && activeBaseId) {
 			const baseObj = bases.find((b) => b.id === activeBaseId);
@@ -102,8 +102,9 @@ export function BaseLayout({
 	// Base selection handled via URL params and sidebar
 
 	const handleTableSelect = (tableId: string) => {
+		// Avoid redundant state updates and navigations
+		if (selectedTableId === tableId) return;
 		setSelectedTableId(tableId);
-		// Navigate to the new base/table URL
 		if (selectedBaseId) {
 			router.push(`/${selectedBaseId}/${tableId}`);
 		}
@@ -128,37 +129,27 @@ export function BaseLayout({
 		}
 	};
 
-	if (basesLoading) {
-		return (
-			<SidebarProvider>
-				<AppSidebar />
-				<SidebarInset>
+	return (
+		<div className="flex h-full">
+			<div className="flex w-15 justify-center border pt-5">
+				<Button
+					className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground"
+					onClick={() => router.push("/dashboard")}
+				>
+					<Database className="h-4 w-4 cursor-pointer" />
+				</Button>
+			</div>
+			<div>
+				{/* Inline conditional content */}
+				{basesLoading ? (
 					<div className="flex h-screen flex-1 items-center justify-center">
 						<div className="text-gray-500">Loading...</div>
 					</div>
-				</SidebarInset>
-			</SidebarProvider>
-		);
-	}
-
-	if (!selectedBase) {
-		return (
-			<SidebarProvider>
-				<AppSidebar />
-				<SidebarInset>
+				) : !selectedBase ? (
 					<div className="flex h-screen flex-1 items-center justify-center">
 						<div className="text-gray-500">No bases found.</div>
 					</div>
-				</SidebarInset>
-			</SidebarProvider>
-		);
-	}
-
-	if (!currentTable) {
-		return (
-			<SidebarProvider>
-				<AppSidebar />
-				<SidebarInset>
+				) : !currentTable ? (
 					<div className="flex h-screen flex-1 items-center justify-center">
 						<div className="text-gray-500">
 							{initialTableId
@@ -166,38 +157,31 @@ export function BaseLayout({
 								: "No table selected. Please select a table from the sidebar."}
 						</div>
 					</div>
-				</SidebarInset>
-			</SidebarProvider>
-		);
-	}
+				) : (
+					<div className="flex h-screen flex-1 flex-col bg-gray-50">
+						<TopNav
+							selectedBase={selectedBase}
+							rowCount={rowCount}
+							setRowCount={setRowCount}
+							handleGenerateRows={handleGenerateRows}
+							generateRows={generateRows}
+							selectedTableId={selectedTableId}
+							handleTableSelect={handleTableSelect}
+							showCreateTable={showCreateTable}
+							setShowCreateTable={setShowCreateTable}
+							newTableName={newTableName}
+							setNewTableName={setNewTableName}
+							handleCreateTable={handleCreateTable}
+							createTable={createTable}
+						/>
 
-	return (
-		<SidebarProvider>
-			<AppSidebar />
-			<SidebarInset>
-				<div className="flex h-screen flex-1 flex-col bg-gray-50">
-					<TopNav
-						selectedBase={selectedBase}
-						rowCount={rowCount}
-						setRowCount={setRowCount}
-						handleGenerateRows={handleGenerateRows}
-						generateRows={generateRows}
-						selectedTableId={selectedTableId}
-						handleTableSelect={handleTableSelect}
-						showCreateTable={showCreateTable}
-						setShowCreateTable={setShowCreateTable}
-						newTableName={newTableName}
-						setNewTableName={setNewTableName}
-						handleCreateTable={handleCreateTable}
-						createTable={createTable}
-					/>
-
-					{/* Main Content */}
-					<div className="flex-1 p-6">
-						<DataTable tableId={currentTable.id} />
+						{/* Main Content */}
+						<div className="flex-1 p-6">
+							<DataTable tableId={currentTable.id} />
+						</div>
 					</div>
-				</div>
-			</SidebarInset>
-		</SidebarProvider>
+				)}
+			</div>
+		</div>
 	);
 }

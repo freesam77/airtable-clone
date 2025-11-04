@@ -38,6 +38,8 @@ import {
 	ArrowUpDown,
 	Palette,
 	Share2,
+	LayoutGrid,
+	Menu,
 } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import {
@@ -98,6 +100,8 @@ export function DataTable({ tableId }: DataTableProps) {
 	const addRowRef = useRef<HTMLTableRowElement | null>(null);
 	const [searchOpen, setSearchOpen] = useState(false);
 	const [searchValue, setSearchValue] = useState("");
+	const [viewSidebarOpen, setViewSidebarOpen] = useState(true);
+	const [viewName, setViewName] = useState("Grid view");
 	const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(new Set());
 	const [showCheckboxes, setShowCheckboxes] = useState(false);
 
@@ -169,21 +173,7 @@ export function DataTable({ tableId }: DataTableProps) {
 		onOptimisticUpdate: handleOptimisticUpdate,
 	});
 
-	// Flush pending updates before page unload
-	useEffect(() => {
-		const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-			if (pendingUpdatesCount > 0) {
-				// Attempt to flush pending updates
-				flushPendingUpdates();
-				// Show browser warning about unsaved changes
-				event.preventDefault();
-				event.returnValue = "";
-			}
-		};
-
-		window.addEventListener("beforeunload", handleBeforeUnload);
-		return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-	}, [pendingUpdatesCount, flushPendingUpdates]);
+	// Before unload handling is centralized inside useCellUpdateQueue.
 	const addRowMutation = api.table.addRow.useMutation({
 		onMutate: async (variables) => {
 			await utils.table.getById.cancel({ id: tableId });
@@ -661,275 +651,378 @@ export function DataTable({ tableId }: DataTableProps) {
 	}
 
 	return (
-		<div>
-			{/* Toolbar - all right aligned */}
-			<div className="flex items-center justify-end gap-1px-3 py-2">
-				<Button variant="ghost" size="sm" className="gap-2 px-2">
-					<EyeOff className="h-4 w-4" />
-					<span className="text-sm">Hide fields</span>
-				</Button>
-				<Button variant="ghost" size="sm" className="gap-2 px-2">
-					<Filter className="h-4 w-4" />
-					<span className="text-sm">Filter</span>
-				</Button>
-				<Button variant="ghost" size="sm" className="gap-2 px-2">
-					<FolderTree className="h-4 w-4" />
-					<span className="text-sm">Group</span>
-				</Button>
-				<Button variant="ghost" size="sm" className="gap-2 px-2">
-					<ArrowUpDown className="h-4 w-4" />
-					<span className="text-sm">Sort</span>
-				</Button>
-				<Button variant="ghost" size="sm" className="gap-2 px-2">
-					<Palette className="h-4 w-4" />
-					<span className="text-sm">Color</span>
-				</Button>
-				<Button variant="ghost" size="sm" className="gap-2 px-2 text-gray-700">
-					<Share2 className="h-4 w-4" />
-					<span className="text-sm">Share and sync</span>
-				</Button>
-				<DropdownMenu open={searchOpen} onOpenChange={setSearchOpen}>
-					<DropdownMenuTrigger asChild>
-						<Button variant="ghost" className="cursor-pointer">
-							<Search />
-						</Button>
-					</DropdownMenuTrigger>
-					<DropdownMenuContent align="end" className="w-full bg-white">
-						<div className="flex items-center gap-3">
-							<Input
-								id="table-search"
-								type="text"
-								value={String(table.getState().globalFilter ?? "")}
-								onChange={(e) => table.setGlobalFilter(e.target.value)}
-								onKeyDown={(e) => {
-									if (e.key === "Enter" || e.key === "NumpadEnter") {
-										// Prevent the dropdown from handling Enter and possibly closing
-										e.preventDefault();
-										e.stopPropagation();
-										if (e.shiftKey) {
-											gotoPrevMatch();
-										} else {
-											gotoNextMatch();
-										}
-									}
-								}}
-								placeholder="Find in view"
-								autoFocus
-							/>
-							<div className="min-w-20 text-center text-gray-500 text-xs">
-								{matches.length > 0 &&
-									`${activeMatchIndex + 1} / ${matches.length}`}
-							</div>
-							<div className="flex gap-1">
-								<Button
-									variant="outline"
-									size="icon"
-									onClick={gotoPrevMatch}
-									disabled={matches.length === 0}
-									aria-label="Previous match"
-								>
-									<ChevronUp className="h-4 w-4" />
-								</Button>
-								<Button
-									variant="outline"
-									size="icon"
-									onClick={gotoNextMatch}
-									disabled={matches.length === 0}
-									aria-label="Next match"
-								>
-									<ChevronDown className="h-4 w-4" />
-								</Button>
-							</div>
-							<Button
-								variant="ghost"
-								className="cursor-pointer"
-								onClick={() => setSearchOpen(false)}
+		<div className="flex">
+			{/* Left views sidebar inside table area */}
+			{viewSidebarOpen && (
+				<aside className="w-64 shrink-0 border-gray-200 border-r bg-white px-4 py-3">
+					<div className="mb-3 flex items-center justify-between">
+						<button
+							type="button"
+							className="flex items-center gap-2 text-gray-700 text-sm hover:text-gray-900"
+						>
+							<span className="text-xl leading-none">+</span>
+							Create new...
+						</button>
+						<button
+							type="button"
+							className="text-gray-500 hover:text-gray-700"
+							aria-label="Views settings"
+						>
+							⚙️
+						</button>
+					</div>
+					<div className="relative mb-3">
+						<Search className="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+						<Input placeholder="Find a view" className="h-8 w-full pl-8" />
+					</div>
+					<div className="space-y-1">
+						<button
+							type="button"
+							className="flex w-full items-center gap-2 rounded px-2 py-2 text-left text-gray-700 hover:bg-gray-50"
+						>
+							<LayoutGrid className="h-4 w-4" /> Grid view
+						</button>
+						<button
+							type="button"
+							className="flex w-full items-center gap-2 rounded px-2 py-2 text-left bg-gray-100 text-gray-900"
+						>
+							<LayoutGrid className="h-4 w-4" /> {viewName}{" "}
+							<ChevronDown className="ml-auto h-4 w-4" />
+						</button>
+					</div>
+				</aside>
+			)}
+			<div className="min-w-0 flex-1">
+				{/* Views header row (hamburger + current view menu) */}
+				<div className="flex items-center gap-3 border-b px-3 py-2">
+					<button
+						type="button"
+						onClick={() => setViewSidebarOpen((v) => !v)}
+						className="flex h-8 w-8 items-center justify-center rounded hover:bg-gray-50"
+						aria-label="Toggle views sidebar"
+					>
+						<Menu className="h-4 w-4" />
+					</button>
+					<DropdownMenu>
+						<DropdownMenuTrigger asChild>
+							<button
+								type="button"
+								className="flex items-center gap-2 rounded px-2 py-1 text-gray-700 text-sm hover:bg-gray-50"
 							>
-								<X />
-							</Button>
-						</div>
-					</DropdownMenuContent>
-				</DropdownMenu>
-			</div>
-			<div className="relative overflow-hidden rounded-lg border border-gray-200">
-				<table
-					className="w-full"
-					key={`table-${columns.length}-${columns.map((c) => c.id).join("-")}`}
-				>
-					<thead className="border-gray-200 border-b bg-gray-50">
-						{table.getHeaderGroups().map((headerGroup) => (
-							<tr key={headerGroup.id}>
-								{headerGroup.headers.map((header) => (
-									<th
-										key={header.id}
-										className={cn(
-											"border-gray-200 border-r px-4 py-3 text-left font-medium text-gray-700 text-sm last:border-r-0",
-											header.column.columnDef.meta?.className,
-										)}
-									>
-										{header.isPlaceholder
-											? null
-											: flexRender(
-													header.column.columnDef.header,
-													header.getContext(),
-												)}
-									</th>
-								))}
-							</tr>
-						))}
-					</thead>
-					<tbody className="divide-y divide-gray-200">
-						{table.getRowModel().rows.map((row, index) => (
-							<ContextMenu key={row.id}>
-								<ContextMenuTrigger asChild>
-									<tr
-										className={cn(
-											"cursor-default hover:bg-gray-50",
-											index % 2 === 0 ? "bg-white" : "bg-gray-50/30",
-										)}
-									>
-										{row.getVisibleCells().map((cell) => (
-											<td
-												key={cell.id}
-												className={cn(
-													"border-gray-200 border-r border-b px-4 py-3 text-gray-900 text-sm last:border-r-0",
+								<LayoutGrid className="h-4 w-4" />
+								{viewName}
+								<ChevronDown className="h-4 w-4" />
+							</button>
+						</DropdownMenuTrigger>
+						<DropdownMenuContent align="start" className="w-64 p-0 bg-white">
+							<div className="p-2">
+								<button
+									type="button"
+									className="w-full rounded px-2 py-2 text-left hover:bg-gray-50"
+									onClick={() => {
+										const name = prompt("Rename view", viewName);
+										if (name && name.trim()) setViewName(name.trim());
+									}}
+								>
+									Rename view
+								</button>
+								<button
+									type="button"
+									className="w-full rounded px-2 py-2 text-left hover:bg-gray-50"
+									onClick={() => setViewName((v) => `${v} copy`)}
+								>
+									Duplicate view
+								</button>
+								<button
+									type="button"
+									className="w-full rounded px-2 py-2 text-left text-red-600 hover:bg-red-50"
+								>
+									Delete view
+								</button>
+							</div>
+						</DropdownMenuContent>
+					</DropdownMenu>
+					<div className="ml-auto" />
+				</div>
 
-													cell.column.columnDef.meta?.className,
-													(() => {
-														const key = getCellKey(
-															row.original.id,
-															cell.column.id,
-														);
-														const isMatch =
-															Boolean(searchValue) && matchKeys.has(key);
-														const isActiveCell =
-															Boolean(activeMatch) &&
-															activeMatch?.rowId === row.original.id &&
-															activeMatch?.columnId === cell.column.id;
-														// Darker bg for active cell; lighter bg for other matched cells
-														return isActiveCell
-															? "bg-yellow-200"
-															: isMatch
-																? "bg-yellow-100"
-																: "";
-													})(),
-												)}
-												data-cell={getCellKey(row.original.id, cell.column.id)}
+				{/* Toolbar - all right aligned */}
+				<div className="flex items-center justify-end gap-1px-3 py-2">
+					<Button variant="ghost" size="sm" className="gap-2 px-2">
+						<EyeOff className="h-4 w-4" />
+						<span className="text-sm">Hide fields</span>
+					</Button>
+					<Button variant="ghost" size="sm" className="gap-2 px-2">
+						<Filter className="h-4 w-4" />
+						<span className="text-sm">Filter</span>
+					</Button>
+					<Button variant="ghost" size="sm" className="gap-2 px-2">
+						<FolderTree className="h-4 w-4" />
+						<span className="text-sm">Group</span>
+					</Button>
+					<Button variant="ghost" size="sm" className="gap-2 px-2">
+						<ArrowUpDown className="h-4 w-4" />
+						<span className="text-sm">Sort</span>
+					</Button>
+					<Button variant="ghost" size="sm" className="gap-2 px-2">
+						<Palette className="h-4 w-4" />
+						<span className="text-sm">Color</span>
+					</Button>
+					<Button
+						variant="ghost"
+						size="sm"
+						className="gap-2 px-2 text-gray-700"
+					>
+						<Share2 className="h-4 w-4" />
+						<span className="text-sm">Share and sync</span>
+					</Button>
+					<DropdownMenu open={searchOpen} onOpenChange={setSearchOpen}>
+						<DropdownMenuTrigger asChild>
+							<Button variant="ghost" className="cursor-pointer">
+								<Search />
+							</Button>
+						</DropdownMenuTrigger>
+						<DropdownMenuContent align="end" className="w-full bg-white">
+							<div className="flex items-center gap-3">
+								<Input
+									id="table-search"
+									type="text"
+									value={String(table.getState().globalFilter ?? "")}
+									onChange={(e) => table.setGlobalFilter(e.target.value)}
+									onKeyDown={(e) => {
+										if (e.key === "Enter" || e.key === "NumpadEnter") {
+											// Prevent the dropdown from handling Enter and possibly closing
+											e.preventDefault();
+											e.stopPropagation();
+											if (e.shiftKey) {
+												gotoPrevMatch();
+											} else {
+												gotoNextMatch();
+											}
+										}
+									}}
+									placeholder="Find in view"
+									autoFocus
+								/>
+								<div className="min-w-20 text-center text-gray-500 text-xs">
+									{matches.length > 0 &&
+										`${activeMatchIndex + 1} / ${matches.length}`}
+								</div>
+								<div className="flex gap-1">
+									<Button
+										variant="outline"
+										size="icon"
+										onClick={gotoPrevMatch}
+										disabled={matches.length === 0}
+										aria-label="Previous match"
+									>
+										<ChevronUp className="h-4 w-4" />
+									</Button>
+									<Button
+										variant="outline"
+										size="icon"
+										onClick={gotoNextMatch}
+										disabled={matches.length === 0}
+										aria-label="Next match"
+									>
+										<ChevronDown className="h-4 w-4" />
+									</Button>
+								</div>
+								<Button
+									variant="ghost"
+									className="cursor-pointer"
+									onClick={() => setSearchOpen(false)}
+								>
+									<X />
+								</Button>
+							</div>
+						</DropdownMenuContent>
+					</DropdownMenu>
+				</div>
+				<div className="relative overflow-hidden rounded-lg border border-gray-200">
+					<table
+						className="w-full"
+						key={`table-${columns.length}-${columns.map((c) => c.id).join("-")}`}
+					>
+						<thead className="border-gray-200 border-b bg-gray-50">
+							{table.getHeaderGroups().map((headerGroup) => (
+								<tr key={headerGroup.id}>
+									{headerGroup.headers.map((header) => (
+										<th
+											key={header.id}
+											className={cn(
+												"border-gray-200 border-r px-4 py-3 text-left font-medium text-gray-700 text-sm last:border-r-0",
+												header.column.columnDef.meta?.className,
+											)}
+										>
+											{header.isPlaceholder
+												? null
+												: flexRender(
+														header.column.columnDef.header,
+														header.getContext(),
+													)}
+										</th>
+									))}
+								</tr>
+							))}
+						</thead>
+						<tbody className="divide-y divide-gray-200">
+							{table.getRowModel().rows.map((row, index) => (
+								<ContextMenu key={row.id}>
+									<ContextMenuTrigger asChild>
+										<tr
+											className={cn(
+												"cursor-default hover:bg-gray-50",
+												index % 2 === 0 ? "bg-white" : "bg-gray-50/30",
+											)}
+										>
+											{row.getVisibleCells().map((cell) => (
+												<td
+													key={cell.id}
+													className={cn(
+														"border-gray-200 border-r border-b px-4 py-3 text-gray-900 text-sm last:border-r-0",
+
+														cell.column.columnDef.meta?.className,
+														(() => {
+															const key = getCellKey(
+																row.original.id,
+																cell.column.id,
+															);
+															const isMatch =
+																Boolean(searchValue) && matchKeys.has(key);
+															const isActiveCell =
+																Boolean(activeMatch) &&
+																activeMatch?.rowId === row.original.id &&
+																activeMatch?.columnId === cell.column.id;
+															// Darker bg for active cell; lighter bg for other matched cells
+															return isActiveCell
+																? "bg-yellow-200"
+																: isMatch
+																	? "bg-yellow-100"
+																	: "";
+														})(),
+													)}
+													data-cell={getCellKey(
+														row.original.id,
+														cell.column.id,
+													)}
+												>
+													{flexRender(
+														cell.column.columnDef.cell,
+														cell.getContext(),
+													)}
+												</td>
+											))}
+										</tr>
+									</ContextMenuTrigger>
+									<ContextMenuContent className="w-48">
+										<ContextMenuItem
+											onClick={() => handleDeleteRow(row.original.id)}
+											className="text-red-600 focus:bg-red-50 focus:text-red-600"
+										>
+											Delete row
+										</ContextMenuItem>
+									</ContextMenuContent>
+								</ContextMenu>
+							))}
+							{isAddingRow && (
+								<tr className="bg-blue-50" ref={addRowRef}>
+									{columns
+										.sort((a, b) => a.position - b.position)
+										.map((col) => (
+											<td
+												key={col.id}
+												className="border-gray-200 border-r px-4 py-3 last:border-r-0"
 											>
-												{flexRender(
-													cell.column.columnDef.cell,
-													cell.getContext(),
-												)}
+												<input
+													type={col.type === "NUMBER" ? "number" : "text"}
+													value={newRowData[col.id] ?? ""}
+													onChange={(e) =>
+														handleInputChange(col.id, e.target.value)
+													}
+													onKeyDown={(e) => {
+														if (e.key === "Enter") {
+															e.preventDefault();
+															submitNewRow();
+														}
+														if (e.key === "Escape") {
+															e.preventDefault();
+															handleCancelAdd();
+														}
+													}}
+													onBlur={() => {
+														// Delay to allow focus to move to another input inside the same row
+														setTimeout(() => {
+															const container = addRowRef.current;
+															if (!container) return;
+															const active = document.activeElement;
+															if (active && container.contains(active)) {
+																return; // still within row inputs
+															}
+															submitNewRow();
+														}, 0);
+													}}
+													className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none"
+													placeholder={`Enter ${col.name.toLowerCase()}`}
+												/>
 											</td>
 										))}
-									</tr>
-								</ContextMenuTrigger>
-								<ContextMenuContent className="w-48">
-									<ContextMenuItem
-										onClick={() => handleDeleteRow(row.original.id)}
-										className="text-red-600 focus:bg-red-50 focus:text-red-600"
+									{/* Empty cell for Add Column column in add row */}
+									<td className="sticky right-0 z-10 border border-gray-200 border-l-0 bg-blue-50 px-4 py-3">
+										{/* Empty cell to match header */}
+									</td>
+								</tr>
+							)}
+						</tbody>
+						{/* Add Row button row */}
+						<tr className="border-gray-200 border-t bg-white">
+							{columns
+								.sort((a, b) => a.position - b.position)
+								.map((col, index) => (
+									<td
+										key={col.id}
+										className={cn(
+											"border-gray-200 border-r px-4 py-3 text-gray-900 text-sm last:border-r-0",
+											index === 0 && "border-b-0", // Remove bottom border for first cell
+										)}
 									>
-										Delete row
-									</ContextMenuItem>
-								</ContextMenuContent>
-							</ContextMenu>
-						))}
-						{isAddingRow && (
-							<tr className="bg-blue-50" ref={addRowRef}>
-								{columns
-									.sort((a, b) => a.position - b.position)
-									.map((col) => (
-										<td
-											key={col.id}
-											className="border-gray-200 border-r px-4 py-3 last:border-r-0"
-										>
-											<input
-												type={col.type === "NUMBER" ? "number" : "text"}
-												value={newRowData[col.id] ?? ""}
-												onChange={(e) =>
-													handleInputChange(col.id, e.target.value)
-												}
-												onKeyDown={(e) => {
-													if (e.key === "Enter") {
-														e.preventDefault();
-														submitNewRow();
-													}
-													if (e.key === "Escape") {
-														e.preventDefault();
-														handleCancelAdd();
-													}
-												}}
-												onBlur={() => {
-													// Delay to allow focus to move to another input inside the same row
-													setTimeout(() => {
-														const container = addRowRef.current;
-														if (!container) return;
-														const active = document.activeElement;
-														if (active && container.contains(active)) {
-															return; // still within row inputs
-														}
-														submitNewRow();
-													}, 0);
-												}}
-												className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none"
-												placeholder={`Enter ${col.name.toLowerCase()}`}
-											/>
-										</td>
-									))}
-								{/* Empty cell for Add Column column in add row */}
-								<td className="sticky right-0 z-10 border border-gray-200 border-l-0 bg-blue-50 px-4 py-3">
-									{/* Empty cell to match header */}
-								</td>
-							</tr>
-						)}
-					</tbody>
-					{/* Add Row button row */}
-					<tr className="border-gray-200 border-t bg-white">
-						{columns
-							.sort((a, b) => a.position - b.position)
-							.map((col, index) => (
-								<td
-									key={col.id}
-									className={cn(
-										"border-gray-200 border-r px-4 py-3 text-gray-900 text-sm last:border-r-0",
-										index === 0 && "border-b-0", // Remove bottom border for first cell
-									)}
-								>
-									{index === 0 ? (
-										<TooltipProvider>
-											<Tooltip>
-												<TooltipTrigger asChild>
-													<button
-														type="button"
-														onClick={handleAddRow}
-														className="flex h-8 w-8 cursor-pointer items-center justify-center text-gray-600 text-xl hover:bg-gray-50 hover:text-gray-800"
-													>
-														+
-													</button>
-												</TooltipTrigger>
-												<TooltipContent>
-													<p>
-														You can also insert a new record anywhere by
-														pressing Shift-Enter
-													</p>
-												</TooltipContent>
-											</Tooltip>
-										</TooltipProvider>
-									) : null}
-								</td>
-							))}
-						{/* Add Column cell */}
-						<td className="sticky right-0 z-10 w-[50px] border border-gray-200 border-b-0 border-l-0 bg-white px-4 py-3 text-center">
-							{/* Empty cell to match header */}
-						</td>
-					</tr>
-				</table>
-			</div>
-			{/* Footer with record count */}
-			<div className="flex items-center justify-end border-gray-200 border-t p-4 text-gray-500 text-sm">
-				<div className="flex items-center gap-2">
-					<span className="font-medium">{table.getRowModel().rows.length}</span>
-					<span>records</span>
+										{index === 0 ? (
+											<TooltipProvider>
+												<Tooltip>
+													<TooltipTrigger asChild>
+														<button
+															type="button"
+															onClick={handleAddRow}
+															className="flex h-8 w-8 cursor-pointer items-center justify-center text-gray-600 text-xl hover:bg-gray-50 hover:text-gray-800"
+														>
+															+
+														</button>
+													</TooltipTrigger>
+													<TooltipContent>
+														<p>
+															You can also insert a new record anywhere by
+															pressing Shift-Enter
+														</p>
+													</TooltipContent>
+												</Tooltip>
+											</TooltipProvider>
+										) : null}
+									</td>
+								))}
+							{/* Add Column cell */}
+							<td className="sticky right-0 z-10 w-[50px] border border-gray-200 border-b-0 border-l-0 bg-white px-4 py-3 text-center">
+								{/* Empty cell to match header */}
+							</td>
+						</tr>
+					</table>
+				</div>
+				{/* Footer with record count */}
+				<div className="flex items-center justify-end border-gray-200 border-t p-4 text-gray-500 text-sm">
+					<div className="flex items-center gap-2">
+						<span className="font-medium">
+							{table.getRowModel().rows.length}
+						</span>
+						<span>records</span>
+					</div>
 				</div>
 			</div>
 		</div>

@@ -14,6 +14,9 @@ import {
 	DropdownMenuContent,
 	DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
+import { Input } from "~/components/ui/input";
+import { Check, Search, LayoutGrid, ChevronDown as SmallChevronDown } from "lucide-react";
+import { SidebarTrigger } from "~/components/ui/sidebar";
 import { api } from "~/trpc/react";
 import { showToast } from "~/components/ui/toast";
 
@@ -95,6 +98,10 @@ export const TopNav = ({
 	const [centerTab, setCenterTab] = useState<
 		"Data" | "Automations" | "Interfaces" | "Forms"
 	>("Data");
+    const [tableMenuOpen, setTableMenuOpen] = useState(false);
+    const [tableSearch, setTableSearch] = useState("");
+    const [showAddInline, setShowAddInline] = useState(false);
+    const [viewName, setViewName] = useState("Grid view");
 
 	useEffect(() => {
 		setNameDraft(selectedBase.name);
@@ -260,59 +267,59 @@ export const TopNav = ({
 							</DropdownMenuContent>
 						</DropdownMenu>
 					</div>
-                    {/* Center section: Data | Automations | Interfaces | Forms */}
-				<nav
-					aria-label="Base sections"
-					className="flex h-12 gap-6 text-gray-600 text-sm"
-				>
-					<button
-						type="button"
-						onClick={() => setCenterTab("Data")}
-						className={`border-b-2 px-1 pb-1 ${
-							centerTab === "Data"
-								? "border-green-700 font-semibold text-gray-900"
-								: "border-transparent hover:text-gray-900"
-						}`}
+					{/* Center section: Data | Automations | Interfaces | Forms */}
+					<nav
+						aria-label="Base sections"
+						className="flex h-12 gap-6 text-gray-600 text-sm"
 					>
-						Data
-					</button>
-					<button
-						type="button"
-						onClick={() => setCenterTab("Automations")}
-						disabled
-                        className={`border-b-2 px-1 pb-1 ${
-							centerTab === "Automations"
-								? "border-green-700 font-semibold text-gray-900"
-								: "border-transparent hover:text-gray-900"
-						}`}
-					>
-						Automations
-					</button>
-					<button
-						type="button"
-						onClick={() => setCenterTab("Interfaces")}
-						disabled
-                        className={`border-b-2 px-1 pb-1 ${
-							centerTab === "Interfaces"
-								? "border-green-700 font-semibold text-gray-900"
-								: "border-transparent hover:text-gray-900"
-						}`}
-					>
-						Interfaces
-					</button>
-					<button
-						type="button"
-						onClick={() => setCenterTab("Forms")}
-						disabled
-                        className={`border-b-2 px-1 pb-1 ${
-							centerTab === "Forms"
-								? "border-green-700 font-semibold text-gray-900"
-								: "border-transparent hover:text-gray-900"
-						}`}
-					>
-						Forms
-					</button>
-				</nav>
+						<button
+							type="button"
+							onClick={() => setCenterTab("Data")}
+							className={`border-b-2 px-1 pb-1 ${
+								centerTab === "Data"
+									? "border-green-700 font-semibold text-gray-900"
+									: "border-transparent hover:text-gray-900"
+							}`}
+						>
+							Data
+						</button>
+						<button
+							type="button"
+							onClick={() => setCenterTab("Automations")}
+							disabled
+							className={`border-b-2 px-1 pb-1 ${
+								centerTab === "Automations"
+									? "border-green-700 font-semibold text-gray-900"
+									: "border-transparent hover:text-gray-900"
+							}`}
+						>
+							Automations
+						</button>
+						<button
+							type="button"
+							onClick={() => setCenterTab("Interfaces")}
+							disabled
+							className={`border-b-2 px-1 pb-1 ${
+								centerTab === "Interfaces"
+									? "border-green-700 font-semibold text-gray-900"
+									: "border-transparent hover:text-gray-900"
+							}`}
+						>
+							Interfaces
+						</button>
+						<button
+							type="button"
+							onClick={() => setCenterTab("Forms")}
+							disabled
+							className={`border-b-2 px-1 pb-1 ${
+								centerTab === "Forms"
+									? "border-green-700 font-semibold text-gray-900"
+									: "border-transparent hover:text-gray-900"
+							}`}
+						>
+							Forms
+						</button>
+					</nav>
 					<div className="flex items-center gap-3">
 						<div className="flex items-center gap-2">
 							<input
@@ -345,19 +352,17 @@ export const TopNav = ({
 						</div>
 					</div>
 				</div>
-
-				
 			</div>
 
-			{/* Table tabs */}
-			<div className="border-gray-200 border-b bg-gray-50 px-6">
+			{/* Table tabs + switcher */}
+			<div className="border-gray-200 border-b bg-gray-50">
 				<div className="flex items-center gap-1">
 					{selectedBase.tables.map((table) => (
 						<button
 							type="button"
 							key={table.id}
 							onClick={() => handleTableSelect(table.id)}
-							className={`rounded-t border-x border-t px-3 py-2 font-medium text-sm ${
+							className={`rounded-t-sm border-x border-t px-3 py-2 font-medium text-sm ${
 								selectedTableId === table.id
 									? "border-gray-300 bg-white text-gray-900"
 									: "border-transparent bg-transparent text-gray-600 hover:text-gray-900"
@@ -366,25 +371,117 @@ export const TopNav = ({
 							{table.name}
 						</button>
 					))}
-					{showCreateTable ? (
-						<CreateTableInlineInput
-							newTableName={newTableName}
-							setNewTableName={setNewTableName}
-							handleCreateTable={handleCreateTable}
-							setShowCreateTable={setShowCreateTable}
-							isPending={createTable.isPending}
-						/>
-					) : (
-						<button
-							type="button"
-							onClick={() => setShowCreateTable(true)}
-							className="ml-2 rounded border border-gray-300 bg-white px-2 py-1 text-gray-600 text-sm hover:bg-gray-50"
+
+					{/* Chevron opens table switcher */}
+					<DropdownMenu
+						open={tableMenuOpen}
+						onOpenChange={(o) => {
+							setTableMenuOpen(o);
+							if (!o) {
+								setTableSearch("");
+								setShowAddInline(false);
+							}
+						}}
+					>
+						<DropdownMenuTrigger asChild>
+							<button
+								type="button"
+								className="cursor-pointer px-2 text-gray-600"
+							>
+								<ChevronDown size={14} />
+							</button>
+						</DropdownMenuTrigger>
+						<DropdownMenuContent
+							align="start"
+							className="w-[420px] bg-white p-0"
 						>
-							<Plus size={14} />
-						</button>
-					)}
+							<div className="p-3">
+								<div className="relative">
+									<Search className="-translate-y-1/2 pointer-events-none absolute top-1/2 left-2 h-4 w-4 text-gray-400" />
+									<Input
+										placeholder="Find a table"
+										value={tableSearch}
+										onChange={(e) => setTableSearch(e.target.value)}
+										className="pl-8"
+									/>
+								</div>
+							</div>
+							<div className="border-gray-200 border-t" />
+							<div className="max-h-72 overflow-auto p-2">
+								{selectedBase.tables
+									.filter((t) =>
+										t.name.toLowerCase().includes(tableSearch.toLowerCase()),
+									)
+									.map((t) => (
+										<button
+											key={t.id}
+											type="button"
+											onClick={() => {
+												handleTableSelect(t.id);
+												setTableMenuOpen(false);
+											}}
+											className={`flex w-full cursor-pointer items-center gap-2 rounded px-3 py-2 text-left hover:bg-gray-50 ${selectedTableId === t.id ? "bg-gray-100" : ""}`}
+										>
+											{selectedTableId === t.id && (
+												<Check className="h-4 w-4" />
+											)}
+											<span>{t.name}</span>
+										</button>
+									))}
+							</div>
+							<div className="border-gray-200 border-t" />
+							<div className="p-2">
+								{!showAddInline ? (
+									<button
+										type="button"
+										className="flex w-full cursor-pointer items-center gap-2 rounded px-3 py-2 text-left hover:bg-gray-50"
+										onClick={() => {
+											setShowAddInline(true);
+											setShowCreateTable(true);
+										}}
+									>
+										<Plus size={14} /> Add table
+									</button>
+								) : (
+									<div className="px-2 py-2">
+										<CreateTableInlineInput
+											newTableName={newTableName}
+											setNewTableName={setNewTableName}
+											handleCreateTable={() => {
+												handleCreateTable();
+												setTableMenuOpen(false);
+												setShowAddInline(false);
+											}}
+											setShowCreateTable={(v) => {
+												setShowCreateTable(v);
+												if (!v) {
+													setShowAddInline(false);
+												}
+											}}
+											isPending={createTable.isPending}
+										/>
+									</div>
+								)}
+							</div>
+						</DropdownMenuContent>
+					</DropdownMenu>
+
+					{/* Add or import triggers same menu in add mode */}
+					<button
+						type="button"
+						onClick={() => {
+							setTableMenuOpen(true);
+							setShowAddInline(true);
+							setShowCreateTable(true);
+						}}
+						className="flex cursor-pointer items-center gap-2 px-2 text-gray-600 text-sm"
+					>
+						<Plus size={14} /> Add or import
+					</button>
 				</div>
 			</div>
+
+            {/* Inner navbar removed (moved into DataTable) */}
 		</div>
 	);
 };

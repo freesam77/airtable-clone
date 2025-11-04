@@ -219,7 +219,8 @@ export const baseRouter = createTRPCRouter({
 				throw new Error("Base not found or access denied");
 			}
 
-			return ctx.db.table.create({
+			// 1) Create table with columns
+			const created = await ctx.db.table.create({
 				data: {
 					name: input.name,
 					description: input.description,
@@ -232,7 +233,34 @@ export const baseRouter = createTRPCRouter({
 					columns: {
 						orderBy: { position: "asc" },
 					},
-					rows: true,
+				},
+			});
+
+			// 2) Create an initial empty row so the table isn't blank
+			await ctx.db.row.create({
+				data: {
+					tableId: created.id,
+					position: 0,
+					cells: {
+						create: created.columns.map((col) => ({
+							columnId: col.id,
+							value: null,
+						})),
+					},
+				},
+			});
+
+			// 3) Return the freshly created table with columns and rows populated
+			return ctx.db.table.findUniqueOrThrow({
+				where: { id: created.id },
+				include: {
+					columns: { orderBy: { position: "asc" } },
+					rows: {
+						include: {
+							cells: { include: { column: true } },
+						},
+						orderBy: { position: "asc" },
+					},
 				},
 			});
 		}),

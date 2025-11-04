@@ -28,8 +28,8 @@ export function useCellUpdateQueue({
     const rowIdMapRef = useRef(new Map<string, string>());
 
 	// Create async queuer for processing cell updates
-	const queuer = useMemo(
-		() =>
+    const queuer = useMemo(
+        () =>
             new AsyncQueuer<CellUpdate>(
                 async (update) => {
                     try {
@@ -87,9 +87,12 @@ export function useCellUpdateQueue({
 					onError: (error, item) =>
 						console.error("Cell update failed:", error, item),
 				},
-			),
-		[tableId, updateCellMutation, utils.table.getById],
-	);
+            ),
+            // Keep the queue instance stable across renders. The mutation object
+            // identity can change each render; we don't want that to recreate the
+            // queue and thrash effects. Recreate only when tableId changes.
+            [tableId],
+    );
 
 	const queueCellUpdate = useCallback(
 		(rowId: string, columnId: string, value?: string | number) => {
