@@ -20,8 +20,8 @@ export function BaseLayout({
 	const [rowCount, setRowCount] = useState(5);
 	const [selectedBaseId, setSelectedBaseId] = useState<string | null>(null);
 	const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
-    const [showCreateTable, setShowCreateTable] = useState(false);
-    const [newTableName, setNewTableName] = useState("");
+	const [showCreateTable, setShowCreateTable] = useState(false);
+	const [newTableName, setNewTableName] = useState("");
 
 	const { base, table } = api;
 
@@ -154,22 +154,22 @@ export function BaseLayout({
 		);
 	}
 
-    if (!currentTable) {
-        return (
-            <SidebarProvider>
-                <AppSidebar />
-                <SidebarInset>
-                    <div className="flex h-screen flex-1 items-center justify-center">
-                        <div className="text-gray-500">
-                            {initialTableId
-                                ? "Preparing your table…"
-                                : "No table selected. Please select a table from the sidebar."}
-                        </div>
-                    </div>
-                </SidebarInset>
-            </SidebarProvider>
-        );
-    }
+	if (!currentTable) {
+		return (
+			<SidebarProvider>
+				<AppSidebar />
+				<SidebarInset>
+					<div className="flex h-screen flex-1 items-center justify-center">
+						<div className="text-gray-500">
+							{initialTableId
+								? "Preparing your table…"
+								: "No table selected. Please select a table from the sidebar."}
+						</div>
+					</div>
+				</SidebarInset>
+			</SidebarProvider>
+		);
+	}
 
 	return (
 		<SidebarProvider>
