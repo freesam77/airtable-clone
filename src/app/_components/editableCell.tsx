@@ -1,4 +1,3 @@
-import type { StringColorFormat } from "@faker-js/faker";
 import { useEffect, useRef, useState } from "react";
 
 interface EditableCellProps {
@@ -13,14 +12,13 @@ interface EditableCellProps {
 }
 
 export function EditableCell({
-	handleCellUpdate,
-	value,
-	rowId,
-	column,
+  handleCellUpdate,
+  value,
+  rowId,
+  column,
 }: EditableCellProps) {
 	const initialValue = value;
 	const [cell, setCell] = useState(initialValue);
-	const [isEditing, setIsEditing] = useState(false);
 	const inputRef = useRef<HTMLInputElement>(null);
 
 	// Get column type from the columns prop or meta
@@ -31,61 +29,39 @@ export function EditableCell({
 		setCell(initialValue);
 	}, [initialValue]);
 
-	// Focus input when editing starts
-	useEffect(() => {
-		if (isEditing && inputRef.current) {
-			inputRef.current.focus();
-			inputRef.current.select();
-		}
-	}, [isEditing]);
-
-    const onBlur = () => {
-        setIsEditing(false);
-        if (cell !== initialValue) {
-            handleCellUpdate(rowId, column.id, cell);
-        }
-    };
 
 	const onKeyDown = (e: React.KeyboardEvent) => {
-		if (e.key === "Enter") {
-			e.preventDefault();
-			onBlur();
-		} else if (e.key === "Escape") {
-			e.preventDefault();
-			setCell(initialValue);
-			setIsEditing(false);
-		}
-	};
+    if (e.key === "Enter") {
+      e.preventDefault();
+      // Move focus out to mimic commit behavior
+      inputRef.current?.blur();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      // Revert to original and notify
+      setCell(initialValue);
+      handleCellUpdate(rowId, column.id, initialValue);
+      inputRef.current?.blur();
+    }
+  };
 
-	if (isEditing) {
-		return (
-            <input
-                ref={inputRef}
-                type={columnType === "NUMBER" ? "number" : "text"}
-                value={String(cell ?? "")}
-                onChange={(e) => {
-                    const raw = e.target.value;
-                    // For numbers, keep empty string as empty (means clear)
-                    if (columnType === "NUMBER") {
-                        setCell(raw === "" ? "" : Number(raw));
-                    } else {
-                        setCell(raw);
-                    }
-                }}
-                onBlur={onBlur}
-                onKeyDown={onKeyDown}
-                className="w-full rounded border-none bg-transparent px-1 py-0.5 outline-none focus:bg-blue-50"
-            />
-        );
-	}
-
-    return (
-        <input
-            type="text"
-            readOnly
-            onFocus={() => setIsEditing(true)}
-            value={String(cell ?? "")}
-            className="h-full min-h-[20px] w-full cursor-text rounded border-none bg-transparent px-1 py-0.5 hover:bg-gray-50 focus:outline-none"
-        />
-    );
+  return (
+    <input
+      ref={inputRef}
+      type={columnType === "NUMBER" ? "number" : "text"}
+      value={String(cell ?? "")}
+      onChange={(e) => {
+        const raw = e.target.value;
+        if (columnType === "NUMBER") {
+          const next = raw === "" ? "" : Number(raw);
+          setCell(next);
+          handleCellUpdate(rowId, column.id, next as string | number);
+        } else {
+          setCell(raw);
+          handleCellUpdate(rowId, column.id, raw);
+        }
+      }}
+      onKeyDown={onKeyDown}
+      className="h-full min-h-5 w-full cursor-text border-gray-200 bg-transparent px-1 hover:bg-gray-50 focus:bg-blue-50 focus:outline-none"
+    />
+  );
 }

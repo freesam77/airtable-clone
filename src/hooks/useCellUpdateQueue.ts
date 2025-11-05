@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AsyncQueuer } from "@tanstack/pacer";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "~/trpc/react";
 
 interface CellUpdate {
-    rowId: string;
-    columnId: string;
-    value?: string | number;
+	rowId: string;
+	columnId: string;
+	value?: string | number;
 }
 
 interface UseCellUpdateQueueProps {
@@ -18,55 +18,55 @@ interface UseCellUpdateQueueProps {
 }
 
 export function useCellUpdateQueue({
-    tableId,
-    onOptimisticUpdate,
+	tableId,
+	onOptimisticUpdate,
 }: UseCellUpdateQueueProps) {
-    const utils = api.useUtils();
-    const updateCellMutation = api.table.updateCell.useMutation();
-    const [hasPendingChanges, setHasPendingChanges] = useState(false);
-    const pendingCountRef = useRef(0);
-    const rowIdMapRef = useRef(new Map<string, string>());
+	const utils = api.useUtils();
+	const updateCellMutation = api.table.updateCell.useMutation();
+	const [hasPendingChanges, setHasPendingChanges] = useState(false);
+	const pendingCountRef = useRef(0);
+	const rowIdMapRef = useRef(new Map<string, string>());
 
 	// Create async queuer for processing cell updates
-    const queuer = useMemo(
-        () =>
-            new AsyncQueuer<CellUpdate>(
-                async (update) => {
-                    try {
-                        const valueStr =
-                            typeof update.value === "number"
-                                ? String(update.value)
-                                : update.value;
-                        // If this update targets an optimistic row, wait briefly
-                        // for the real rowId mapping to appear before sending.
-                        const resolveRowId = async (rowId: string) => {
-                            // Fast path: already mapped
-                            const existing = rowIdMapRef.current.get(rowId);
-                            if (existing) return existing;
+	const queuer = useMemo(
+		() =>
+			new AsyncQueuer<CellUpdate>(
+				async (update) => {
+					try {
+						const valueStr =
+							typeof update.value === "number"
+								? String(update.value)
+								: update.value;
+						// If this update targets an optimistic row, wait briefly
+						// for the real rowId mapping to appear before sending.
+						const resolveRowId = async (rowId: string) => {
+							// Fast path: already mapped
+							const existing = rowIdMapRef.current.get(rowId);
+							if (existing) return existing;
 
-                            // If not a temp id, just use it
-                            if (!rowId.startsWith("temp-")) return rowId;
+							// If not a temp id, just use it
+							if (!rowId.startsWith("temp-")) return rowId;
 
-                            // Poll for mapping up to ~5s
-                            const start = Date.now();
-                            while (Date.now() - start < 5000) {
-                                const mapped = rowIdMapRef.current.get(rowId);
-                                if (mapped) return mapped;
-                                await new Promise((r) => setTimeout(r, 150));
-                            }
-                            // Give up; send with temp id (may fail, but won't block queue)
-                            return rowId;
-                        };
+							// Poll for mapping up to ~5s
+							const start = Date.now();
+							while (Date.now() - start < 5000) {
+								const mapped = rowIdMapRef.current.get(rowId);
+								if (mapped) return mapped;
+								await new Promise((r) => setTimeout(r, 150));
+							}
+							// Give up; send with temp id (may fail, but won't block queue)
+							return rowId;
+						};
 
-                        const mappedRowId = await resolveRowId(update.rowId);
-                        await updateCellMutation.mutateAsync({
-                            rowId: mappedRowId,
-                            columnId: update.columnId,
-                            // normalize empty string to null so it clears the value
-                            value: valueStr === "" ? null : valueStr,
-                        });
-                        utils.table.getById.invalidate({ id: tableId });
-                    } finally {
+						const mappedRowId = await resolveRowId(update.rowId);
+						await updateCellMutation.mutateAsync({
+							rowId: mappedRowId,
+							columnId: update.columnId,
+							// normalize empty string to null so it clears the value
+							value: valueStr === "" ? null : valueStr,
+						});
+						utils.table.getById.invalidate({ id: tableId });
+					} finally {
 						// Decrement pending count when item finishes (success or error)
 						pendingCountRef.current = Math.max(0, pendingCountRef.current - 1);
 						const pending = pendingCountRef.current > 0;
@@ -87,17 +87,17 @@ export function useCellUpdateQueue({
 					onError: (error, item) =>
 						console.error("Cell update failed:", error, item),
 				},
-            ),
-            // Keep the queue instance stable across renders. The mutation object
-            // identity can change each render; we don't want that to recreate the
-            // queue and thrash effects. Recreate only when tableId changes.
-            [tableId],
-    );
+			),
+		// Keep the queue instance stable across renders. The mutation object
+		// identity can change each render; we don't want that to recreate the
+		// queue and thrash effects. Recreate only when tableId changes.
+		[tableId, updateCellMutation.mutateAsync, utils.table.getById.invalidate],
+	);
 
 	const queueCellUpdate = useCallback(
 		(rowId: string, columnId: string, value?: string | number) => {
 			// Apply optimistic update immediately
-            console.log({rowId})
+			console.log({ rowId });
 			onOptimisticUpdate(rowId, columnId, value);
 
 			// Deduplicate: remove existing update for same cell
@@ -134,11 +134,11 @@ export function useCellUpdateQueue({
 				);
 			}
 		},
-        [onOptimisticUpdate, queuer],
-    );
+		[onOptimisticUpdate, queuer],
+	);
 
-    const flushPendingUpdates = useCallback(async () => {
-        await queuer.flush();
+	const flushPendingUpdates = useCallback(async () => {
+		await queuer.flush();
 		// Reset pending count after manual flush
 		pendingCountRef.current = 0;
 		setHasPendingChanges(false);
@@ -177,34 +177,37 @@ export function useCellUpdateQueue({
 		};
 	}, [hasPendingChanges, flushPendingUpdates]);
 
-    // Clean up on unmount
-    useEffect(() => () => queuer.stop(), [queuer]);
+	// Clean up on unmount
+	useEffect(() => () => queuer.stop(), [queuer]);
 
-    // Public API to remap optimistic temp row IDs to actual persisted IDs
-    const remapRowId = useCallback((tempRowId: string, realRowId: string) => {
-        if (!tempRowId || !realRowId || tempRowId === realRowId) return;
-        rowIdMapRef.current.set(tempRowId, realRowId);
+	// Public API to remap optimistic temp row IDs to actual persisted IDs
+	const remapRowId = useCallback(
+		(tempRowId: string, realRowId: string) => {
+			if (!tempRowId || !realRowId || tempRowId === realRowId) return;
+			rowIdMapRef.current.set(tempRowId, realRowId);
 
-        // Also rewrite any pending items so they point to the real row id
-        const pending = queuer.peekPendingItems();
-        if (pending.length > 0) {
-            queuer.clear();
-            for (const item of pending) {
-                const mapped = {
-                    ...item,
-                    rowId: item.rowId === tempRowId ? realRowId : item.rowId,
-                };
-                queuer.addItem(mapped);
-            }
-        }
-    }, [queuer]);
+			// Also rewrite any pending items so they point to the real row id
+			const pending = queuer.peekPendingItems();
+			if (pending.length > 0) {
+				queuer.clear();
+				for (const item of pending) {
+					const mapped = {
+						...item,
+						rowId: item.rowId === tempRowId ? realRowId : item.rowId,
+					};
+					queuer.addItem(mapped);
+				}
+			}
+		},
+		[queuer],
+	);
 
-    return {
-        queueCellUpdate,
-        flushPendingUpdates,
-        pendingUpdatesCount: pendingCountRef.current,
-        isProcessing: queuer.store.state.activeItems.length > 0,
-        hasPendingChanges,
-        remapRowId,
-    };
+	return {
+		queueCellUpdate,
+		flushPendingUpdates,
+		pendingUpdatesCount: pendingCountRef.current,
+		isProcessing: queuer.store.state.activeItems.length > 0,
+		hasPendingChanges,
+		remapRowId,
+	};
 }

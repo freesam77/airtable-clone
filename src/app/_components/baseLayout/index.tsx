@@ -1,11 +1,12 @@
 "use client";
+import { Database } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { Button } from "~/components/ui/button";
 import { api } from "~/trpc/react";
 import { DataTable } from "../dataTable";
+import Image from "next/image";
 import { TopNav } from "./topNav";
-import { Database } from "lucide-react";
-import { Button } from "~/components/ui/button";
 
 interface DashboardLayoutProps {
 	initialBaseId?: string;
@@ -131,15 +132,17 @@ export function BaseLayout({
 
 	return (
 		<div className="flex h-full">
-			<div className="flex w-15 justify-center border pt-5">
-				<Button
-					className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground"
+			<div className="flex w-15 items-start justify-center border pt-5">
+				<Image
+					src="/airtable-logo.svg"
+					className="h-6 cursor-pointer"
+					width={30}
+					height={10}
 					onClick={() => router.push("/dashboard")}
-				>
-					<Database className="h-4 w-4 cursor-pointer" />
-				</Button>
+					alt={"Home"}
+				/>
 			</div>
-			<div>
+			<div className="w-full">
 				{/* Inline conditional content */}
 				{basesLoading ? (
 					<div className="flex h-screen flex-1 items-center justify-center">
@@ -175,10 +178,7 @@ export function BaseLayout({
 							createTable={createTable}
 						/>
 
-						{/* Main Content */}
-						<div className="flex-1 p-6">
-							<DataTable tableId={currentTable.id} />
-						</div>
+						<DataTable tableId={currentTable.id} />
 					</div>
 				)}
 			</div>

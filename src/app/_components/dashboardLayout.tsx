@@ -24,19 +24,19 @@ interface DashboardLayoutProps {
 }
 
 export function DashboardLayout({ user }: DashboardLayoutProps) {
-    const router = useRouter();
-    const [showCreateBase, setShowCreateBase] = useState(false);
-    const [newBaseName, setNewBaseName] = useState("");
-    const [newBaseDescription, setNewBaseDescription] = useState("");
-    const utils = api.useUtils();
+	const router = useRouter();
+	const [showCreateBase, setShowCreateBase] = useState(false);
+	const [newBaseName, setNewBaseName] = useState("");
+	const [newBaseDescription, setNewBaseDescription] = useState("");
+	const utils = api.useUtils();
 
 	const { data: bases, refetch, isLoading } = api.base.getAll.useQuery();
-    const createBase = api.base.create.useMutation({
-        onSuccess: (newBase) => {
-            void refetch();
-            setShowCreateBase(false);
-            setNewBaseName("");
-            setNewBaseDescription("");
+	const createBase = api.base.create.useMutation({
+		onSuccess: (newBase) => {
+			void refetch();
+			setShowCreateBase(false);
+			setNewBaseName("");
+			setNewBaseDescription("");
 			// After creating a base, create a default table then navigate
 			if (newBase?.id) {
 				createTable.mutate({
@@ -54,17 +54,17 @@ export function DashboardLayout({ user }: DashboardLayoutProps) {
 		},
 	});
 
-    const createTable = api.base.createTable.useMutation({
-        onSuccess: async (table) => {
-            await utils.base.getAll.invalidate();
-            void refetch();
-            if (table?.id && table?.baseId) {
-                router.push(`/${table.baseId}/${table.id}`);
-            }
-        },
-    });
+	const createTable = api.base.createTable.useMutation({
+		onSuccess: async (table) => {
+			await utils.base.getAll.invalidate();
+			void refetch();
+			if (table?.id && table?.baseId) {
+				router.push(`/${table.baseId}/${table.id}`);
+			}
+		},
+	});
 
-    const isCreating = createBase.isPending || createTable.isPending;
+	const isCreating = createBase.isPending || createTable.isPending;
 
 	const getUserInitials = (name: string | null | undefined) => {
 		if (!name) return "U";
@@ -120,11 +120,11 @@ export function DashboardLayout({ user }: DashboardLayoutProps) {
 		<main className="flex-1 p-8">
 			<div className="mb-8 flex items-center justify-between">
 				<h2 className="font-semibold text-3xl text-gray-900">Home</h2>
-                <Button
-                    onClick={() => setShowCreateBase(true)}
-                    disabled={isCreating}
-                    className="bg-blue-600 hover:bg-blue-700"
-                >
+				<Button
+					onClick={() => setShowCreateBase(true)}
+					disabled={isCreating}
+					className="bg-blue-600 hover:bg-blue-700"
+				>
 					<Plus size={16} className="mr-2" />
 					Create a workspace
 				</Button>
@@ -154,14 +154,14 @@ export function DashboardLayout({ user }: DashboardLayoutProps) {
 				))}
 
 				{/* Create New Base Card */}
-                <button
-                    onClick={() => {
-                        if (!isCreating) setShowCreateBase(true);
-                    }}
-                    disabled={isCreating}
-                    type="button"
-                    className="group flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-gray-300 border-dashed bg-gray-50 p-6 transition-colors hover:border-gray-400 hover:bg-gray-100"
-                >
+				<button
+					onClick={() => {
+						if (!isCreating) setShowCreateBase(true);
+					}}
+					disabled={isCreating}
+					type="button"
+					className="group flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-gray-300 border-dashed bg-gray-50 p-6 transition-colors hover:border-gray-400 hover:bg-gray-100"
+				>
 					<div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-white">
 						<Plus size={24} className="text-gray-400" />
 					</div>
@@ -203,28 +203,28 @@ export function DashboardLayout({ user }: DashboardLayoutProps) {
 						</div>
 					</div>
 					<DialogFooter>
-                    <Button
-                        variant="ghost"
-                        onClick={() => {
-                            setShowCreateBase(false);
-                            setNewBaseName("");
-                            setNewBaseDescription("");
-                        }}
-                    >
-                        Cancel
-                    </Button>
-                    <Button
-                        onClick={handleCreateBase}
-                        disabled={!newBaseName.trim() || isCreating}
-                        className="bg-blue-600 hover:bg-blue-700"
-                    >
-                        {isCreating ? "Creating..." : "Create workspace"}
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-        </main>
-    );
+						<Button
+							variant="ghost"
+							onClick={() => {
+								setShowCreateBase(false);
+								setNewBaseName("");
+								setNewBaseDescription("");
+							}}
+						>
+							Cancel
+						</Button>
+						<Button
+							onClick={handleCreateBase}
+							disabled={!newBaseName.trim() || isCreating}
+							className="bg-blue-600 hover:bg-blue-700"
+						>
+							{isCreating ? "Creating..." : "Create workspace"}
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+		</main>
+	);
 
 	return (
 		<div className="min-h-screen bg-gray-50">
@@ -280,15 +280,15 @@ export function DashboardLayout({ user }: DashboardLayoutProps) {
 
 				{/* Main Content */}
 				{!isLoading ? mainContent() : <div>Loading</div>}
-            </div>
+			</div>
 
-            {isCreating && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/80">
-                    <div className="text-gray-700">Creating your workspace…</div>
-                </div>
-            )}
-        </div>
-    );
+			{isCreating && (
+				<div className="fixed inset-0 z-50 flex items-center justify-center bg-white/80">
+					<div className="text-gray-700">Creating your workspace…</div>
+				</div>
+			)}
+		</div>
+	);
 }
 
 // Full-screen overlay to block interaction while creating a base/table

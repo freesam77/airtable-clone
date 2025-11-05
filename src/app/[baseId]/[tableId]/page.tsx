@@ -17,10 +17,5 @@ export default async function BaseTablePage({ params }: BaseTablePageProps) {
 		redirect("/");
 	}
 
-	return (
-		<BaseLayout
-			initialBaseId={baseId}
-			initialTableId={tableId}
-		/>
-	);
+	return <BaseLayout initialBaseId={baseId} initialTableId={tableId} />;
 }

@@ -1,24 +1,23 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
 import {
-	Plus,
-	Folder,
 	ChevronDown,
 	ChevronRight,
-	Star,
 	ExternalLink,
+	Folder,
 	MoreHorizontal,
+	Plus,
+	Star,
 } from "lucide-react";
+import { Check, Search } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
 	DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
 import { Input } from "~/components/ui/input";
-import { Check, Search, LayoutGrid, ChevronDown as SmallChevronDown } from "lucide-react";
-import { SidebarTrigger } from "~/components/ui/sidebar";
-import { api } from "~/trpc/react";
 import { showToast } from "~/components/ui/toast";
+import { api } from "~/trpc/react";
 
 type Table = { id: string; name: string };
 type Base = {
@@ -98,15 +97,15 @@ export const TopNav = ({
 	const [centerTab, setCenterTab] = useState<
 		"Data" | "Automations" | "Interfaces" | "Forms"
 	>("Data");
-    const [tableMenuOpen, setTableMenuOpen] = useState(false);
-    const [tableSearch, setTableSearch] = useState("");
-    const [showAddInline, setShowAddInline] = useState(false);
-    const [viewName, setViewName] = useState("Grid view");
+	const [tableMenuOpen, setTableMenuOpen] = useState(false);
+	const [tableSearch, setTableSearch] = useState("");
+	const [showAddInline, setShowAddInline] = useState(false);
+	const [viewName, setViewName] = useState("Grid view");
 
 	useEffect(() => {
 		setNameDraft(selectedBase.name);
 		setDescDraft(selectedBase.description ?? "");
-	}, [selectedBase.id, selectedBase.name, selectedBase.description]);
+	}, [selectedBase.name, selectedBase.description]);
 
 	const commitName = () => {
 		const trimmed = nameDraft.trim();
@@ -135,7 +134,7 @@ export const TopNav = ({
 	return (
 		<div>
 			{/* Base name and description */}
-			<div className="relative border-b px-6 pt-2">
+			<div className="relative border-b px-3 pt-2">
 				<div className="flex items-center justify-between">
 					<div className="flex items-center gap-1">
 						<DropdownMenu>
@@ -143,7 +142,7 @@ export const TopNav = ({
 								<button type="button" className="flex items-center gap-2">
 									<Folder
 										size={32}
-										className="mr-1 rounded-md border p-[5px]"
+										className="mr-1 rounded-md border bg-blue-600 p-[5px] text-white"
 									/>
 									{editingName ? (
 										<input
@@ -196,7 +195,6 @@ export const TopNav = ({
 													}
 												}}
 												className="w-full max-w-[360px] rounded border border-gray-300 px-2 py-1 text-xl"
-												autoFocus
 											/>
 										) : (
 											<h2
@@ -270,14 +268,14 @@ export const TopNav = ({
 					{/* Center section: Data | Automations | Interfaces | Forms */}
 					<nav
 						aria-label="Base sections"
-						className="flex h-12 gap-6 text-gray-600 text-sm"
+						className="flex h-12 gap-2 text-gray-600 text-sm"
 					>
 						<button
 							type="button"
 							onClick={() => setCenterTab("Data")}
 							className={`border-b-2 px-1 pb-1 ${
 								centerTab === "Data"
-									? "border-green-700 font-semibold text-gray-900"
+									? "border-blue-700 font-semibold text-gray-900"
 									: "border-transparent hover:text-gray-900"
 							}`}
 						>
@@ -289,7 +287,7 @@ export const TopNav = ({
 							disabled
 							className={`border-b-2 px-1 pb-1 ${
 								centerTab === "Automations"
-									? "border-green-700 font-semibold text-gray-900"
+									? "border-blue-700 font-semibold text-gray-900"
 									: "border-transparent hover:text-gray-900"
 							}`}
 						>
@@ -301,7 +299,7 @@ export const TopNav = ({
 							disabled
 							className={`border-b-2 px-1 pb-1 ${
 								centerTab === "Interfaces"
-									? "border-green-700 font-semibold text-gray-900"
+									? "border-blue-700 font-semibold text-gray-900"
 									: "border-transparent hover:text-gray-900"
 							}`}
 						>
@@ -313,7 +311,7 @@ export const TopNav = ({
 							disabled
 							className={`border-b-2 px-1 pb-1 ${
 								centerTab === "Forms"
-									? "border-green-700 font-semibold text-gray-900"
+									? "border-blue-700 font-semibold text-gray-900"
 									: "border-transparent hover:text-gray-900"
 							}`}
 						>
@@ -346,7 +344,7 @@ export const TopNav = ({
 								<Plus size={16} />
 								{generateRows.isPending ? "Generating..." : "Generate Rows"}
 							</button>
-							<button type="button" onClick={handleShare} className="btn-share">
+							<button type="button" onClick={handleShare} className="btn-share bg-blue-600 text-white">
 								Share
 							</button>
 						</div>
@@ -481,7 +479,7 @@ export const TopNav = ({
 				</div>
 			</div>
 
-            {/* Inner navbar removed (moved into DataTable) */}
+			{/* Inner navbar removed (moved into DataTable) */}
 		</div>
 	);
 };

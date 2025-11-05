@@ -2,11 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 // Minimal shapes needed by the hook (keeps it reusable and typed)
 type RowLike = {
-    id: string;
-    cells: Array<{
-        column: { id: string };
-        value?: string | null;
-    }>;
+	id: string;
+	cells: Array<{
+		column: { id: string };
+		value?: string | null;
+	}>;
 };
 
 type ColumnLike = { id: string };
@@ -76,7 +76,7 @@ export function useTableSearchNavigation({
 	// Reset active index only when the query changes
 	useEffect(() => {
 		setActiveMatchIndex(0);
-	}, [query]);
+	}, []);
 
 	const activeMatch = useMemo(() => {
 		if (matches.length === 0) return undefined;
