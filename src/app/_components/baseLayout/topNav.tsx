@@ -344,7 +344,11 @@ export const TopNav = ({
 								<Plus size={16} />
 								{generateRows.isPending ? "Generating..." : "Generate Rows"}
 							</button>
-							<button type="button" onClick={handleShare} className="btn-share bg-blue-600 text-white">
+							<button
+								type="button"
+								onClick={handleShare}
+								className="btn-share bg-blue-600 text-white"
+							>
 								Share
 							</button>
 						</div>
@@ -353,7 +357,7 @@ export const TopNav = ({
 			</div>
 
 			{/* Table tabs + switcher */}
-			<div className="border-gray-200 border-b bg-gray-50">
+			<div className="flex items-center justify-between border-gray-200 border-b bg-blue-50">
 				<div className="flex items-center gap-1">
 					{selectedBase.tables.map((table) => (
 						<button
@@ -384,7 +388,7 @@ export const TopNav = ({
 						<DropdownMenuTrigger asChild>
 							<button
 								type="button"
-								className="cursor-pointer px-2 text-gray-600"
+								className="cursor-pointer border-gray-300 border-l pl-3 text-gray-600"
 							>
 								<ChevronDown size={14} />
 							</button>
@@ -477,6 +481,13 @@ export const TopNav = ({
 						<Plus size={14} /> Add or import
 					</button>
 				</div>
+				<button
+					type="button"
+					className="flex cursor-pointer items-center gap-2 border-gray-300 pr-3 text-gray-600 text-sm"
+				>
+					Tools
+					<ChevronDown size={14} />
+				</button>
 			</div>
 
 			{/* Inner navbar removed (moved into DataTable) */}

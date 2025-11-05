@@ -15,7 +15,7 @@ import {
 	EyeOff,
 	Filter,
 	FolderTree,
-	LayoutGrid,
+	Sheet,
 	Menu,
 	Palette,
 	Search,
@@ -95,9 +95,6 @@ interface DataTableProps {
 }
 
 export function DataTable({ tableId }: DataTableProps) {
-	const [isAddingRow, setIsAddingRow] = useState(false);
-	const [newRowData, setNewRowData] = useState<Record<string, string>>({});
-	const addRowRef = useRef<HTMLTableRowElement | null>(null);
 	const [searchOpen, setSearchOpen] = useState(false);
 	const [searchValue, setSearchValue] = useState("");
 	const [viewSidebarOpen, setViewSidebarOpen] = useState(true);
@@ -179,10 +176,6 @@ export function DataTable({ tableId }: DataTableProps) {
 			await utils.table.getById.cancel({ id: tableId });
 			const previousData = utils.table.getById.getData({ id: tableId });
 
-			// Immediately hide the editing state and clear input data
-			setIsAddingRow(false);
-			setNewRowData({});
-
 			// Create optimistic row
 			const optimisticRowId = `temp-${Date.now()}`;
 			const now = new Date();
@@ -244,8 +237,6 @@ export function DataTable({ tableId }: DataTableProps) {
 			if (context?.previousData) {
 				utils.table.getById.setData({ id: tableId }, context.previousData);
 			}
-			// Show the editing state again on error
-			setIsAddingRow(true);
 		},
 		onSettled: () => {
 			utils.table.getById.invalidate({ id: tableId });
@@ -436,7 +427,7 @@ export function DataTable({ tableId }: DataTableProps) {
 			enableSorting: false,
 			enableGlobalFilter: false,
 			meta: {
-				className: "sticky left-0 w-12 text-center",
+				className: "sticky left-0 w-2 border-b border-r-none text-center",
 			},
 		},
 		// Data columns
@@ -445,11 +436,11 @@ export function DataTable({ tableId }: DataTableProps) {
 			.map((col) => ({
 				id: col.id,
 				header: () => (
-					<div className="flex items-center gap-2">
+					<div className="flex items-center">
 						<TooltipProvider>
 							<Tooltip>
 								<TooltipTrigger asChild>
-									<span className="flex size-4 items-center justify-center rounded bg-muted text-muted-foreground text-xs">
+									<span className="flex size-6 items-center justify-center text-md text-muted-foreground">
 										{getColumnTypeIcon(col.type)}
 									</span>
 								</TooltipTrigger>
@@ -578,36 +569,9 @@ export function DataTable({ tableId }: DataTableProps) {
 		return () => window.removeEventListener("keydown", handler);
 	}, []);
 
-	const submitNewRow = () => {
-		// Check if there's any data to submit
-		const hasData = Object.values(newRowData).some(
-			(value) => value.trim() !== "",
-		);
-
-		if (!hasData) {
-			// If no data, just cancel the add operation
-			handleCancelAdd();
-			return;
-		}
-
-		const cells = columns.map((col) => ({
-			columnId: col.id,
-			value: newRowData[col.id] || "",
-		}));
-
-		addRowMutation.mutate({
-			tableId,
-			cells: cells,
-		});
-	};
-
 	const handleAddRow = () => {
-		if (isAddingRow) {
-			submitNewRow();
-			return;
-		}
-		// Start adding a new row
-		setIsAddingRow(true);
+		const cells = columns.map((col) => ({ columnId: col.id, value: "" }));
+		addRowMutation.mutate({ tableId, cells });
 	};
 
 	const handleAddColumn = (name: string, type: "TEXT" | "NUMBER") => {
@@ -618,17 +582,7 @@ export function DataTable({ tableId }: DataTableProps) {
 		});
 	};
 
-	const handleCancelAdd = () => {
-		setIsAddingRow(false);
-		setNewRowData({});
-	};
-
-	const handleInputChange = (columnId: string, value: string) => {
-		setNewRowData((prev) => ({
-			...prev,
-			[columnId]: value,
-		}));
-	};
+	// removed: inline add-row editing state and handlers
 
 	const handleDeleteRow = (rowId: string) => {
 		deleteRowMutation.mutate({ rowId });
@@ -655,7 +609,7 @@ export function DataTable({ tableId }: DataTableProps) {
 			<div className="min-w-0 flex-1">
 				{/* Views header row (hamburger + current view menu) */}
 				<div className="flex items-center justify-between border-b px-3">
-					<div className="flex gap-3">
+					<div className="flex gap-1">
 						<button
 							type="button"
 							onClick={() => setViewSidebarOpen((v) => !v)}
@@ -670,7 +624,7 @@ export function DataTable({ tableId }: DataTableProps) {
 									type="button"
 									className="flex items-center gap-2 rounded px-2 py-1 text-gray-700 text-sm hover:bg-gray-50"
 								>
-									<LayoutGrid className="size-4" />
+									<Sheet className="size-4 text-blue-600" />
 									{viewName}
 									<ChevronDown className="size-4" />
 								</button>
@@ -822,34 +776,36 @@ export function DataTable({ tableId }: DataTableProps) {
 				<div className="flex h-full">
 					{/* Left views sidebar inside table area */}
 					{viewSidebarOpen && (
-						<aside className="w-64 shrink-0 border-gray-200 border-r bg-white px-4 py-3">
-							<div className="mb-3 flex items-center justify-between">
+						<nav className="flex w-70 shrink-0 flex-col gap-2 border-gray-200 border-r bg-white px-4 py-3 text-xs">
+							<button
+								type="button"
+								className="flex cursor-pointer items-center gap-2 px-3 text-gray-700 text-sm hover:text-gray-900"
+							>
+								<span className="text-xl">+</span>
+								Create new...
+							</button>
+							<div className="flex items-center gap-2 px-3">
+								<Search className="size-4 text-gray-400" />
+								<Input
+									placeholder="Find a view"
+									className="h-8 w-full pl-0 text-xs shadow-none md:text-xs"
+								/>
+							</div>
+							<div>
 								<button
 									type="button"
-									className="flex items-center gap-2 text-gray-700 text-sm hover:text-gray-900"
+									className="flex w-full items-center gap-2 bg-gray-100 px-3 py-2 text-gray-900"
 								>
-									<span className="text-xl leading-none">+</span>
-									Create new...
-								</button>
-							</div>
-							<div className="relative mb-3">
-								<Search className="-translate-y-1/2 pointer-events-none absolute top-1/2 left-2 size-4 text-gray-400" />
-								<Input placeholder="Find a view" className="h-8 w-full pl-8" />
-							</div>
-							<div className="space-y-1">
-								<button
-									type="button"
-									className="flex w-full items-center gap-2 rounded bg-gray-100 px-2 py-2 text-left text-gray-900"
-								>
-									<LayoutGrid className="size-4" /> {viewName}
+									<Sheet className="size-4 text-blue-600" />
+									<span>{viewName}</span>
 									<ChevronDown className="ml-auto size-4" />
 								</button>
 							</div>
-						</aside>
+						</nav>
 					)}
 
-					<div className="w-full">
-						<div className="relative overflow-hidden border border-gray-200">
+					<div className="relative w-full">
+						<div className="overflow-hidden border border-gray-200">
 							<table
 								className="w-full bg-white"
 								key={`table-${columns.length}-${columns.map((c) => c.id).join("-")}`}
@@ -885,7 +841,7 @@ export function DataTable({ tableId }: DataTableProps) {
 														<td
 															key={cell.id}
 															className={cn(
-																"border-gray-200 border-r border-b py-1 text-gray-900 text-sm last:border-r-0",
+																"w-[150px] truncate whitespace-nowrap border-gray-200 border-r border-b py-1 text-gray-900 text-sm last:border-r-0",
 
 																cell.column.columnDef.meta?.className,
 																(() => {
@@ -930,50 +886,7 @@ export function DataTable({ tableId }: DataTableProps) {
 											</ContextMenuContent>
 										</ContextMenu>
 									))}
-									{isAddingRow && (
-										<tr className="bg-blue-50" ref={addRowRef}>
-											{columns
-												.sort((a, b) => a.position - b.position)
-												.map((col) => (
-													<td
-														key={col.id}
-														className="border-gray-200 border-r p-2 last:border-r-0"
-													>
-														<input
-															type={col.type === "NUMBER" ? "number" : "text"}
-															value={newRowData[col.id] ?? ""}
-															onChange={(e) =>
-																handleInputChange(col.id, e.target.value)
-															}
-															onKeyDown={(e) => {
-																if (e.key === "Enter") {
-																	e.preventDefault();
-																	submitNewRow();
-																}
-																if (e.key === "Escape") {
-																	e.preventDefault();
-																	handleCancelAdd();
-																}
-															}}
-															onBlur={() => {
-																// Delay to allow focus to move to another input inside the same row
-																setTimeout(() => {
-																	const container = addRowRef.current;
-																	if (!container) return;
-																	const active = document.activeElement;
-																	if (active && container.contains(active)) {
-																		return; // still within row inputs
-																	}
-																	submitNewRow();
-																}, 0);
-															}}
-															className="w-full border-gray-300 p-2 text-sm focus:border-blue-500 focus:outline-none"
-															placeholder={`Enter ${col.name.toLowerCase()}`}
-														/>
-													</td>
-												))}
-										</tr>
-									)}
+									{/* Inline add row UI removed: plus button adds row immediately */}
 								</tbody>
 								{/* Add Row button row */}
 								<tr className="border-gray-200 border-t bg-white">
@@ -1018,13 +931,8 @@ export function DataTable({ tableId }: DataTableProps) {
 							</table>
 						</div>
 						{/* Footer with record count */}
-						<div className="flex items-center justify-end border-gray-200 border-t p-4 text-gray-500 text-sm">
-							<div className="flex items-center gap-2">
-								<span className="font-medium">
-									{table.getRowModel().rows.length}
-								</span>
-								<span>records</span>
-							</div>
+						<div className="absolute bottom-0 w-full border-t bg-white p-4 py-2 text-gray-900 text-xs last:border-r-0">
+							<span> {table.getRowModel().rows.length} records</span>
 						</div>
 					</div>
 				</div>
