@@ -425,9 +425,8 @@ export function DataTable({ tableId }: DataTableProps) {
 				);
 			},
 			enableSorting: false,
-			enableGlobalFilter: false,
 			meta: {
-				className: "sticky left-0 w-2 border-b border-r-none text-center",
+				className: "sticky left-0 w-2 border-b text-center",
 			},
 		},
 		// Data columns
@@ -476,31 +475,6 @@ export function DataTable({ tableId }: DataTableProps) {
 						(cv: { column: { id: string } }) => cv.column.id === col.id,
 					),
 			})),
-		// Add Column button - pinned to right
-		{
-			id: "add-column",
-			header: () => (
-				<AddColumnDropdown
-					onCreate={handleAddColumn}
-					isLoading={addColumnMutation.isPending}
-					trigger={
-						<button
-							type="button"
-							className="h-full w-full cursor-pointer transition-colors hover:bg-gray-100"
-						>
-							+
-						</button>
-					}
-				/>
-			),
-			cell: () => null, // Empty cell for data rows
-			enableGlobalFilter: false,
-			enablePinning: true,
-			meta: {
-				className:
-					"sticky right-0 z-10 bg-gray-50 p-0 text-center font-medium text-gray-700 text-sm transition-colors hover:bg-gray-100 items-center justify-center text-xl",
-			},
-		},
 	];
 
 	// Pre-filter rows using the same logic as the global filter so non-matching rows are hidden at the data level too
@@ -524,7 +498,6 @@ export function DataTable({ tableId }: DataTableProps) {
 		initialState: {
 			columnPinning: {
 				left: ["row-number"],
-				right: ["add-column"],
 			},
 		},
 	});
@@ -805,9 +778,9 @@ export function DataTable({ tableId }: DataTableProps) {
 					)}
 
 					<div className="relative w-full">
-						<div className="overflow-hidden border border-gray-200">
+						<div className="flex overflow-hidden border-gray-200">
 							<table
-								className="w-full bg-white"
+								className="border bg-white"
 								key={`table-${columns.length}-${columns.map((c) => c.id).join("-")}`}
 							>
 								<thead className="border-gray-300 border-b">
@@ -817,7 +790,7 @@ export function DataTable({ tableId }: DataTableProps) {
 												<th
 													key={header.id}
 													className={cn(
-														"border-gray-200 border-r p-2 text-left text-gray-700 text-sm last:border-r-0",
+														"border-gray-200 border-r p-2 text-left text-gray-700 text-sm",
 														header.column.columnDef.meta?.className,
 													)}
 												>
@@ -841,7 +814,7 @@ export function DataTable({ tableId }: DataTableProps) {
 														<td
 															key={cell.id}
 															className={cn(
-																"w-[150px] truncate whitespace-nowrap border-gray-200 border-r border-b py-1 text-gray-900 text-sm last:border-r-0",
+																"h-8 w-[150px] truncate whitespace-nowrap border-gray-200 border-r border-b text-gray-900 text-sm",
 
 																cell.column.columnDef.meta?.className,
 																(() => {
@@ -889,16 +862,13 @@ export function DataTable({ tableId }: DataTableProps) {
 									{/* Inline add row UI removed: plus button adds row immediately */}
 								</tbody>
 								{/* Add Row button row */}
-								<tr className="border-gray-200 border-t bg-white">
+								<tr className="border-gray-200 border-r bg-white">
 									{columns
 										.sort((a, b) => a.position - b.position)
 										.map((col, index) => (
 											<td
 												key={col.id}
-												className={cn(
-													"border-gray-200 border-r text-gray-900 text-sm last:border-r-0",
-													index === 0 && "border-b-0", // Remove bottom border for first cell
-												)}
+												className={cn("border-gray-200 text-gray-900 text-sm")}
 											>
 												{index === 0 ? (
 													<TooltipProvider>
@@ -923,15 +893,25 @@ export function DataTable({ tableId }: DataTableProps) {
 												) : null}
 											</td>
 										))}
-									{/* Add Column cell */}
-									<td className="sticky right-0 z-10 w-[50px] border border-gray-200 border-b-0 border-l-0 bg-white py-2 text-center">
-										{/* Empty cell to match header */}
-									</td>
 								</tr>
 							</table>
+							{/* Floating Add Column button (no body cells underneath) */}
+							<AddColumnDropdown
+								onCreate={handleAddColumn}
+								isLoading={addColumnMutation.isPending}
+								trigger={
+									<button
+										type="button"
+										className="pointer-events-auto h-[41.19px] w-[100px] cursor-pointer border border-gray-200 border-l-0 bg-white text-gray-900 text-lg hover:bg-gray-100"
+										aria-label="Add column"
+									>
+										+
+									</button>
+								}
+							/>
 						</div>
 						{/* Footer with record count */}
-						<div className="absolute bottom-0 w-full border-t bg-white p-4 py-2 text-gray-900 text-xs last:border-r-0">
+						<div className="absolute bottom-0 w-full border-t bg-white p-4 py-2 text-xs">
 							<span> {table.getRowModel().rows.length} records</span>
 						</div>
 					</div>
