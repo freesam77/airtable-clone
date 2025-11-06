@@ -131,7 +131,7 @@ export function BaseLayout({
 	};
 
 	return (
-		<div className="flex h-full">
+		<div className="flex">
 			<div className="flex w-15 items-start justify-center border pt-5">
 				<Image
 					src="/airtable-logo.svg"
@@ -144,43 +144,39 @@ export function BaseLayout({
 			</div>
 			<div className="w-full">
 				{/* Inline conditional content */}
-				{basesLoading ? (
-					<div className="flex h-screen flex-1 items-center justify-center">
+				<div className="flex h-screen flex-1 flex-col bg-gray-50">
+					{basesLoading ? (
 						<div className="text-gray-500">Loading...</div>
-					</div>
-				) : !selectedBase ? (
-					<div className="flex h-screen flex-1 items-center justify-center">
+					) : !selectedBase ? (
 						<div className="text-gray-500">No bases found.</div>
-					</div>
-				) : !currentTable ? (
-					<div className="flex h-screen flex-1 items-center justify-center">
+					) : !currentTable ? (
 						<div className="text-gray-500">
 							{initialTableId
 								? "Preparing your table…"
 								: "No table selected. Please select a table from the sidebar."}
 						</div>
-					</div>
-				) : (
-					<div className="flex h-screen flex-1 flex-col bg-gray-50">
-						<TopNav
-							selectedBase={selectedBase}
-							rowCount={rowCount}
-							setRowCount={setRowCount}
-							handleGenerateRows={handleGenerateRows}
-							generateRows={generateRows}
-							selectedTableId={selectedTableId}
-							handleTableSelect={handleTableSelect}
-							showCreateTable={showCreateTable}
-							setShowCreateTable={setShowCreateTable}
-							newTableName={newTableName}
-							setNewTableName={setNewTableName}
-							handleCreateTable={handleCreateTable}
-							createTable={createTable}
-						/>
+					) : (
+						<>
+							<TopNav
+								selectedBase={selectedBase}
+								rowCount={rowCount}
+								setRowCount={setRowCount}
+								handleGenerateRows={handleGenerateRows}
+								generateRows={generateRows}
+								selectedTableId={selectedTableId}
+								handleTableSelect={handleTableSelect}
+								showCreateTable={showCreateTable}
+								setShowCreateTable={setShowCreateTable}
+								newTableName={newTableName}
+								setNewTableName={setNewTableName}
+								handleCreateTable={handleCreateTable}
+								createTable={createTable}
+							/>
 
-						<DataTable tableId={currentTable.id} />
-					</div>
-				)}
+							<DataTable tableId={currentTable.id} />
+						</>
+					)}
+				</div>
 			</div>
 		</div>
 	);

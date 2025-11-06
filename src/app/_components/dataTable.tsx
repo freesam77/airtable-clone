@@ -777,8 +777,8 @@ export function DataTable({ tableId }: DataTableProps) {
 						</nav>
 					)}
 
-					<div className="relative w-full">
-						<div className="flex overflow-hidden border-gray-200">
+					<div className="flex w-full flex-col justify-between overflow-hidden">
+						<div className="flex border-gray-200">
 							<table
 								className="border bg-white"
 								key={`table-${columns.length}-${columns.map((c) => c.id).join("-")}`}
@@ -911,7 +911,7 @@ export function DataTable({ tableId }: DataTableProps) {
 							/>
 						</div>
 						{/* Footer with record count */}
-						<div className="absolute bottom-0 w-full border-t bg-white p-4 py-2 text-xs">
+						<div className="w-full border-t bg-white p-4 text-xs">
 							<span> {table.getRowModel().rows.length} records</span>
 						</div>
 					</div>
