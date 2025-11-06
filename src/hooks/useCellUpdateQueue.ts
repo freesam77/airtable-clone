@@ -23,6 +23,18 @@ export function useCellUpdateQueue({
 }: UseCellUpdateQueueProps) {
 	const utils = api.useUtils();
 	const updateCellMutation = api.table.updateCell.useMutation();
+
+	// Keep unstable function references in refs so the queuer instance
+	// doesn't need to be re-created every render.
+	const mutateRef = useRef(updateCellMutation.mutateAsync);
+	useEffect(() => {
+		mutateRef.current = updateCellMutation.mutateAsync;
+	}, [updateCellMutation.mutateAsync]);
+
+	const invalidateRef = useRef(utils.table.getById.invalidate);
+	useEffect(() => {
+		invalidateRef.current = utils.table.getById.invalidate;
+	}, [utils.table.getById.invalidate]);
 	const [hasPendingChanges, setHasPendingChanges] = useState(false);
 	const pendingCountRef = useRef(0);
 	const rowIdMapRef = useRef(new Map<string, string>());
@@ -59,13 +71,13 @@ export function useCellUpdateQueue({
 						};
 
 						const mappedRowId = await resolveRowId(update.rowId);
-						await updateCellMutation.mutateAsync({
+						await mutateRef.current({
 							rowId: mappedRowId,
 							columnId: update.columnId,
 							// normalize empty string to null so it clears the value
 							value: valueStr === "" ? null : valueStr,
 						});
-						utils.table.getById.invalidate({ id: tableId });
+						invalidateRef.current({ id: tableId });
 					} finally {
 						// Decrement pending count when item finishes (success or error)
 						pendingCountRef.current = Math.max(0, pendingCountRef.current - 1);
@@ -88,16 +100,13 @@ export function useCellUpdateQueue({
 						console.error("Cell update failed:", error, item),
 				},
 			),
-		// Keep the queue instance stable across renders. The mutation object
-		// identity can change each render; we don't want that to recreate the
-		// queue and thrash effects. Recreate only when tableId changes.
-		[tableId, updateCellMutation.mutateAsync, utils.table.getById.invalidate],
+		// Keep the queue instance stable across renders. Recreate only when tableId changes.
+		[tableId],
 	);
 
 	const queueCellUpdate = useCallback(
 		(rowId: string, columnId: string, value?: string | number) => {
 			// Apply optimistic update immediately
-			console.log({ rowId });
 			onOptimisticUpdate(rowId, columnId, value);
 
 			// Deduplicate: remove existing update for same cell
@@ -178,6 +187,7 @@ export function useCellUpdateQueue({
 	}, [hasPendingChanges, flushPendingUpdates]);
 
 	// Clean up on unmount
+	// Stop the queue only when unmounting or when the tableId (and thus queuer) changes.
 	useEffect(() => () => queuer.stop(), [queuer]);
 
 	// Public API to remap optimistic temp row IDs to actual persisted IDs

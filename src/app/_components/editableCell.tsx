@@ -12,56 +12,60 @@ interface EditableCellProps {
 }
 
 export function EditableCell({
-  handleCellUpdate,
-  value,
-  rowId,
-  column,
+	handleCellUpdate,
+	value,
+	rowId,
+	column,
 }: EditableCellProps) {
 	const initialValue = value;
-	const [cell, setCell] = useState(initialValue);
+	const [cellValue, setCellValue] = useState(initialValue);
 	const inputRef = useRef<HTMLInputElement>(null);
+	const committedRef = useRef(false);
 
-	// Get column type from the columns prop or meta
-	const columnType = column.columnDef.meta?.type || "TEXT";
-
-	// Sync with external changes
+	// Keep local state in sync when external value changes
 	useEffect(() => {
-		setCell(initialValue);
+		setCellValue(initialValue);
 	}, [initialValue]);
 
+	const commit = (val: string | number) => {
+		committedRef.current = true;
+		handleCellUpdate(rowId, column.id, val);
+	};
 
 	const onKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      // Move focus out to mimic commit behavior
-      inputRef.current?.blur();
-    } else if (e.key === "Escape") {
-      e.preventDefault();
-      // Revert to original and notify
-      setCell(initialValue);
-      handleCellUpdate(rowId, column.id, initialValue);
-      inputRef.current?.blur();
-    }
-  };
+		if (e.key === "Enter" || e.key === "Escape") {
+			commit(cellValue);
+			// For Enter/Escape, manually blur; for Tab, let native tabbing move focus
+			if (e.key === "Enter" || e.key === "Escape") {
+				inputRef.current?.blur();
+				e.preventDefault();
+			}
+		}
+	};
 
-  return (
-    <input
-      ref={inputRef}
-      type={columnType === "NUMBER" ? "number" : "text"}
-      value={String(cell ?? "")}
-      onChange={(e) => {
-        const raw = e.target.value;
-        if (columnType === "NUMBER") {
-          const next = raw === "" ? "" : Number(raw);
-          setCell(next);
-          handleCellUpdate(rowId, column.id, next as string | number);
-        } else {
-          setCell(raw);
-          handleCellUpdate(rowId, column.id, raw);
-        }
-      }}
-      onKeyDown={onKeyDown}
-      className="h-full min-h-5 w-full cursor-text border-gray-200 bg-transparent px-1 hover:bg-gray-50 focus:bg-blue-50 focus:outline-none"
-    />
-  );
+	return (
+		<input
+			ref={inputRef}
+			type={column.columnDef.meta?.type === "NUMBER" ? "number" : "text"}
+			value={String(cellValue ?? "")}
+			onChange={(e) => {
+				const inputValue = e.target.value.toString();
+				if (cellValue !== inputValue) {
+					setCellValue(inputValue);
+				}
+			}}
+			onKeyDown={onKeyDown}
+			onFocus={() => {
+				committedRef.current = false;
+			}}
+			onBlur={(e) => {
+				// Avoid double-queuing if we already committed via keydown
+				if (!committedRef.current) {
+					const inputValue = e.target.value.toString();
+					commit(inputValue);
+				}
+			}}
+			className="h-full min-h-5 w-full cursor-text border-gray-200 bg-transparent px-1 hover:bg-gray-50 focus:bg-blue-50 focus:outline-none"
+		/>
+	);
 }

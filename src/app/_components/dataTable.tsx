@@ -15,11 +15,11 @@ import {
 	EyeOff,
 	Filter,
 	FolderTree,
-	Sheet,
 	Menu,
 	Palette,
 	Search,
 	Share2,
+	Sheet,
 	X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -63,6 +63,8 @@ const getColumnTypeLabel = (type: "TEXT" | "NUMBER") => {
 declare module "@tanstack/react-table" {
 	interface ColumnMeta<TData, TValue> {
 		className?: string;
+		// Optional: used for editor input typing
+		type?: "TEXT" | "NUMBER";
 	}
 }
 
@@ -160,15 +162,11 @@ export function DataTable({ tableId }: DataTableProps) {
 	);
 
 	// Initialize the cell update queue
-	const {
-		queueCellUpdate,
-		flushPendingUpdates,
-		pendingUpdatesCount,
-		remapRowId,
-	} = useCellUpdateQueue({
-		tableId,
-		onOptimisticUpdate: handleOptimisticUpdate,
-	});
+	const { queueCellUpdate, flushPendingUpdates, remapRowId } =
+		useCellUpdateQueue({
+			tableId,
+			onOptimisticUpdate: handleOptimisticUpdate,
+		});
 
 	// Before unload handling is centralized inside useCellUpdateQueue.
 	const addRowMutation = api.table.addRow.useMutation({
@@ -351,8 +349,10 @@ export function DataTable({ tableId }: DataTableProps) {
 			// Queue the update with proper typing
 			// Always queue. Empty string means clear the cell
 			queueCellUpdate(rowId, columnId, value);
+			// Flush pending updates immediately after a committed edit
+			flushPendingUpdates();
 		},
-		[columns, queueCellUpdate],
+		[columns, queueCellUpdate, flushPendingUpdates],
 	);
 
 	// Create column definitions dynamically based on the table structure
@@ -833,7 +833,7 @@ export function DataTable({ tableId }: DataTableProps) {
 									))}
 								</thead>
 								<tbody>
-									{table.getRowModel().rows.map((row, index) => (
+									{table.getRowModel().rows.map((row) => (
 										<ContextMenu key={row.id}>
 											<ContextMenuTrigger asChild>
 												<tr className={cn("cursor-default")}>
