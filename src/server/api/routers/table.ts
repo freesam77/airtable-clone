@@ -2,42 +2,6 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 
 export const tableRouter = createTRPCRouter({
-	// Get all tables for a specific base
-	getByBaseId: protectedProcedure
-		.input(z.object({ baseId: z.string() }))
-		.query(async ({ ctx, input }) => {
-			// First verify the base belongs to the user
-			const base = await ctx.db.base.findFirst({
-				where: {
-					id: input.baseId,
-					createdById: ctx.session.user.id,
-				},
-			});
-
-			if (!base) {
-				throw new Error("Base not found or access denied");
-			}
-
-			return ctx.db.table.findMany({
-				where: { baseId: input.baseId },
-				include: {
-					columns: {
-						orderBy: { position: "asc" },
-					},
-					rows: {
-						include: {
-							cells: {
-								include: {
-									column: true,
-								},
-							},
-						},
-						orderBy: { position: "asc" },
-					},
-				},
-			});
-		}),
-
 	// Get a specific table with its data
 	getById: protectedProcedure
 		.input(z.object({ id: z.string() }))
@@ -65,6 +29,73 @@ export const tableRouter = createTRPCRouter({
 					},
 				},
 			});
+		}),
+	// Get infinite rows
+	getInfiniteRows: protectedProcedure
+		.input(
+			z.object({
+				id: z.string(),
+				limit: z.number().min(1).max(200).nullish(),
+				cursor: z.string().nullish(),
+				direction: z.enum(["forward", "backward"]).default("forward"),
+			}),
+		)
+		.query(async ({ ctx, input }) => {
+			const limit = input.limit ?? 50;
+			const forward = input.direction === "forward";
+
+			// Stable deterministic ordering using position then id as tiebreaker
+			const orderBy = forward
+				? [{ position: "asc" as const }, { id: "asc" as const }]
+				: [{ position: "desc" as const }, { id: "desc" as const }];
+
+			const rows = await ctx.db.row.findMany({
+				where: {
+					tableId: input.id,
+					table: {
+						base: { createdById: ctx.session.user.id },
+					},
+				},
+				include: {
+					cells: {
+						include: { column: true },
+					},
+				},
+				orderBy,
+				take: (forward ? 1 : -1) * (limit + 1),
+				...(input.cursor
+					? {
+							cursor: { id: input.cursor },
+							skip: 1,
+						}
+					: {}),
+			});
+
+			let nextCursor: string | undefined = undefined;
+			let prevCursor: string | undefined = undefined;
+
+			let items = rows;
+			// If we fetched more than the page size, pop the extra and set cursors
+			const hasMore = rows.length > limit;
+			if (hasMore) {
+				const extra = items.pop();
+				if (forward) {
+					nextCursor = extra?.id;
+				} else {
+					prevCursor = extra?.id;
+				}
+			}
+
+			// For backward pagination, return items in ascending order for UI consistency
+			if (!forward) {
+				items = items.reverse();
+			}
+
+			return {
+				items,
+				nextCursor,
+				prevCursor,
+			};
 		}),
 
 	// Create a new table (now handled by base router createTable)
@@ -304,7 +335,7 @@ export const tableRouter = createTRPCRouter({
 		.input(
 			z.object({
 				tableId: z.string(),
-				count: z.number().min(1).max(100),
+				count: z.number().min(1).max(100000),
 			}),
 		)
 		.mutation(async ({ ctx, input }) => {
@@ -416,22 +447,20 @@ export const tableRouter = createTRPCRouter({
 				};
 			});
 
-			// Create all rows in a transaction
-			const createdRows = await ctx.db.$transaction(
-				rowsToCreate.map((rowData) =>
-					ctx.db.row.create({
-						data: rowData,
-						include: {
-							cells: {
-								include: {
-									column: true,
-								},
-							},
-						},
-					}),
-				),
-			);
+			// Create rows in chunks to avoid oversized transactions/responses
+			const chunkSize = 1000;
+			for (let i = 0; i < rowsToCreate.length; i += chunkSize) {
+				const chunk = rowsToCreate.slice(i, i + chunkSize);
+				await ctx.db.$transaction(
+					chunk.map((rowData) =>
+						ctx.db.row.create({
+							data: rowData,
+						}),
+					),
+				);
+			}
 
-			return createdRows;
+			// Return a lightweight result; clients should re-fetch table
+			return { created: rowsToCreate.length };
 		}),
 });

@@ -29,9 +29,8 @@ type Base = {
 
 interface TopNavProps {
 	selectedBase: Base;
-	rowCount: number;
-	setRowCount: (value: number) => void;
 	handleGenerateRows: () => void;
+	handleGenerateRows100: () => void;
 	generateRows: { isPending: boolean };
 	selectedTableId: string | null;
 	handleTableSelect: (tableId: string) => void;
@@ -45,9 +44,8 @@ interface TopNavProps {
 
 export const TopNav = ({
 	selectedBase,
-	rowCount,
-	setRowCount,
 	handleGenerateRows,
+	handleGenerateRows100,
 	generateRows,
 	selectedTableId,
 	handleTableSelect,
@@ -320,21 +318,6 @@ export const TopNav = ({
 					</nav>
 					<div className="flex items-center gap-3">
 						<div className="flex items-center gap-2">
-							<input
-								type="number"
-								value={rowCount}
-								onChange={(e) =>
-									setRowCount(
-										Math.max(
-											1,
-											Math.min(100, Number.parseInt(e.target.value) || 1),
-										),
-									)
-								}
-								className="w-16 rounded border border-gray-300 px-2 py-1 text-sm"
-								min="1"
-								max="100"
-							/>
 							<button
 								type="button"
 								onClick={handleGenerateRows}
@@ -342,7 +325,16 @@ export const TopNav = ({
 								className="btn-share"
 							>
 								<Plus size={16} />
-								{generateRows.isPending ? "Generating..." : "Generate Rows"}
+								{generateRows.isPending ? "Adding rows..." : "Add 100K Rows"}
+							</button>
+							<button
+								type="button"
+								onClick={handleGenerateRows100}
+								disabled={generateRows.isPending}
+								className="btn-share"
+							>
+								<Plus size={16} />
+								{generateRows.isPending ? "Adding rows..." : "Add 100 Rows"}
 							</button>
 							<button
 								type="button"

@@ -18,7 +18,7 @@ export function BaseLayout({
 	initialTableId,
 }: DashboardLayoutProps) {
 	const router = useRouter();
-	const [rowCount, setRowCount] = useState(5);
+	// No row count input anymore; Generate Rows always adds 100k
 	const [selectedBaseId, setSelectedBaseId] = useState<string | null>(null);
 	const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
 	const [showCreateTable, setShowCreateTable] = useState(false);
@@ -95,7 +95,16 @@ export function BaseLayout({
 		if (currentTable) {
 			generateRows.mutate({
 				tableId: currentTable.id,
-				count: rowCount,
+				count: 100_000,
+			});
+		}
+	};
+
+	const handleGenerateRows100 = () => {
+		if (currentTable) {
+			generateRows.mutate({
+				tableId: currentTable.id,
+				count: 100,
 			});
 		}
 	};
@@ -159,9 +168,8 @@ export function BaseLayout({
 						<>
 							<TopNav
 								selectedBase={selectedBase}
-								rowCount={rowCount}
-								setRowCount={setRowCount}
 								handleGenerateRows={handleGenerateRows}
+								handleGenerateRows100={handleGenerateRows100}
 								generateRows={generateRows}
 								selectedTableId={selectedTableId}
 								handleTableSelect={handleTableSelect}

@@ -104,7 +104,12 @@ export function DataTable({ tableId }: DataTableProps) {
 	const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(new Set());
 	const [showCheckboxes, setShowCheckboxes] = useState(false);
 
-	// Fetch table data directly in this component for optimistic updates
+	// Infinite scroll refs
+	const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+	// Observe the last visible row to trigger fetching next page
+	const lastRowObserver = useRef<IntersectionObserver | null>(null);
+
+	// Fetch table metadata (columns, etc.)
 	const { data: tableData, isLoading: tableLoading } =
 		api.table.getById.useQuery(
 			{ id: tableId },
@@ -118,8 +123,57 @@ export function DataTable({ tableId }: DataTableProps) {
 			},
 		);
 
-	// Extract data and columns from the fetched table data
-	const data = tableData?.rows || [];
+	// Fetch rows via infinite query (page size 50)
+	const infiniteInput = {
+		id: tableId,
+		limit: 50 as const,
+		direction: "forward" as const,
+	};
+	const rowsInfinite = api.table.getInfiniteRows.useInfiniteQuery(
+		infiniteInput,
+		{
+			getNextPageParam: (lastPage) => lastPage.nextCursor,
+			getPreviousPageParam: (firstPage) => firstPage.prevCursor,
+		},
+	);
+
+	// Callback ref set on the last visible row
+	const setLastRowRef = useCallback(
+		(node: HTMLTableRowElement | null) => {
+			if (lastRowObserver.current) {
+				lastRowObserver.current.disconnect();
+				lastRowObserver.current = null;
+			}
+			if (!node) return;
+			lastRowObserver.current = new IntersectionObserver(
+				(entries) => {
+					const anyVisible = entries.some((e) => e.isIntersecting);
+					if (
+						anyVisible &&
+						rowsInfinite.hasNextPage &&
+						!rowsInfinite.isFetchingNextPage
+					) {
+						void rowsInfinite.fetchNextPage();
+					}
+				},
+				{
+					root: scrollContainerRef.current,
+					rootMargin: "200px",
+					threshold: 0.1,
+				},
+			);
+			lastRowObserver.current.observe(node);
+		},
+		[rowsInfinite.hasNextPage, rowsInfinite.isFetchingNextPage],
+	);
+
+	// No global sentinel needed; we observe the last rendered row
+
+	// Flatten paged rows for the table
+	const data = useMemo(
+		() => rowsInfinite.data?.pages.flatMap((p) => p.items) ?? [],
+		[rowsInfinite.data],
+	);
 	const columns = tableData?.columns || [];
 
 	// Stable ordered columns list used for filtering and match navigation
@@ -135,30 +189,29 @@ export function DataTable({ tableId }: DataTableProps) {
 		(rowId: string, columnId: string, value?: string | number) => {
 			const stringValue = typeof value === "number" ? String(value) : value;
 			const normalized = stringValue === "" ? null : stringValue;
-			utils.table.getById.setData({ id: tableId }, (old) => {
+			utils.table.getInfiniteRows.setInfiniteData(infiniteInput, (old) => {
 				if (!old) return old;
-
 				return {
 					...old,
-					rows: old.rows.map((row) =>
-						row.id === rowId
-							? {
-									...row,
-									cells: row.cells.map((cell) =>
-										cell.column.id === columnId
-											? {
-													...cell,
-													value: normalized ?? null,
-												}
-											: cell,
-									),
-								}
-							: row,
-					),
+					pages: old.pages.map((page) => ({
+						...page,
+						items: page.items.map((row) =>
+							row.id === rowId
+								? {
+										...row,
+										cells: row.cells.map((cell) =>
+											cell.column.id === columnId
+												? { ...cell, value: normalized ?? null }
+												: cell,
+										),
+									}
+								: row,
+						),
+					})),
 				};
 			});
 		},
-		[utils.table.getById, tableId],
+		[utils.table.getInfiniteRows, tableId],
 	);
 
 	// Initialize the cell update queue
@@ -171,7 +224,9 @@ export function DataTable({ tableId }: DataTableProps) {
 	// Before unload handling is centralized inside useCellUpdateQueue.
 	const addRowMutation = api.table.addRow.useMutation({
 		onMutate: async (variables) => {
-			await utils.table.getById.cancel({ id: tableId });
+			await utils.table.getInfiniteRows.cancel(infiniteInput);
+			const previousInfinite =
+				utils.table.getInfiniteRows.getInfiniteData(infiniteInput);
 			const previousData = utils.table.getById.getData({ id: tableId });
 
 			// Create optimistic row
@@ -179,7 +234,10 @@ export function DataTable({ tableId }: DataTableProps) {
 			const now = new Date();
 			const optimisticRow: TableData = {
 				id: optimisticRowId,
-				position: previousData?.rows.length || 0,
+				position:
+					(previousInfinite?.pages
+						.flatMap((p) => p.items)
+						.reduce((acc, r) => Math.max(acc, r.position), -1) ?? -1) + 1,
 				createdAt: now,
 				updatedAt: now,
 				tableId: tableId,
@@ -204,40 +262,50 @@ export function DataTable({ tableId }: DataTableProps) {
 				}),
 			};
 
-			utils.table.getById.setData({ id: tableId }, (old) => {
+			utils.table.getInfiniteRows.setInfiniteData(infiniteInput, (old) => {
 				if (!old) return old;
-				return {
-					...old,
-					rows: [...old.rows, optimisticRow],
-				};
+				// Append to the last page's items
+				if (old.pages.length === 0) return old;
+				const pages = old.pages.map((page, idx, arr) =>
+					idx === arr.length - 1
+						? { ...page, items: [...page.items, optimisticRow] }
+						: page,
+				);
+				return { ...old, pages };
 			});
 
-			return { previousData, optimisticRow };
+			return { previousInfinite, previousData, optimisticRow };
 		},
 		onSuccess: (result, _variables, context) => {
 			// Replace optimistic row with server result
 			if (context?.optimisticRow?.id && result?.id) {
 				remapRowId(context.optimisticRow.id, result.id);
 			}
-			utils.table.getById.setData({ id: tableId }, (old) => {
+			utils.table.getInfiniteRows.setInfiniteData(infiniteInput, (old) => {
 				if (!old) return old;
 				return {
 					...old,
-					rows: old.rows.map((row) =>
-						row.id === context?.optimisticRow.id ? result : row,
-					),
+					pages: old.pages.map((page) => ({
+						...page,
+						items: page.items.map((row) =>
+							row.id === context?.optimisticRow.id ? result : row,
+						),
+					})),
 				};
 			});
 		},
 		onError: (err, variables, context) => {
 			void err;
 			void variables;
-			if (context?.previousData) {
-				utils.table.getById.setData({ id: tableId }, context.previousData);
+			if (context?.previousInfinite) {
+				utils.table.getInfiniteRows.setInfiniteData(
+					infiniteInput,
+					context.previousInfinite,
+				);
 			}
 		},
 		onSettled: () => {
-			utils.table.getById.invalidate({ id: tableId });
+			utils.table.getInfiniteRows.invalidate(infiniteInput);
 		},
 	});
 
@@ -245,6 +313,8 @@ export function DataTable({ tableId }: DataTableProps) {
 		onMutate: async (variables) => {
 			await utils.table.getById.cancel({ id: tableId });
 			const previousData = utils.table.getById.getData({ id: tableId });
+			const previousInfinite =
+				utils.table.getInfiniteRows.getInfiniteData(infiniteInput);
 
 			// Create optimistic column with all required fields
 			const optimisticColumn = {
@@ -262,25 +332,37 @@ export function DataTable({ tableId }: DataTableProps) {
 					...old,
 					columns: [...old.columns, optimisticColumn],
 					// Add empty cell values for existing rows
-					rows: old.rows.map((row) => ({
-						...row,
-						cells: [
-							...row.cells,
-							{
-								id: `temp-cell-${Date.now()}-${row.id}`,
-								columnId: optimisticColumn.id,
-								rowId: row.id,
-								value: null,
-								column: optimisticColumn,
-							},
-						],
+					rows: old.rows,
+				};
+			});
+
+			// Also add empty cell to each loaded row in the infinite cache
+			utils.table.getInfiniteRows.setInfiniteData(infiniteInput, (old) => {
+				if (!old) return old;
+				return {
+					...old,
+					pages: old.pages.map((page) => ({
+						...page,
+						items: page.items.map((row) => ({
+							...row,
+							cells: [
+								...row.cells,
+								{
+									id: `temp-cell-${Date.now()}-${row.id}`,
+									columnId: optimisticColumn.id,
+									rowId: row.id,
+									value: null,
+									column: optimisticColumn,
+								},
+							],
+						})),
 					})),
 				};
 			});
 
-			return { previousData, optimisticColumn };
+			return { previousData, previousInfinite, optimisticColumn };
 		},
-		onSuccess: (result, variables, context) => {
+		onSuccess: (result, _variables, context) => {
 			// Replace optimistic column with server result and update all related cell values
 			utils.table.getById.setData({ id: tableId }, (old) => {
 				if (!old) return old;
@@ -289,13 +371,22 @@ export function DataTable({ tableId }: DataTableProps) {
 					columns: old.columns.map((col) =>
 						col.id === context?.optimisticColumn.id ? result : col,
 					),
-					rows: old.rows.map((row) => ({
-						...row,
-						cells: row.cells.map((cell) =>
-							cell.column.id === context?.optimisticColumn.id
-								? { ...cell, column: result }
-								: cell,
-						),
+				};
+			});
+			utils.table.getInfiniteRows.setInfiniteData(infiniteInput, (old) => {
+				if (!old) return old;
+				return {
+					...old,
+					pages: old.pages.map((page) => ({
+						...page,
+						items: page.items.map((row) => ({
+							...row,
+							cells: row.cells.map((cell) =>
+								cell.column.id === context?.optimisticColumn.id
+									? { ...cell, column: result }
+									: cell,
+							),
+						})),
 					})),
 				};
 			});
@@ -306,36 +397,50 @@ export function DataTable({ tableId }: DataTableProps) {
 			if (context?.previousData) {
 				utils.table.getById.setData({ id: tableId }, context.previousData);
 			}
+			if (context?.previousInfinite) {
+				utils.table.getInfiniteRows.setInfiniteData(
+					infiniteInput,
+					context.previousInfinite,
+				);
+			}
 		},
 		onSettled: () => {
 			utils.table.getById.invalidate({ id: tableId });
+			utils.table.getInfiniteRows.invalidate(infiniteInput);
 		},
 	});
 
 	const deleteRowMutation = api.table.deleteRow.useMutation({
 		onMutate: async (variables) => {
-			await utils.table.getById.cancel({ id: tableId });
-			const previousData = utils.table.getById.getData({ id: tableId });
+			await utils.table.getInfiniteRows.cancel(infiniteInput);
+			const previousInfinite =
+				utils.table.getInfiniteRows.getInfiniteData(infiniteInput);
 
-			utils.table.getById.setData({ id: tableId }, (old) => {
+			utils.table.getInfiniteRows.setInfiniteData(infiniteInput, (old) => {
 				if (!old) return old;
 				return {
 					...old,
-					rows: old.rows.filter((row) => row.id !== variables.rowId),
+					pages: old.pages.map((page) => ({
+						...page,
+						items: page.items.filter((row) => row.id !== variables.rowId),
+					})),
 				};
 			});
 
-			return { previousData };
+			return { previousInfinite };
 		},
 		onError: (err, variables, context) => {
 			void err;
 			void variables;
-			if (context?.previousData) {
-				utils.table.getById.setData({ id: tableId }, context.previousData);
+			if (context?.previousInfinite) {
+				utils.table.getInfiniteRows.setInfiniteData(
+					infiniteInput,
+					context.previousInfinite,
+				);
 			}
 		},
 		onSettled: () => {
-			utils.table.getById.invalidate({ id: tableId });
+			utils.table.getInfiniteRows.invalidate(infiniteInput);
 		},
 	});
 
@@ -557,11 +662,18 @@ export function DataTable({ tableId }: DataTableProps) {
 
 	// removed: inline add-row editing state and handlers
 
-	const handleDeleteRow = (rowId: string) => {
-		deleteRowMutation.mutate({ rowId });
+	const handleDeleteRows = async (clickedRowId: string) => {
+		const ids =
+			selectedRowIds.size > 0 ? Array.from(selectedRowIds) : [clickedRowId];
+		await Promise.all(
+			ids.map((id) => deleteRowMutation.mutateAsync({ rowId: id })),
+		);
+		setSelectedRowIds(new Set());
+		utils.table.getById.invalidate({ id: tableId });
+		utils.table.getInfiniteRows.invalidate(infiniteInput);
 	};
 
-	if (tableLoading) {
+	if (tableLoading || rowsInfinite.isLoading) {
 		return (
 			<div className="flex h-64 items-center justify-center">
 				<div className="text-gray-500">Loading table...</div>
@@ -749,7 +861,7 @@ export function DataTable({ tableId }: DataTableProps) {
 				<div className="flex h-full">
 					{/* Left views sidebar inside table area */}
 					{viewSidebarOpen && (
-						<nav className="flex w-70 shrink-0 flex-col gap-2 border-gray-200 border-r bg-white px-4 py-3 text-xs">
+						<nav className="flex w-70 flex-col gap-2 border-gray-200 border-r bg-white px-4 py-3 text-xs">
 							<button
 								type="button"
 								className="flex cursor-pointer items-center gap-2 px-3 text-gray-700 text-sm hover:text-gray-900"
@@ -777,8 +889,11 @@ export function DataTable({ tableId }: DataTableProps) {
 						</nav>
 					)}
 
-					<div className="flex w-full flex-col justify-between overflow-hidden">
-						<div className="flex border-gray-200">
+					<div className="flex max-h-[90vh] w-full flex-col justify-between overflow-hidden">
+						<div
+							className="flex overflow-y-auto border-gray-200"
+							ref={scrollContainerRef}
+						>
 							<table
 								className="border bg-white"
 								key={`table-${columns.length}-${columns.map((c) => c.id).join("-")}`}
@@ -806,10 +921,15 @@ export function DataTable({ tableId }: DataTableProps) {
 									))}
 								</thead>
 								<tbody>
-									{table.getRowModel().rows.map((row) => (
+									{table.getRowModel().rows.map((row, idx, arr) => (
 										<ContextMenu key={row.id}>
 											<ContextMenuTrigger asChild>
-												<tr className={cn("cursor-default")}>
+												<tr
+													ref={
+														idx === arr.length - 1 ? setLastRowRef : undefined
+													}
+													className={cn("cursor-default")}
+												>
 													{row.getVisibleCells().map((cell) => (
 														<td
 															key={cell.id}
@@ -851,7 +971,9 @@ export function DataTable({ tableId }: DataTableProps) {
 											</ContextMenuTrigger>
 											<ContextMenuContent className="w-48">
 												<ContextMenuItem
-													onClick={() => handleDeleteRow(row.original.id)}
+													onClick={() => {
+														handleDeleteRows(row.original.id);
+													}}
 													className="text-red-600 focus:bg-red-50 focus:text-red-600"
 												>
 													Delete row
