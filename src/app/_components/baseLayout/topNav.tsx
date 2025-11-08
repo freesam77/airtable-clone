@@ -29,9 +29,6 @@ type Base = {
 
 interface TopNavProps {
 	selectedBase: Base;
-	handleGenerateRows: () => void;
-	handleGenerateRows100: () => void;
-	generateRows: { isPending: boolean };
 	selectedTableId: string | null;
 	handleTableSelect: (tableId: string) => void;
 	showCreateTable: boolean;
@@ -44,9 +41,6 @@ interface TopNavProps {
 
 export const TopNav = ({
 	selectedBase,
-	handleGenerateRows,
-	handleGenerateRows100,
-	generateRows,
 	selectedTableId,
 	handleTableSelect,
 	showCreateTable,
@@ -57,6 +51,11 @@ export const TopNav = ({
 	createTable,
 }: TopNavProps) => {
 	const utils = api.useUtils();
+	const generateRows = api.table.generateRows.useMutation({
+		onSuccess: async () => {
+			await utils.base.getAll.invalidate();
+		},
+	});
 	const updateBase = api.base.update.useMutation({
 		// Optimistic update of the base cache
 		onMutate: async (variables) => {
@@ -320,7 +319,11 @@ export const TopNav = ({
 						<div className="flex items-center gap-2">
 							<button
 								type="button"
-								onClick={handleGenerateRows}
+								onClick={() => {
+									const id = selectedTableId ?? selectedBase.tables[0]?.id;
+									if (!id) return;
+									generateRows.mutate({ tableId: id, count: 100_000 });
+								}}
 								disabled={generateRows.isPending}
 								className="btn-share"
 							>
@@ -329,7 +332,11 @@ export const TopNav = ({
 							</button>
 							<button
 								type="button"
-								onClick={handleGenerateRows100}
+								onClick={() => {
+									const id = selectedTableId ?? selectedBase.tables[0]?.id;
+									if (!id) return;
+									generateRows.mutate({ tableId: id, count: 100 });
+								}}
 								disabled={generateRows.isPending}
 								className="btn-share"
 							>

@@ -3,7 +3,6 @@ import { Database } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Button } from "~/components/ui/button";
 import { api } from "~/trpc/react";
 import { DataTable } from "../dataTable";
 import { TopNav } from "./topNav";
@@ -18,13 +17,12 @@ export function BaseLayout({
 	initialTableId,
 }: DashboardLayoutProps) {
 	const router = useRouter();
-	// No row count input anymore; Generate Rows always adds 100k
 	const [selectedBaseId, setSelectedBaseId] = useState<string | null>(null);
 	const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
 	const [showCreateTable, setShowCreateTable] = useState(false);
 	const [newTableName, setNewTableName] = useState("");
 
-	const { base, table } = api;
+	const { base } = api;
 
 	const {
 		data: bases,
@@ -36,12 +34,6 @@ export function BaseLayout({
 				return false;
 			}
 			return failureCount < 3;
-		},
-	});
-
-	const generateRows = table.generateRows.useMutation({
-		onSuccess: () => {
-			void refetchBases();
 		},
 	});
 
@@ -91,23 +83,7 @@ export function BaseLayout({
 		(table) => table.id === selectedTableId,
 	);
 
-	const handleGenerateRows = () => {
-		if (currentTable) {
-			generateRows.mutate({
-				tableId: currentTable.id,
-				count: 100_000,
-			});
-		}
-	};
-
-	const handleGenerateRows100 = () => {
-		if (currentTable) {
-			generateRows.mutate({
-				tableId: currentTable.id,
-				count: 100,
-			});
-		}
-	};
+	// generateRows mutation and handlers moved to TopNav
 
 	// Base selection handled via URL params and sidebar
 
@@ -168,9 +144,6 @@ export function BaseLayout({
 						<>
 							<TopNav
 								selectedBase={selectedBase}
-								handleGenerateRows={handleGenerateRows}
-								handleGenerateRows100={handleGenerateRows100}
-								generateRows={generateRows}
 								selectedTableId={selectedTableId}
 								handleTableSelect={handleTableSelect}
 								showCreateTable={showCreateTable}
