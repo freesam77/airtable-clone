@@ -1,9 +1,10 @@
 import { z } from "zod";
+import type { Prisma } from "@prisma/client";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 
 export const tableRouter = createTRPCRouter({
-	// Get a specific table with its data
-	getById: protectedProcedure
+    // Get table columns (for headers/typing)
+    getTableColumnType: protectedProcedure
 		.input(z.object({ id: z.string() }))
 		.query(async ({ ctx, input }) => {
 			return ctx.db.table.findFirst({
@@ -15,16 +16,6 @@ export const tableRouter = createTRPCRouter({
 				},
 				include: {
 					columns: {
-						orderBy: { position: "asc" },
-					},
-					rows: {
-						include: {
-							cells: {
-								include: {
-									column: true,
-								},
-							},
-						},
 						orderBy: { position: "asc" },
 					},
 				},
@@ -45,9 +36,9 @@ export const tableRouter = createTRPCRouter({
 			const forward = input.direction === "forward";
 
 			// Stable deterministic ordering using position then id as tiebreaker
-			const orderBy = forward
-				? [{ position: "asc" as const }, { id: "asc" as const }]
-				: [{ position: "desc" as const }, { id: "desc" as const }];
+			const orderBy: Prisma.RowOrderByWithRelationInput[] = forward
+				? [{ position: "asc" }, { id: "asc" }]
+				: [{ position: "desc" }, { id: "desc" }];
 
 			const rows = await ctx.db.row.findMany({
 				where: {

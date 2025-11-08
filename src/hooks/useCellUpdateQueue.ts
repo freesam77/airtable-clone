@@ -31,10 +31,10 @@ export function useCellUpdateQueue({
 		mutateRef.current = updateCellMutation.mutateAsync;
 	}, [updateCellMutation.mutateAsync]);
 
-	const invalidateRef = useRef(utils.table.getById.invalidate);
+	const invalidateRef = useRef(utils.table.getTableColumnType.invalidate);
 	useEffect(() => {
-		invalidateRef.current = utils.table.getById.invalidate;
-	}, [utils.table.getById.invalidate]);
+		invalidateRef.current = utils.table.getTableColumnType.invalidate;
+	}, [utils.table.getTableColumnType.invalidate]);
 	const [hasPendingChanges, setHasPendingChanges] = useState(false);
 	const pendingCountRef = useRef(0);
 	const rowIdMapRef = useRef(new Map<string, string>());

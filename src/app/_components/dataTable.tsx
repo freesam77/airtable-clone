@@ -42,7 +42,7 @@ import {
 	TooltipProvider,
 	TooltipTrigger,
 } from "~/components/ui/tooltip";
-import { useCellUpdateQueue } from "~/hooks/useCellUpdateQueue";
+import { useTableMutations } from "~/hooks/useTableMutations";
 import { useTableSearchNavigation } from "~/hooks/useTableSearchNavigation";
 import { detectOS } from "~/lib/detectOS";
 import { filterRowsByQuery, rowMatchesQuery } from "~/lib/tableFilter";
@@ -109,9 +109,9 @@ export function DataTable({ tableId }: DataTableProps) {
 	// Observe the last visible row to trigger fetching next page
 	const lastRowObserver = useRef<IntersectionObserver | null>(null);
 
-	// Fetch table metadata (columns, etc.)
-	const { data: tableData, isLoading: tableLoading } =
-		api.table.getById.useQuery(
+	// Fetch table metadata for columns
+	const { data: tableColumn, isLoading: tableColumnLoading } =
+		api.table.getTableColumnType.useQuery(
 			{ id: tableId },
 			{
 				retry: (failureCount, error) => {
@@ -174,7 +174,7 @@ export function DataTable({ tableId }: DataTableProps) {
 		() => rowsInfinite.data?.pages.flatMap((p) => p.items) ?? [],
 		[rowsInfinite.data],
 	);
-	const columns = tableData?.columns || [];
+	const columns = tableColumn?.columns || [];
 
 	// Stable ordered columns list used for filtering and match navigation
 	const orderedColumns = useMemo(
@@ -214,235 +214,18 @@ export function DataTable({ tableId }: DataTableProps) {
 		[utils.table.getInfiniteRows, tableId],
 	);
 
-	// Initialize the cell update queue
-	const { queueCellUpdate, flushPendingUpdates, remapRowId } =
-		useCellUpdateQueue({
-			tableId,
-			onOptimisticUpdate: handleOptimisticUpdate,
-		});
-
-	// Before unload handling is centralized inside useCellUpdateQueue.
-	const addRowMutation = api.table.addRow.useMutation({
-		onMutate: async (variables) => {
-			await utils.table.getInfiniteRows.cancel(infiniteInput);
-			const previousInfinite =
-				utils.table.getInfiniteRows.getInfiniteData(infiniteInput);
-			const previousData = utils.table.getById.getData({ id: tableId });
-
-			// Create optimistic row
-			const optimisticRowId = `temp-${Date.now()}`;
-			const now = new Date();
-			const optimisticRow: TableData = {
-				id: optimisticRowId,
-				position:
-					(previousInfinite?.pages
-						.flatMap((p) => p.items)
-						.reduce((acc, r) => Math.max(acc, r.position), -1) ?? -1) + 1,
-				createdAt: now,
-				updatedAt: now,
-				tableId: tableId,
-				cells: variables.cells.map((cv) => {
-					const column = previousData?.columns.find(
-						(col) => col.id === cv.columnId,
-					);
-					return {
-						id: `temp-cell-${Date.now()}-${cv.columnId}`,
-						columnId: cv.columnId,
-						rowId: optimisticRowId,
-						value: cv.value || null,
-						column: column || {
-							id: cv.columnId,
-							name: "Unknown",
-							type: "TEXT" as const,
-							required: false,
-							position: 0,
-							tableId: tableId,
-						},
-					};
-				}),
-			};
-
-			utils.table.getInfiniteRows.setInfiniteData(infiniteInput, (old) => {
-				if (!old) return old;
-				// Append to the last page's items
-				if (old.pages.length === 0) return old;
-				const pages = old.pages.map((page, idx, arr) =>
-					idx === arr.length - 1
-						? { ...page, items: [...page.items, optimisticRow] }
-						: page,
-				);
-				return { ...old, pages };
-			});
-
-			return { previousInfinite, previousData, optimisticRow };
-		},
-		onSuccess: (result, _variables, context) => {
-			// Replace optimistic row with server result
-			if (context?.optimisticRow?.id && result?.id) {
-				remapRowId(context.optimisticRow.id, result.id);
-			}
-			utils.table.getInfiniteRows.setInfiniteData(infiniteInput, (old) => {
-				if (!old) return old;
-				return {
-					...old,
-					pages: old.pages.map((page) => ({
-						...page,
-						items: page.items.map((row) =>
-							row.id === context?.optimisticRow.id ? result : row,
-						),
-					})),
-				};
-			});
-		},
-		onError: (err, variables, context) => {
-			void err;
-			void variables;
-			if (context?.previousInfinite) {
-				utils.table.getInfiniteRows.setInfiniteData(
-					infiniteInput,
-					context.previousInfinite,
-				);
-			}
-		},
-		onSettled: () => {
-			utils.table.getInfiniteRows.invalidate(infiniteInput);
-		},
-	});
-
-	const addColumnMutation = api.table.addColumn.useMutation({
-		onMutate: async (variables) => {
-			await utils.table.getById.cancel({ id: tableId });
-			const previousData = utils.table.getById.getData({ id: tableId });
-			const previousInfinite =
-				utils.table.getInfiniteRows.getInfiniteData(infiniteInput);
-
-			// Create optimistic column with all required fields
-			const optimisticColumn = {
-				id: `temp-col-${Date.now()}`,
-				name: variables.name,
-				type: variables.type,
-				position: previousData?.columns.length || 0,
-				required: false,
-				tableId: tableId,
-			};
-
-			utils.table.getById.setData({ id: tableId }, (old) => {
-				if (!old) return old;
-				return {
-					...old,
-					columns: [...old.columns, optimisticColumn],
-					// Add empty cell values for existing rows
-					rows: old.rows,
-				};
-			});
-
-			// Also add empty cell to each loaded row in the infinite cache
-			utils.table.getInfiniteRows.setInfiniteData(infiniteInput, (old) => {
-				if (!old) return old;
-				return {
-					...old,
-					pages: old.pages.map((page) => ({
-						...page,
-						items: page.items.map((row) => ({
-							...row,
-							cells: [
-								...row.cells,
-								{
-									id: `temp-cell-${Date.now()}-${row.id}`,
-									columnId: optimisticColumn.id,
-									rowId: row.id,
-									value: null,
-									column: optimisticColumn,
-								},
-							],
-						})),
-					})),
-				};
-			});
-
-			return { previousData, previousInfinite, optimisticColumn };
-		},
-		onSuccess: (result, _variables, context) => {
-			// Replace optimistic column with server result and update all related cell values
-			utils.table.getById.setData({ id: tableId }, (old) => {
-				if (!old) return old;
-				return {
-					...old,
-					columns: old.columns.map((col) =>
-						col.id === context?.optimisticColumn.id ? result : col,
-					),
-				};
-			});
-			utils.table.getInfiniteRows.setInfiniteData(infiniteInput, (old) => {
-				if (!old) return old;
-				return {
-					...old,
-					pages: old.pages.map((page) => ({
-						...page,
-						items: page.items.map((row) => ({
-							...row,
-							cells: row.cells.map((cell) =>
-								cell.column.id === context?.optimisticColumn.id
-									? { ...cell, column: result }
-									: cell,
-							),
-						})),
-					})),
-				};
-			});
-		},
-		onError: (err, variables, context) => {
-			void err;
-			void variables;
-			if (context?.previousData) {
-				utils.table.getById.setData({ id: tableId }, context.previousData);
-			}
-			if (context?.previousInfinite) {
-				utils.table.getInfiniteRows.setInfiniteData(
-					infiniteInput,
-					context.previousInfinite,
-				);
-			}
-		},
-		onSettled: () => {
-			utils.table.getById.invalidate({ id: tableId });
-			utils.table.getInfiniteRows.invalidate(infiniteInput);
-		},
-	});
-
-	const deleteRowMutation = api.table.deleteRow.useMutation({
-		onMutate: async (variables) => {
-			await utils.table.getInfiniteRows.cancel(infiniteInput);
-			const previousInfinite =
-				utils.table.getInfiniteRows.getInfiniteData(infiniteInput);
-
-			utils.table.getInfiniteRows.setInfiniteData(infiniteInput, (old) => {
-				if (!old) return old;
-				return {
-					...old,
-					pages: old.pages.map((page) => ({
-						...page,
-						items: page.items.filter((row) => row.id !== variables.rowId),
-					})),
-				};
-			});
-
-			return { previousInfinite };
-		},
-		onError: (err, variables, context) => {
-			void err;
-			void variables;
-			if (context?.previousInfinite) {
-				utils.table.getInfiniteRows.setInfiniteData(
-					infiniteInput,
-					context.previousInfinite,
-				);
-			}
-		},
-		onSettled: () => {
-			utils.table.getInfiniteRows.invalidate(infiniteInput);
-		},
-	});
+const {
+    queueCellUpdate,
+    flushPendingUpdates,
+    remapRowId,
+    addRowMutation,
+    addColumnMutation,
+    deleteRowMutation,
+} = useTableMutations({
+    tableId,
+    infiniteInput,
+    onOptimisticUpdate: handleOptimisticUpdate,
+});
 
 	// Handle cell value updates using the queue
 	const handleCellUpdate = useCallback(
@@ -669,11 +452,11 @@ export function DataTable({ tableId }: DataTableProps) {
 			ids.map((id) => deleteRowMutation.mutateAsync({ rowId: id })),
 		);
 		setSelectedRowIds(new Set());
-		utils.table.getById.invalidate({ id: tableId });
+		utils.table.getTableColumnType.invalidate({ id: tableId });
 		utils.table.getInfiniteRows.invalidate(infiniteInput);
 	};
 
-	if (tableLoading || rowsInfinite.isLoading) {
+	if (tableColumnLoading || rowsInfinite.isLoading) {
 		return (
 			<div className="flex h-64 items-center justify-center">
 				<div className="text-gray-500">Loading table...</div>
@@ -681,7 +464,7 @@ export function DataTable({ tableId }: DataTableProps) {
 		);
 	}
 
-	if (!tableData) {
+	if (!tableColumn || !rowsInfinite.data?.pages) {
 		return (
 			<div className="flex h-64 items-center justify-center">
 				<div className="text-gray-500">Table not found.</div>
