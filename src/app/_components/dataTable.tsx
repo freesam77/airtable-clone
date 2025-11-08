@@ -1,41 +1,14 @@
 "use client";
 
-import {
-	type CellContext,
-	type ColumnDef,
-	flexRender,
-	getCoreRowModel,
-	getFilteredRowModel,
-	useReactTable,
-} from "@tanstack/react-table";
-import {
-	ArrowUpDown,
-	ChevronDown,
-	ChevronUp,
-	EyeOff,
-	Filter,
-	FolderTree,
-	Menu,
-	Palette,
-	Search,
-	Share2,
-	Sheet,
-	X,
-} from "lucide-react";
+import { type ColumnDef, flexRender, getCoreRowModel, getFilteredRowModel, useReactTable } from "@tanstack/react-table";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Button } from "~/components/ui/button";
+import { useInView } from "react-intersection-observer";
 import {
 	ContextMenu,
 	ContextMenuContent,
 	ContextMenuItem,
 	ContextMenuTrigger,
 } from "~/components/ui/context-menu";
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuTrigger,
-} from "~/components/ui/dropdown-menu";
-import { Input } from "~/components/ui/input";
 import {
 	Tooltip,
 	TooltipContent,
@@ -49,15 +22,11 @@ import { filterRowsByQuery, rowMatchesQuery } from "~/lib/tableFilter";
 import { cn } from "~/lib/utils";
 import { api } from "~/trpc/react";
 import { AddColumnDropdown } from "./addColumnDropdown";
-import { EditableCell } from "./editableCell";
+import { ViewsHeader } from "./dataTable/ViewsHeader";
+import { ViewsSidebar } from "./dataTable/ViewsSidebar";
+import { createColumnDefs, type TableData as TableRowData } from "./dataTable/columnDefs";
 
-const getColumnTypeIcon = (type: "TEXT" | "NUMBER") => {
-	return type === "TEXT" ? "A" : "#";
-};
-
-const getColumnTypeLabel = (type: "TEXT" | "NUMBER") => {
-	return type === "TEXT" ? "Single line text" : "Number";
-};
+// Column helpers and definitions extracted to dataTable/columnDefs
 
 // Extend the column meta type to include className
 declare module "@tanstack/react-table" {
@@ -104,10 +73,8 @@ export function DataTable({ tableId }: DataTableProps) {
 	const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(new Set());
 	const [showCheckboxes, setShowCheckboxes] = useState(false);
 
-	// Infinite scroll refs
-	const scrollContainerRef = useRef<HTMLDivElement | null>(null);
-	// Observe the last visible row to trigger fetching next page
-	const lastRowObserver = useRef<IntersectionObserver | null>(null);
+// IntersectionObserver root (scroll container)
+const [rootEl, setRootEl] = useState<HTMLDivElement | null>(null);
 
 	// Fetch table metadata for columns
 	const { data: tableColumn, isLoading: tableColumnLoading } =
@@ -137,35 +104,6 @@ export function DataTable({ tableId }: DataTableProps) {
 		},
 	);
 
-	// Callback ref set on the last visible row
-	const setLastRowRef = useCallback(
-		(node: HTMLTableRowElement | null) => {
-			if (lastRowObserver.current) {
-				lastRowObserver.current.disconnect();
-				lastRowObserver.current = null;
-			}
-			if (!node) return;
-			lastRowObserver.current = new IntersectionObserver(
-				(entries) => {
-					const anyVisible = entries.some((e) => e.isIntersecting);
-					if (
-						anyVisible &&
-						rowsInfinite.hasNextPage &&
-						!rowsInfinite.isFetchingNextPage
-					) {
-						void rowsInfinite.fetchNextPage();
-					}
-				},
-				{
-					root: scrollContainerRef.current,
-					rootMargin: "200px",
-					threshold: 0.1,
-				},
-			);
-			lastRowObserver.current.observe(node);
-		},
-		[rowsInfinite.hasNextPage, rowsInfinite.isFetchingNextPage],
-	);
 
 	// No global sentinel needed; we observe the last rendered row
 
@@ -214,18 +152,17 @@ export function DataTable({ tableId }: DataTableProps) {
 		[utils.table.getInfiniteRows, tableId],
 	);
 
-const {
-    queueCellUpdate,
-    flushPendingUpdates,
-    remapRowId,
-    addRowMutation,
-    addColumnMutation,
-    deleteRowMutation,
-} = useTableMutations({
-    tableId,
-    infiniteInput,
-    onOptimisticUpdate: handleOptimisticUpdate,
-});
+	const {
+		queueCellUpdate,
+		flushPendingUpdates,
+		addRowMutation,
+		addColumnMutation,
+		deleteRowMutation,
+	} = useTableMutations({
+		tableId,
+		infiniteInput,
+		onOptimisticUpdate: handleOptimisticUpdate,
+	});
 
 	// Handle cell value updates using the queue
 	const handleCellUpdate = useCallback(
@@ -243,135 +180,24 @@ const {
 		[columns, queueCellUpdate, flushPendingUpdates],
 	);
 
-	// Create column definitions dynamically based on the table structure
-	// Force re-render when columns change by including columns length in dependency
-	const columnDefs: ColumnDef<TableData>[] = [
-		// Row ID + checklist combined (pinned left)
-		{
-			id: "row-number",
-			header: () => {
-				const visibleIds = displayData.map((r) => r.id);
-				const someSelected = visibleIds.some((id) => selectedRowIds.has(id));
-
-				const ref = useRef<HTMLInputElement | null>(null);
-				useEffect(() => {
-					if (ref.current)
-						ref.current.indeterminate = !showCheckboxes && someSelected;
-				}, [someSelected]);
-
-				const toggleAll = (checked: boolean) => {
-					setSelectedRowIds((prev) => {
-						const next = new Set(prev);
-						if (checked) {
-							for (const id of visibleIds) {
-								next.add(id);
-							}
-						} else {
-							for (const id of visibleIds) {
-								next.delete(id);
-							}
-						}
-						return next;
-					});
-				};
-
-				return (
-					<input
-						ref={ref}
-						type="checkbox"
-						aria-label="Select all"
-						className="size-4"
-						checked={showCheckboxes}
-						onChange={(e) => {
-							const checked = e.target.checked;
-							setShowCheckboxes(checked);
-							toggleAll(checked);
-						}}
-					/>
-				);
-			},
-			cell: ({ row }) => {
-				if (!showCheckboxes) {
-					return <span className="text-gray-500 text-xs">{row.index + 1}</span>;
-				}
-				const checked = selectedRowIds.has(row.original.id);
-				const onToggle = () =>
-					setSelectedRowIds((prev) => {
-						const next = new Set(prev);
-						if (next.has(row.original.id)) next.delete(row.original.id);
-						else next.add(row.original.id);
-						return next;
-					});
-				return (
-					<input
-						type="checkbox"
-						aria-label="Select row"
-						className="size-4"
-						checked={checked}
-						onChange={onToggle}
-					/>
-				);
-			},
-			enableSorting: false,
-			meta: {
-				className: "sticky left-0 w-2 border-b text-center",
-			},
-		},
-		// Data columns
-		...columns
-			.sort((a, b) => a.position - b.position)
-			.map((col) => ({
-				id: col.id,
-				header: () => (
-					<div className="flex items-center">
-						<TooltipProvider>
-							<Tooltip>
-								<TooltipTrigger asChild>
-									<span className="flex size-6 items-center justify-center text-md text-muted-foreground">
-										{getColumnTypeIcon(col.type)}
-									</span>
-								</TooltipTrigger>
-								<TooltipContent>
-									<p>{getColumnTypeLabel(col.type)}</p>
-								</TooltipContent>
-							</Tooltip>
-						</TooltipProvider>
-						<span className="font-medium">{col.name}</span>
-					</div>
-				),
-				cell: ({ getValue, row, column }: CellContext<TableData, unknown>) => {
-					const cells = getValue() as Cell | undefined;
-					const value = cells?.value || "";
-
-					return (
-						<EditableCell
-							value={value}
-							rowId={row.original.id}
-							column={{
-								...column,
-								columnDef: {
-									...column.columnDef,
-									meta: { ...column.columnDef.meta, type: col.type },
-								},
-							}}
-							handleCellUpdate={handleCellUpdate}
-						/>
-					);
-				},
-				accessorFn: (row: TableData) =>
-					row.cells.find(
-						(cv: { column: { id: string } }) => cv.column.id === col.id,
-					),
-			})),
-	];
-
-	// Pre-filter rows using the same logic as the global filter so non-matching rows are hidden at the data level too
 	const displayData = useMemo(
 		() => filterRowsByQuery(data, orderedColumns, searchValue),
 		[data, orderedColumns, searchValue],
 	);
+	// Pre-filter rows using the same logic as the global filter so non-matching rows are hidden at the data level too
 
-	const table = useReactTable({
+	// Create column definitions dynamically based on the table structure
+	const columnDefs: ColumnDef<TableRowData>[] = createColumnDefs({
+		columns: orderedColumns as any,
+		displayData: displayData as any,
+		selectedRowIds,
+		setSelectedRowIds,
+		showCheckboxes,
+		setShowCheckboxes,
+		handleCellUpdate,
+	}) as unknown as ColumnDef<TableData>[];
+
+const table = useReactTable({
 		data: displayData,
 		columns: columnDefs,
 		getCoreRowModel: getCoreRowModel(),
@@ -388,7 +214,20 @@ const {
 				left: ["row-number"],
 			},
 		},
-	});
+});
+
+// Observe last visible row: fetch next page
+const { ref: lastRowRef, inView: lastRowInView } = useInView({
+    root: rootEl,
+    rootMargin: "200px",
+    threshold: 0.1,
+});
+
+useEffect(() => {
+    if (lastRowInView && rowsInfinite.hasNextPage && !rowsInfinite.isFetchingNextPage) {
+        void rowsInfinite.fetchNextPage();
+    }
+}, [lastRowInView, rowsInfinite.hasNextPage, rowsInfinite.isFetchingNextPage]);
 
 	// Use filtered rows for match nav/highlight (already reflects search filtering)
 	const filteredRows = table.getRowModel().rows.map((r) => r.original);
@@ -464,7 +303,8 @@ const {
 		);
 	}
 
-	if (!tableColumn || !rowsInfinite.data?.pages) {
+	// If metadata is missing, we cannot render the table structure
+	if (!tableColumn) {
 		return (
 			<div className="flex h-64 items-center justify-center">
 				<div className="text-gray-500">Table not found.</div>
@@ -475,207 +315,26 @@ const {
 	return (
 		<div className="flex h-full">
 			<div className="min-w-0 flex-1">
-				{/* Views header row (hamburger + current view menu) */}
-				<div className="flex items-center justify-between border-b px-3">
-					<div className="flex gap-1">
-						<button
-							type="button"
-							onClick={() => setViewSidebarOpen((v) => !v)}
-							className="flex h-8 w-8 items-center justify-center rounded hover:bg-gray-50"
-							aria-label="Toggle views sidebar"
-						>
-							<Menu className="size-4 cursor-pointer" />
-						</button>
-						<DropdownMenu>
-							<DropdownMenuTrigger asChild>
-								<button
-									type="button"
-									className="flex items-center gap-2 rounded px-2 py-1 text-gray-700 text-sm hover:bg-gray-50"
-								>
-									<Sheet className="size-4 text-blue-600" />
-									{viewName}
-									<ChevronDown className="size-4" />
-								</button>
-							</DropdownMenuTrigger>
-							<DropdownMenuContent align="start" className="w-64 bg-white p-0">
-								<div className="p-2">
-									<button
-										type="button"
-										className="w-full rounded px-2 py-2 text-left hover:bg-gray-50"
-										onClick={() => {
-											const name = prompt("Rename view", viewName);
-											if (name?.trim()) setViewName(name.trim());
-										}}
-									>
-										Rename view
-									</button>
-									<button
-										type="button"
-										className="w-full rounded px-2 py-2 text-left hover:bg-gray-50"
-										onClick={() => setViewName((v) => `${v} copy`)}
-									>
-										Duplicate view
-									</button>
-									<button
-										type="button"
-										className="w-full rounded px-2 py-2 text-left text-red-600 hover:bg-red-50"
-									>
-										Delete view
-									</button>
-								</div>
-							</DropdownMenuContent>
-						</DropdownMenu>
-					</div>
-					{/* Toolbar - all right aligned */}
-					<div className="flex items-center justify-end gap-1 p-1 text-gray-500">
-						<Button
-							variant="ghost"
-							size="sm"
-							className="cursor-pointer gap-2 px-2 hover:bg-gray-100"
-						>
-							<EyeOff className="size-4" />
-							<span className="text-sm">Hide fields</span>
-						</Button>
-						<Button
-							variant="ghost"
-							size="sm"
-							className="cursor-pointer gap-2 px-2 hover:bg-gray-100"
-						>
-							<Filter className="size-4" />
-							<span className="text-sm">Filter</span>
-						</Button>
-						<Button
-							variant="ghost"
-							size="sm"
-							className="cursor-pointer gap-2 px-2 hover:bg-gray-100"
-						>
-							<FolderTree className="size-4" />
-							<span className="text-sm">Group</span>
-						</Button>
-						<Button
-							variant="ghost"
-							size="sm"
-							className="cursor-pointer gap-2 px-2 hover:bg-gray-100"
-						>
-							<ArrowUpDown className="size-4" />
-							<span className="text-sm">Sort</span>
-						</Button>
-						<Button
-							variant="ghost"
-							size="sm"
-							className="cursor-pointer gap-2 px-2 hover:bg-gray-100"
-						>
-							<Palette className="size-4" />
-							<span className="text-sm">Color</span>
-						</Button>
-						<Button
-							variant="ghost"
-							size="sm"
-							className="cursor-pointer gap-2 px-2 hover:bg-gray-100"
-						>
-							<Share2 className="size-4" />
-							<span className="text-sm">Share and sync</span>
-						</Button>
-						<DropdownMenu open={searchOpen} onOpenChange={setSearchOpen}>
-							<DropdownMenuTrigger asChild>
-								<Button variant="ghost" className="cursor-pointer">
-									<Search />
-								</Button>
-							</DropdownMenuTrigger>
-							<DropdownMenuContent align="end" className="w-full bg-white">
-								<div className="flex items-center gap-3">
-									<Input
-										id="table-search"
-										type="text"
-										value={String(table.getState().globalFilter ?? "")}
-										onChange={(e) => table.setGlobalFilter(e.target.value)}
-										onKeyDown={(e) => {
-											if (e.key === "Enter" || e.key === "NumpadEnter") {
-												// Prevent the dropdown from handling Enter and possibly closing
-												e.preventDefault();
-												e.stopPropagation();
-												if (e.shiftKey) {
-													gotoPrevMatch();
-												} else {
-													gotoNextMatch();
-												}
-											}
-										}}
-										placeholder="Find in view"
-										autoFocus
-									/>
-									<div className="min-w-20 text-center text-gray-500 text-xs">
-										{matches.length > 0 &&
-											`${activeMatchIndex + 1} / ${matches.length}`}
-									</div>
-									<div className="flex gap-1">
-										<Button
-											variant="outline"
-											size="icon"
-											onClick={gotoPrevMatch}
-											disabled={matches.length === 0}
-											aria-label="Previous match"
-										>
-											<ChevronUp className="size-4" />
-										</Button>
-										<Button
-											variant="outline"
-											size="icon"
-											onClick={gotoNextMatch}
-											disabled={matches.length === 0}
-											aria-label="Next match"
-										>
-											<ChevronDown className="size-4" />
-										</Button>
-									</div>
-									<Button
-										variant="ghost"
-										className="cursor-pointer"
-										onClick={() => setSearchOpen(false)}
-									>
-										<X />
-									</Button>
-								</div>
-							</DropdownMenuContent>
-						</DropdownMenu>
-					</div>
-				</div>
+				<ViewsHeader
+					viewName={viewName}
+					onRenameView={(name) => setViewName(name)}
+					onToggleSidebar={() => setViewSidebarOpen((v) => !v)}
+					searchOpen={searchOpen}
+					setSearchOpen={setSearchOpen}
+					table={table as any}
+					matchesCount={matches.length}
+					activeMatchIndex={activeMatchIndex}
+					gotoPrevMatch={gotoPrevMatch}
+					gotoNextMatch={gotoNextMatch}
+				/>
 
 				<div className="flex h-full">
 					{/* Left views sidebar inside table area */}
-					{viewSidebarOpen && (
-						<nav className="flex w-70 flex-col gap-2 border-gray-200 border-r bg-white px-4 py-3 text-xs">
-							<button
-								type="button"
-								className="flex cursor-pointer items-center gap-2 px-3 text-gray-700 text-sm hover:text-gray-900"
-							>
-								<span className="text-xl">+</span>
-								Create new...
-							</button>
-							<div className="flex items-center gap-2 px-3">
-								<Search className="size-4 text-gray-400" />
-								<Input
-									placeholder="Find a view"
-									className="h-8 w-full pl-0 text-xs shadow-none md:text-xs"
-								/>
-							</div>
-							<div>
-								<button
-									type="button"
-									className="flex w-full items-center gap-2 bg-gray-100 px-3 py-2 text-gray-900"
-								>
-									<Sheet className="size-4 text-blue-600" />
-									<span>{viewName}</span>
-									<ChevronDown className="ml-auto size-4" />
-								</button>
-							</div>
-						</nav>
-					)}
+					{viewSidebarOpen && <ViewsSidebar viewName={viewName} />}
 
-					<div className="flex max-h-[90vh] w-full flex-col justify-between overflow-hidden">
+					<div className="flex max-h-[90vh] w-full flex-col justify-between overflow-hidden min-h-0">
 						<div
-							className="flex overflow-y-auto border-gray-200"
-							ref={scrollContainerRef}
+							className="flex overflow-y-auto border-gray-200 flex-1 min-h-0"
 						>
 							<table
 								className="border bg-white"
@@ -704,69 +363,51 @@ const {
 									))}
 								</thead>
 								<tbody>
-									{table.getRowModel().rows.map((row, idx, arr) => (
-										<ContextMenu key={row.id}>
-											<ContextMenuTrigger asChild>
-												<tr
-													ref={
-														idx === arr.length - 1 ? setLastRowRef : undefined
-													}
-													className={cn("cursor-default")}
-												>
-													{row.getVisibleCells().map((cell) => (
-														<td
-															key={cell.id}
-															className={cn(
-																"h-8 w-[150px] truncate whitespace-nowrap border-gray-200 border-r border-b text-gray-900 text-sm",
-
-																cell.column.columnDef.meta?.className,
-																(() => {
-																	const key = getCellKey(
-																		row.original.id,
-																		cell.column.id,
-																	);
-																	const isMatch =
-																		Boolean(searchValue) && matchKeys.has(key);
-																	const isActiveCell =
-																		Boolean(activeMatch) &&
-																		activeMatch?.rowId === row.original.id &&
-																		activeMatch?.columnId === cell.column.id;
-																	// Darker bg for active cell; lighter bg for other matched cells
-																	return isActiveCell
-																		? "bg-yellow-200"
-																		: isMatch
-																			? "bg-yellow-100"
-																			: "";
-																})(),
-															)}
-															data-cell={getCellKey(
-																row.original.id,
-																cell.column.id,
-															)}
-														>
-															{flexRender(
-																cell.column.columnDef.cell,
-																cell.getContext(),
-															)}
-														</td>
-													))}
-												</tr>
-											</ContextMenuTrigger>
-											<ContextMenuContent className="w-48">
-												<ContextMenuItem
-													onClick={() => {
-														handleDeleteRows(row.original.id);
-													}}
-													className="text-red-600 focus:bg-red-50 focus:text-red-600"
-												>
-													Delete row
-												</ContextMenuItem>
-											</ContextMenuContent>
-										</ContextMenu>
-									))}
-									{/* Inline add row UI removed: plus button adds row immediately */}
-								</tbody>
+	{table.getRowModel().rows.map((row, idx, arr) => (
+		<ContextMenu key={row.id}>
+			<ContextMenuTrigger asChild>
+				<tr
+					ref={idx === arr.length - 1 ? lastRowRef : undefined}
+					className={cn("cursor-default")}
+				>
+					{row.getVisibleCells().map((cell) => (
+						<td
+							key={cell.id}
+							className={cn(
+								"h-8 w-[150px] truncate whitespace-nowrap border-gray-200 border-r border-b text-gray-900 text-sm",
+								cell.column.columnDef.meta?.className,
+								(() => {
+									const key = getCellKey(row.original.id, cell.column.id);
+									const isMatch = Boolean(searchValue) && matchKeys.has(key);
+									const isActiveCell =
+										Boolean(activeMatch) &&
+										activeMatch?.rowId === row.original.id &&
+										activeMatch?.columnId === cell.column.id;
+									return isActiveCell ? "bg-yellow-200" : isMatch ? "bg-yellow-100" : "";
+								})(),
+							)}
+							data-cell={getCellKey(row.original.id, cell.column.id)}
+						>
+							{flexRender(cell.column.columnDef.cell, cell.getContext())}
+						</td>
+					))}
+				</tr>
+			</ContextMenuTrigger>
+			<ContextMenuContent className="w-48">
+				<ContextMenuItem
+					onClick={() => {
+						handleDeleteRows(row.original.id);
+					}}
+					className="text-red-600 focus:bg-red-50 focus:text-red-600"
+				>
+					Delete row
+				</ContextMenuItem>
+			</ContextMenuContent>
+		</ContextMenu>
+	))}
+</tbody>
 								{/* Add Row button row */}
+								<tfoot>
 								<tr className="border-gray-200 border-r bg-white">
 									{columns
 										.sort((a, b) => a.position - b.position)
@@ -785,7 +426,7 @@ const {
 																	className="flex size-8 w-full cursor-pointer items-center justify-center text-gray-600 text-xl hover:bg-gray-50 hover:text-gray-800"
 																>
 																	+
-																</button>
+									</button>
 															</TooltipTrigger>
 															<TooltipContent>
 																<p>
@@ -799,6 +440,7 @@ const {
 											</td>
 										))}
 								</tr>
+								</tfoot>
 							</table>
 							{/* Floating Add Column button (no body cells underneath) */}
 							<AddColumnDropdown
@@ -825,3 +467,11 @@ const {
 		</div>
 	);
 }
+
+
+
+
+
+
+
+
