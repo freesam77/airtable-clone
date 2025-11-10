@@ -1,10 +1,10 @@
-import { z } from "zod";
 import type { Prisma } from "@prisma/client";
+import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 
 export const tableRouter = createTRPCRouter({
-    // Get table columns (for headers/typing)
-    getTableColumnType: protectedProcedure
+	// Get table columns (for headers/typing)
+	getTableColumnType: protectedProcedure
 		.input(z.object({ id: z.string() }))
 		.query(async ({ ctx, input }) => {
 			return ctx.db.table.findFirst({

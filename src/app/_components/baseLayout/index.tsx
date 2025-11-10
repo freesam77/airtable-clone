@@ -117,7 +117,7 @@ export function BaseLayout({
 
 	return (
 		<div className="flex">
-			<div className="flex w-15 items-start justify-center border pt-5">
+			<div className="relative z-50 flex w-16 shrink-0 items-start justify-center border-r bg-white pt-5">
 				<Image
 					src="/airtable-logo.svg"
 					className="h-6 cursor-pointer"
