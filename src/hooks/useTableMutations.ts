@@ -260,13 +260,19 @@ export function useTableMutations({
 			await utils.table.getTableColumnType.cancel({ id: tableId });
 			await utils.table.getInfiniteRows.cancel(infiniteInput);
 
-			const prevColumnData = utils.table.getTableColumnType.getData({ id: tableId });
-			const prevInfiniteRows = utils.table.getInfiniteRows.getInfiniteData(infiniteInput);
+			const prevColumnData = utils.table.getTableColumnType.getData({
+				id: tableId,
+			});
+			const prevInfiniteRows =
+				utils.table.getInfiniteRows.getInfiniteData(infiniteInput);
 
 			// Optimistically remove the column metadata
 			utils.table.getTableColumnType.setData({ id: tableId }, (old) => {
 				if (!old) return old;
-				return { ...old, columns: old.columns.filter((c) => c.id !== variables.colId) };
+				return {
+					...old,
+					columns: old.columns.filter((c) => c.id !== variables.colId),
+				};
 			});
 
 			// Optimistically remove cells for that column from each row
@@ -278,17 +284,30 @@ export function useTableMutations({
 						...page,
 						items: page.items.map((row) => ({
 							...row,
-							cells: row.cells.filter((cell) => cell.columnId !== variables.colId),
+							cells: row.cells.filter(
+								(cell) => cell.columnId !== variables.colId,
+							),
 						})),
 					})),
 				};
 			});
 
-			return { previousColumns: prevColumnData, previousInfinite: prevInfiniteRows } as const;
+			return {
+				previousColumns: prevColumnData,
+				previousInfinite: prevInfiniteRows,
+			} as const;
 		},
 		onError: (_err, _variables, ctx) => {
-			if (ctx?.previousColumns) utils.table.getTableColumnType.setData({ id: tableId }, ctx.previousColumns);
-			if (ctx?.previousInfinite) utils.table.getInfiniteRows.setInfiniteData(infiniteInput, ctx.previousInfinite);
+			if (ctx?.previousColumns)
+				utils.table.getTableColumnType.setData(
+					{ id: tableId },
+					ctx.previousColumns,
+				);
+			if (ctx?.previousInfinite)
+				utils.table.getInfiniteRows.setInfiniteData(
+					infiniteInput,
+					ctx.previousInfinite,
+				);
 		},
 		onSettled: () => {
 			utils.table.getTableColumnType.invalidate({ id: tableId });
@@ -301,15 +320,20 @@ export function useTableMutations({
 			await utils.table.getTableColumnType.cancel({ id: tableId });
 			await utils.table.getInfiniteRows.cancel(infiniteInput);
 
-			const prevColumnData = utils.table.getTableColumnType.getData({ id: tableId });
-			const prevInfiniteRows = utils.table.getInfiniteRows.getInfiniteData(infiniteInput);
+			const prevColumnData = utils.table.getTableColumnType.getData({
+				id: tableId,
+			});
+			const prevInfiniteRows =
+				utils.table.getInfiniteRows.getInfiniteData(infiniteInput);
 
 			// Optimistically rename in column metadata
 			utils.table.getTableColumnType.setData({ id: tableId }, (old) => {
 				if (!old) return old;
 				return {
 					...old,
-					columns: old.columns.map((c) => (c.id === variables.colId ? { ...c, name: variables.name } : c)),
+					columns: old.columns.map((c) =>
+						c.id === variables.colId ? { ...c, name: variables.name } : c,
+					),
 				};
 			});
 
@@ -323,7 +347,12 @@ export function useTableMutations({
 						items: page.items.map((row) => ({
 							...row,
 							cells: row.cells.map((cell) =>
-								cell.columnId === variables.colId ? { ...cell, column: { ...cell.column, name: variables.name } } : cell,
+								cell.columnId === variables.colId
+									? {
+											...cell,
+											column: { ...cell.column, name: variables.name },
+										}
+									: cell,
 							),
 						})),
 					})),
@@ -333,8 +362,16 @@ export function useTableMutations({
 			return { prevColumnData, prevInfiniteRows } as const;
 		},
 		onError: (_err, _variables, ctx) => {
-			if (ctx?.prevColumnData) utils.table.getTableColumnType.setData({ id: tableId }, ctx.prevColumnData);
-			if (ctx?.prevInfiniteRows) utils.table.getInfiniteRows.setInfiniteData(infiniteInput, ctx.prevInfiniteRows);
+			if (ctx?.prevColumnData)
+				utils.table.getTableColumnType.setData(
+					{ id: tableId },
+					ctx.prevColumnData,
+				);
+			if (ctx?.prevInfiniteRows)
+				utils.table.getInfiniteRows.setInfiniteData(
+					infiniteInput,
+					ctx.prevInfiniteRows,
+				);
 		},
 		onSettled: () => {
 			utils.table.getTableColumnType.invalidate({ id: tableId });
@@ -347,19 +384,24 @@ export function useTableMutations({
 			await utils.table.getTableColumnType.cancel({ id: tableId });
 			await utils.table.getInfiniteRows.cancel(infiniteInput);
 
-			const prevColumnData = utils.table.getTableColumnType.getData({ id: tableId });
-			const prevInfiniteRows = utils.table.getInfiniteRows.getInfiniteData(infiniteInput);
+			const prevColumnData = utils.table.getTableColumnType.getData({
+				id: tableId,
+			});
+			const prevInfiniteRows =
+				utils.table.getInfiniteRows.getInfiniteData(infiniteInput);
 
-			const original = prevColumnData?.columns.find((c) => c.id === variables.colId);
+			const original = prevColumnData?.columns.find(
+				(c) => c.id === variables.colId,
+			);
 			const optimisticColumn = original
 				? {
-					id: `temp-dup-col-${Date.now()}`,
-					name: `${original.name} copy`,
-					type: original.type,
-					position: prevColumnData?.columns.length || 0,
-					required: false,
-					tableId,
-				}
+						id: `temp-dup-col-${Date.now()}`,
+						name: `${original.name} copy`,
+						type: original.type,
+						position: prevColumnData?.columns.length || 0,
+						required: false,
+						tableId,
+					}
 				: undefined;
 
 			if (optimisticColumn) {
@@ -375,7 +417,9 @@ export function useTableMutations({
 						pages: old.pages.map((page) => ({
 							...page,
 							items: page.items.map((row) => {
-								const src = row.cells.find((c) => c.columnId === variables.colId);
+								const src = row.cells.find(
+									(c) => c.columnId === variables.colId,
+								);
 								return {
 									...row,
 									cells: [
@@ -403,7 +447,9 @@ export function useTableMutations({
 				if (!old || !ctx?.optimisticColumn) return old;
 				return {
 					...old,
-					columns: old.columns.map((c) => (c.id === ctx.optimisticColumn!.id ? result : c)),
+					columns: old.columns.map((c) =>
+						c.id === ctx.optimisticColumn!.id ? result : c,
+					),
 				};
 			});
 			utils.table.getInfiniteRows.setInfiniteData(infiniteInput, (old) => {
@@ -415,7 +461,9 @@ export function useTableMutations({
 						items: page.items.map((row) => ({
 							...row,
 							cells: row.cells.map((cell) =>
-								cell.columnId === ctx.optimisticColumn!.id ? { ...cell, column: result } : cell,
+								cell.columnId === ctx.optimisticColumn!.id
+									? { ...cell, column: result }
+									: cell,
 							),
 						})),
 					})),
@@ -423,16 +471,22 @@ export function useTableMutations({
 			});
 		},
 		onError: (_err, _variables, ctx) => {
-			if (ctx?.prevColumnData) utils.table.getTableColumnType.setData({ id: tableId }, ctx.prevColumnData);
-			if (ctx?.prevInfiniteRows) utils.table.getInfiniteRows.setInfiniteData(infiniteInput, ctx.prevInfiniteRows);
+			if (ctx?.prevColumnData)
+				utils.table.getTableColumnType.setData(
+					{ id: tableId },
+					ctx.prevColumnData,
+				);
+			if (ctx?.prevInfiniteRows)
+				utils.table.getInfiniteRows.setInfiniteData(
+					infiniteInput,
+					ctx.prevInfiniteRows,
+				);
 		},
 		onSettled: () => {
 			utils.table.getTableColumnType.invalidate({ id: tableId });
 			utils.table.getInfiniteRows.invalidate(infiniteInput);
 		},
 	});
-
-    
 
 	return {
 		queueCellUpdate,

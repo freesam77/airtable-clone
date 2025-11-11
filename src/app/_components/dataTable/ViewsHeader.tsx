@@ -5,7 +5,6 @@ import {
 	ChevronDown,
 	ChevronUp,
 	EyeOff,
-	Filter,
 	FolderTree,
 	Menu,
 	Palette,
@@ -21,6 +20,8 @@ import {
 	DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
 import { Input } from "~/components/ui/input";
+import type { FilterCondition } from "./Filters";
+import { FiltersDropdown } from "./FiltersDropdown";
 
 type ViewsHeaderProps = {
 	viewName: string;
@@ -34,6 +35,9 @@ type ViewsHeaderProps = {
 	activeMatchIndex: number;
 	gotoPrevMatch: () => void;
 	gotoNextMatch: () => void;
+	columns: Array<{ id: string; name: string; type: "TEXT" | "NUMBER" }>;
+	filters: FilterCondition[];
+	setFilters: (updater: any) => void;
 };
 
 export function ViewsHeader({
@@ -47,7 +51,11 @@ export function ViewsHeader({
 	activeMatchIndex,
 	gotoPrevMatch,
 	gotoNextMatch,
+	columns,
+	filters,
+	setFilters,
 }: ViewsHeaderProps) {
+	// filter UI moved to FiltersDropdown
 	return (
 		<div className="flex items-center justify-between border-b bg-white px-3">
 			<div className="flex gap-1">
@@ -109,14 +117,11 @@ export function ViewsHeader({
 					<EyeOff className="size-4" />
 					<span className="text-sm">Hide fields</span>
 				</Button>
-				<Button
-					variant="ghost"
-					size="sm"
-					className="cursor-pointer gap-2 px-2 hover:bg-gray-100"
-				>
-					<Filter className="size-4" />
-					<span className="text-sm">Filter</span>
-				</Button>
+				<FiltersDropdown
+					columns={columns}
+					filters={filters}
+					setFilters={setFilters}
+				/>
 				<Button
 					variant="ghost"
 					size="sm"

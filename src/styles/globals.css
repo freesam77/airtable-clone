@@ -187,9 +187,9 @@
 		@apply bg-background text-foreground;
 	}
 
-    button {
-        @apply cursor-pointer;
-    }
+	button {
+		@apply cursor-pointer;
+	}
 }
 
 /* Components */

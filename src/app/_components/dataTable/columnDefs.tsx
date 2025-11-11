@@ -8,7 +8,7 @@ import {
 	TooltipProvider,
 	TooltipTrigger,
 } from "~/components/ui/tooltip";
-import { EditableCell } from "../editableCell";
+import { EditableCell } from "./editableCell";
 
 export type ColumnType = "TEXT" | "NUMBER";
 
@@ -140,36 +140,38 @@ export function createColumnDefs({
 			.sort((a, b) => a.position - b.position)
 			.map((col) => ({
 				id: col.id,
-            header: () => (
-                <div className="flex min-w-0 items-center">
-                    <TooltipProvider>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <span className="flex size-6 flex-none items-center justify-center text-md text-muted-foreground">
-                                    {getColumnTypeIcon(col.type)}
-                                </span>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                                <p>{getColumnTypeLabel(col.type)}</p>
-                            </TooltipContent>
-                        </Tooltip>
-                    </TooltipProvider>
-                    <span className="flex-1 truncate whitespace-nowrap font-medium">{col.name}</span>
-                </div>
-            ),
-                cell: ({ getValue, row }: CellContext<TableData, unknown>) => {
-                    const cells = getValue() as Cell | undefined;
-                    const value = cells?.value || "";
-                    return (
-                        <EditableCell
-                            value={value}
-                            rowId={row.original.id}
-                            columnId={col.id}
-                            type={col.type}
-                            handleCellUpdate={handleCellUpdate}
-                        />
-                    );
-                },
+				header: () => (
+					<div className="flex min-w-0 items-center">
+						<TooltipProvider>
+							<Tooltip>
+								<TooltipTrigger asChild>
+									<span className="flex size-6 flex-none items-center justify-center text-md text-muted-foreground">
+										{getColumnTypeIcon(col.type)}
+									</span>
+								</TooltipTrigger>
+								<TooltipContent>
+									<p>{getColumnTypeLabel(col.type)}</p>
+								</TooltipContent>
+							</Tooltip>
+						</TooltipProvider>
+						<span className="flex-1 truncate whitespace-nowrap font-medium">
+							{col.name}
+						</span>
+					</div>
+				),
+				cell: ({ getValue, row }: CellContext<TableData, unknown>) => {
+					const cells = getValue() as Cell | undefined;
+					const value = cells?.value || "";
+					return (
+						<EditableCell
+							value={value}
+							rowId={row.original.id}
+							columnId={col.id}
+							type={col.type}
+							handleCellUpdate={handleCellUpdate}
+						/>
+					);
+				},
 				accessorFn: (row: TableData) =>
 					row.cells.find(
 						(cv: { column: { id: string } }) => cv.column.id === col.id,

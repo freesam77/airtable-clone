@@ -15,30 +15,23 @@ import {
 	ContextMenuTrigger,
 } from "~/components/ui/context-menu";
 import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuTrigger,
-} from "~/components/ui/dropdown-menu";
-import {
 	Tooltip,
 	TooltipContent,
 	TooltipProvider,
 	TooltipTrigger,
 } from "~/components/ui/tooltip";
-import { ChevronDown } from "lucide-react";
 import { useTableMutations } from "~/hooks/useTableMutations";
 import { useTableSearchNavigation } from "~/hooks/useTableSearchNavigation";
 import { detectOS } from "~/lib/detectOS";
 import { filterRowsByQuery, rowMatchesQuery } from "~/lib/tableFilter";
 import { cn } from "~/lib/utils";
 import { api } from "~/trpc/react";
+import { ColumnHeaderMenu } from "./ColumnHeaderMenu";
+import { type FilterCondition, applyFilters } from "./Filters";
+import { ViewsHeader } from "./ViewsHeader";
+import { ViewsSidebar } from "./ViewsSidebar";
 import { AddColumnDropdown } from "./addColumnDropdown";
-import { ViewsHeader } from "./dataTable/ViewsHeader";
-import { ViewsSidebar } from "./dataTable/ViewsSidebar";
-import {
-	type TableData as TableRowData,
-	createColumnDefs,
-} from "./dataTable/columnDefs";
+import { type TableData as TableRowData, createColumnDefs } from "./columnDefs";
 
 // Column helpers and definitions extracted to dataTable/columnDefs
 
@@ -129,6 +122,8 @@ export function DataTable({ tableId }: DataTableProps) {
 		[columns],
 	);
 
+	const [filters, setFilters] = useState<FilterCondition[]>([]);
+
 	const utils = api.useUtils();
 
 	// Optimistic update function for immediate UI feedback
@@ -192,10 +187,19 @@ export function DataTable({ tableId }: DataTableProps) {
 		[columns, queueCellUpdate, flushPendingUpdates],
 	);
 
-	const displayData = useMemo(
-		() => filterRowsByQuery(data, orderedColumns, searchValue),
-		[data, orderedColumns, searchValue],
-	);
+	const displayData = useMemo<TableData[]>(() => {
+		const pre = filterRowsByQuery(
+			data,
+			orderedColumns,
+			searchValue,
+		) as unknown as TableData[];
+		return applyFilters<TableData>(
+			data,
+			orderedColumns,
+			pre,
+			filters,
+		) as unknown as TableData[];
+	}, [data, orderedColumns, searchValue, filters]);
 	// Pre-filter rows using the same logic as the global filter so non-matching rows are hidden at the data level too
 
 	// Create column definitions dynamically based on the table structure
@@ -206,8 +210,8 @@ export function DataTable({ tableId }: DataTableProps) {
 		[addColumnMutation, tableId],
 	);
 	const columnDefs: ColumnDef<TableRowData>[] = createColumnDefs({
-		columns: orderedColumns as any,
-		displayData: displayData as any,
+		columns: orderedColumns,
+		displayData: displayData,
 		selectedRowIds,
 		setSelectedRowIds,
 		showCheckboxes,
@@ -215,7 +219,7 @@ export function DataTable({ tableId }: DataTableProps) {
 		handleCellUpdate,
 	}) as unknown as ColumnDef<TableData>[];
 
-	const table = useReactTable({
+	const table = useReactTable<TableData>({
 		data: displayData,
 		columns: columnDefs,
 		getCoreRowModel: getCoreRowModel(),
@@ -345,11 +349,14 @@ export function DataTable({ tableId }: DataTableProps) {
 					onToggleSidebar={() => setViewSidebarOpen((v) => !v)}
 					searchOpen={searchOpen}
 					setSearchOpen={setSearchOpen}
-					table={table as any}
+					table={table}
 					matchesCount={matches.length}
 					activeMatchIndex={activeMatchIndex}
 					gotoPrevMatch={gotoPrevMatch}
 					gotoNextMatch={gotoNextMatch}
+					columns={orderedColumns}
+					filters={filters}
+					setFilters={setFilters}
 				/>
 
 				<div className="flex">
@@ -366,7 +373,7 @@ export function DataTable({ tableId }: DataTableProps) {
 								key={`table-${columns.length}-${columns.map((c) => c.id).join("-")}`}
 							>
 								<colgroup>
-									{(table as any).getVisibleLeafColumns?.().map((col: any) => (
+									{table.getVisibleLeafColumns?.().map((col) => (
 										<col
 											key={col.id}
 											className={cn("w-[150px]", col.columnDef.meta?.className)}
@@ -398,70 +405,37 @@ export function DataTable({ tableId }: DataTableProps) {
 																)}
 
 														{header.column.id !== "row-number" && (
-															<DropdownMenu>
-																<DropdownMenuTrigger asChild>
-																	<button
-																		type="button"
-																		className="ml-auto opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100"
-																		aria-label="Column menu"
-																	>
-																		<ChevronDown className="size-4" />
-																	</button>
-																</DropdownMenuTrigger>
-																<DropdownMenuContent
-																	align="start"
-																	className="w-64 bg-white p-0"
-																>
-																	<div className="p-2">
-																		<button
-																			type="button"
-																			className="w-full rounded px-2 py-2 text-left hover:bg-gray-50"
-																			onClick={() => {
-																				const current = header.column.columnDef
-																					.header as any;
-																				const name = prompt(
-																					"Rename column",
-																					String(
-																						current instanceof Function
-																							? header.column.id
-																							: current,
-																					) || header.column.id,
-																				);
-																				if (name && name.trim()) {
-																					renameColumnMutation.mutate({
-																						colId: header.column.id,
-																						name: name.trim(),
-																					});
-																				}
-																			}}
-																		>
-																			Rename column
-																		</button>
-																		<button
-																			type="button"
-																			className="w-full rounded px-2 py-2 text-left hover:bg-gray-50"
-																			onClick={() => {
-																				duplicateColumnMutation.mutate({
-																					colId: header.column.id,
-																				});
-																			}}
-																		>
-																			Duplicate column
-																		</button>
-																		<button
-																			type="button"
-																			className="w-full rounded px-2 py-2 text-left text-red-600 hover:bg-red-50"
-																			onClick={() =>
-																				deleteColumnMutation.mutate({
-																					colId: header.column.id,
-																				})
-																			}
-																		>
-																			Delete column
-																		</button>
-																	</div>
-																</DropdownMenuContent>
-															</DropdownMenu>
+															<ColumnHeaderMenu
+																columnId={header.column.id}
+																onRename={(id) => {
+																	const current =
+																		header.column.columnDef.header;
+																	const name = prompt(
+																		"Rename column",
+																		String(
+																			current instanceof Function
+																				? id
+																				: current,
+																		) || id,
+																	);
+																	if (name?.trim()) {
+																		renameColumnMutation.mutate({
+																			colId: id,
+																			name: name.trim(),
+																		});
+																	}
+																}}
+																onDuplicate={(id) =>
+																	duplicateColumnMutation.mutate({ colId: id })
+																}
+																onDelete={(id) =>
+																	deleteColumnMutation.mutate({ colId: id })
+																}
+																disabledRename={renameColumnMutation.isPending}
+																disabledDuplicate={
+																	duplicateColumnMutation.isPending
+																}
+															/>
 														)}
 													</div>
 												</th>

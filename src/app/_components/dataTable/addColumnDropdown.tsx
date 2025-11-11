@@ -85,7 +85,7 @@ export function AddColumnDropdown({
 									type="button"
 									onClick={() => setColumnType(type.value)}
 									className={cn(
-										"flex flex w-full cursor-pointer items-center items-center gap-3 p-3 text-left transition-colors hover:bg-gray-100",
+										"flex w-full cursor-pointer items-center gap-3 p-3 text-left transition-colors hover:bg-gray-100",
 										columnType === type.value
 											? "border-primary bg-accent"
 											: "border-border",

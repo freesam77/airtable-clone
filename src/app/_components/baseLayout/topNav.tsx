@@ -1,26 +1,26 @@
 "use client";
 import {
+	Calendar,
 	ChevronDown,
 	ChevronRight,
+	Cloud,
+	Database,
 	ExternalLink,
+	FileSpreadsheet,
 	Folder,
 	MoreHorizontal,
 	Plus,
 	Star,
-	Database,
-	FileSpreadsheet,
-	Calendar,
-	Cloud,
 } from "lucide-react";
 import { Check, Search } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuTrigger,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuLabel,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
 import { Input } from "~/components/ui/input";
 import { showToast } from "~/components/ui/toast";
@@ -128,12 +128,12 @@ export const TopNav = ({
 	const [centerTab, setCenterTab] = useState<
 		"Data" | "Automations" | "Interfaces" | "Forms"
 	>("Data");
-    const [tableMenuOpen, setTableMenuOpen] = useState(false);
-    const [tableSearch, setTableSearch] = useState("");
-    const [showAddInline, setShowAddInline] = useState(false);
-    // Add or import dropdown state
-    const [importMenuOpen, setImportMenuOpen] = useState(false);
-    const [importInlineOpen, setImportInlineOpen] = useState(false);
+	const [tableMenuOpen, setTableMenuOpen] = useState(false);
+	const [tableSearch, setTableSearch] = useState("");
+	const [showAddInline, setShowAddInline] = useState(false);
+	// Add or import dropdown state
+	const [importMenuOpen, setImportMenuOpen] = useState(false);
+	const [importInlineOpen, setImportInlineOpen] = useState(false);
 
 	useEffect(() => {
 		setNameDraft(selectedBase.name);
@@ -400,13 +400,13 @@ export const TopNav = ({
 						return (
 							<div
 								key={table.id}
-									className={cn(
-										"flex border-separate border-spacing-0 items-center justify-between gap-2 rounded-tr-sm border-x border-t px-3 py-2 font-medium text-sm",
-										isActive
-											? "-mb-0.5 z-10 border-gray-300 bg-white text-gray-900"
-											: "border-transparent bg-transparent text-gray-600 hover:bg-slate-200 hover:text-gray-900",
-										tableIndex !== 0 && "rounded-t-sm",
-									)}
+								className={cn(
+									"flex border-separate border-spacing-0 items-center justify-between gap-2 rounded-tr-sm border-x border-t px-3 py-2 font-medium text-sm",
+									isActive
+										? "-mb-0.5 z-10 border-gray-300 bg-white text-gray-900"
+										: "border-transparent bg-transparent text-gray-600 hover:bg-slate-200 hover:text-gray-900",
+									tableIndex !== 0 && "rounded-t-sm",
+								)}
 							>
 								<button
 									type="button"
@@ -542,19 +542,19 @@ export const TopNav = ({
 										<Plus size={14} /> Add table
 									</button>
 								) : (
-                            <div className="px-2 py-2">
-                                <CreateTableInlineInput
-                                    newTableName={newTableName}
-                                    setNewTableName={setNewTableName}
-                                    handleCreateTable={() => {
-                                        handleCreateTable();
-                                        setTableMenuOpen(false);
-                                        setShowAddInline(false);
-                                    }}
-                                    onCancel={() => setShowAddInline(false)}
-                                    isPending={createTable.isPending}
-                                />
-                            </div>
+									<div className="px-2 py-2">
+										<CreateTableInlineInput
+											newTableName={newTableName}
+											setNewTableName={setNewTableName}
+											handleCreateTable={() => {
+												handleCreateTable();
+												setTableMenuOpen(false);
+												setShowAddInline(false);
+											}}
+											onCancel={() => setShowAddInline(false)}
+											isPending={createTable.isPending}
+										/>
+									</div>
 								)}
 							</div>
 						</DropdownMenuContent>
@@ -576,67 +576,106 @@ export const TopNav = ({
 								<Plus size={14} /> Add or import
 							</button>
 						</DropdownMenuTrigger>
-                    <DropdownMenuContent align="start" className="w-[320px] bg-white p-0">
-                        <div className="py-2">
-                            <DropdownMenuLabel className="px-2 py-1">Add a blank table</DropdownMenuLabel>
-                            <div className="px-1">
-                                {importInlineOpen ? (
-                                    <CreateTableInlineInput
-                                        newTableName={newTableName}
-                                        setNewTableName={setNewTableName}
-                                        handleCreateTable={() => {
-                                            handleCreateTable();
-                                            setImportMenuOpen(false);
-                                            setImportInlineOpen(false);
-                                        }}
-                                        onCancel={() => setImportInlineOpen(false)}
-                                        isPending={createTable.isPending}
-                                    />
-                                ) : (
-                                    <DropdownMenuItem
-                                        onSelect={(e) => {
-                                            e.preventDefault();
-                                            setImportInlineOpen(true);
-                                        }}
-                                        className="cursor-pointer"
-                                    >
-                                        Start from scratch
-                                    </DropdownMenuItem>
-                                )}
-                            </div>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuLabel className="px-2 py-1">Add from other sources</DropdownMenuLabel>
-                            <DropdownMenuItem disabled className="cursor-not-allowed opacity-60">
-                                <Database className="mr-2 h-4 w-4" /> Airtable base
-                                <span className="ml-auto rounded bg-blue-50 px-1.5 py-0.5 text-blue-700 text-[10px]">Team</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem disabled className="cursor-not-allowed opacity-60">
-                                <FileSpreadsheet className="mr-2 h-4 w-4" /> CSV file
-                            </DropdownMenuItem>
-                            <DropdownMenuItem disabled className="cursor-not-allowed opacity-60">
-                                <Calendar className="mr-2 h-4 w-4" /> Google Calendar
-                                <span className="ml-auto rounded bg-blue-50 px-1.5 py-0.5 text-blue-700 text-[10px]">Team</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem disabled className="cursor-not-allowed opacity-60">
-                                <FileSpreadsheet className="mr-2 h-4 w-4" /> Google Sheets
-                            </DropdownMenuItem>
-                            <DropdownMenuItem disabled className="cursor-not-allowed opacity-60">
-                                <FileSpreadsheet className="mr-2 h-4 w-4" /> Microsoft Excel
-                            </DropdownMenuItem>
-                            <DropdownMenuItem disabled className="cursor-not-allowed opacity-60">
-                                <Cloud className="mr-2 h-4 w-4" /> Salesforce
-                                <span className="ml-auto rounded bg-amber-50 px-1.5 py-0.5 text-amber-800 text-[10px]">Business</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem disabled className="cursor-not-allowed opacity-60">
-                                <FileSpreadsheet className="mr-2 h-4 w-4" /> Smartsheet
-                            </DropdownMenuItem>
-                            <DropdownMenuItem disabled className="cursor-not-allowed opacity-60">
-                                <span className="mr-2 flex h-4 w-4 items-center justify-center"><ChevronRight className="h-3 w-3" /></span>
-                                26 more sources…
-                            </DropdownMenuItem>
-                        </div>
-                    </DropdownMenuContent>
-                </DropdownMenu>
+						<DropdownMenuContent
+							align="start"
+							className="w-[320px] bg-white p-0"
+						>
+							<div className="py-2">
+								<DropdownMenuLabel className="px-2 py-1">
+									Add a blank table
+								</DropdownMenuLabel>
+								<div className="px-1">
+									{importInlineOpen ? (
+										<CreateTableInlineInput
+											newTableName={newTableName}
+											setNewTableName={setNewTableName}
+											handleCreateTable={() => {
+												handleCreateTable();
+												setImportMenuOpen(false);
+												setImportInlineOpen(false);
+											}}
+											onCancel={() => setImportInlineOpen(false)}
+											isPending={createTable.isPending}
+										/>
+									) : (
+										<DropdownMenuItem
+											onSelect={(e) => {
+												e.preventDefault();
+												setImportInlineOpen(true);
+											}}
+											className="cursor-pointer"
+										>
+											Start from scratch
+										</DropdownMenuItem>
+									)}
+								</div>
+								<DropdownMenuSeparator />
+								<DropdownMenuLabel className="px-2 py-1">
+									Add from other sources
+								</DropdownMenuLabel>
+								<DropdownMenuItem
+									disabled
+									className="cursor-not-allowed opacity-60"
+								>
+									<Database className="mr-2 h-4 w-4" /> Airtable base
+									<span className="ml-auto rounded bg-blue-50 px-1.5 py-0.5 text-[10px] text-blue-700">
+										Team
+									</span>
+								</DropdownMenuItem>
+								<DropdownMenuItem
+									disabled
+									className="cursor-not-allowed opacity-60"
+								>
+									<FileSpreadsheet className="mr-2 h-4 w-4" /> CSV file
+								</DropdownMenuItem>
+								<DropdownMenuItem
+									disabled
+									className="cursor-not-allowed opacity-60"
+								>
+									<Calendar className="mr-2 h-4 w-4" /> Google Calendar
+									<span className="ml-auto rounded bg-blue-50 px-1.5 py-0.5 text-[10px] text-blue-700">
+										Team
+									</span>
+								</DropdownMenuItem>
+								<DropdownMenuItem
+									disabled
+									className="cursor-not-allowed opacity-60"
+								>
+									<FileSpreadsheet className="mr-2 h-4 w-4" /> Google Sheets
+								</DropdownMenuItem>
+								<DropdownMenuItem
+									disabled
+									className="cursor-not-allowed opacity-60"
+								>
+									<FileSpreadsheet className="mr-2 h-4 w-4" /> Microsoft Excel
+								</DropdownMenuItem>
+								<DropdownMenuItem
+									disabled
+									className="cursor-not-allowed opacity-60"
+								>
+									<Cloud className="mr-2 h-4 w-4" /> Salesforce
+									<span className="ml-auto rounded bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-800">
+										Business
+									</span>
+								</DropdownMenuItem>
+								<DropdownMenuItem
+									disabled
+									className="cursor-not-allowed opacity-60"
+								>
+									<FileSpreadsheet className="mr-2 h-4 w-4" /> Smartsheet
+								</DropdownMenuItem>
+								<DropdownMenuItem
+									disabled
+									className="cursor-not-allowed opacity-60"
+								>
+									<span className="mr-2 flex h-4 w-4 items-center justify-center">
+										<ChevronRight className="h-3 w-3" />
+									</span>
+									26 more sources…
+								</DropdownMenuItem>
+							</div>
+						</DropdownMenuContent>
+					</DropdownMenu>
 				</div>
 				<button
 					type="button"
@@ -651,65 +690,65 @@ export const TopNav = ({
 };
 
 interface CreateTableInlineInputProps {
-    newTableName: string;
-    setNewTableName: (name: string) => void;
-    handleCreateTable: () => void;
-    onCancel: () => void;
-    isPending: boolean;
+	newTableName: string;
+	setNewTableName: (name: string) => void;
+	handleCreateTable: () => void;
+	onCancel: () => void;
+	isPending: boolean;
 }
 
 const CreateTableInlineInput = ({
-    newTableName,
-    setNewTableName,
-    handleCreateTable,
-    onCancel,
-    isPending,
+	newTableName,
+	setNewTableName,
+	handleCreateTable,
+	onCancel,
+	isPending,
 }: CreateTableInlineInputProps) => {
 	const inputRef = useRef<HTMLInputElement>(null);
 	useEffect(() => {
 		inputRef.current?.focus();
 	}, []);
 
-    return (
-        <div className="py-1">
-            <DropdownMenuLabel className="px-2">Create table</DropdownMenuLabel>
-            <div className="px-2 pt-1 pb-2">
-                <Input
-                    type="text"
-                    placeholder="Table name"
-                    value={newTableName}
-                    onChange={(e) => setNewTableName(e.target.value)}
-                    onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                            handleCreateTable();
-                        } else if (e.key === "Escape") {
-                            setNewTableName("");
-                            onCancel();
-                        }
-                    }}
-                    ref={inputRef}
-                />
-            </div>
-            <div className="flex items-center gap-2 px-2 pb-2">
-                <button
-                    type="button"
-                    onClick={handleCreateTable}
-                    disabled={!newTableName.trim() || isPending}
-                    className="rounded bg-blue-500 px-2 py-1 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
-                >
-                    Add
-                </button>
-                <button
-                    type="button"
-                    onClick={() => {
-                        setNewTableName("");
-                        onCancel();
-                    }}
-                    className="rounded bg-red-500 px-2 py-1 text-sm text-white hover:bg-red-700"
-                >
-                    Cancel
-                </button>
-            </div>
-        </div>
-    );
+	return (
+		<div className="py-1">
+			<DropdownMenuLabel className="px-2">Create table</DropdownMenuLabel>
+			<div className="px-2 pt-1 pb-2">
+				<Input
+					type="text"
+					placeholder="Table name"
+					value={newTableName}
+					onChange={(e) => setNewTableName(e.target.value)}
+					onKeyDown={(e) => {
+						if (e.key === "Enter") {
+							handleCreateTable();
+						} else if (e.key === "Escape") {
+							setNewTableName("");
+							onCancel();
+						}
+					}}
+					ref={inputRef}
+				/>
+			</div>
+			<div className="flex items-center gap-2 px-2 pb-2">
+				<button
+					type="button"
+					onClick={handleCreateTable}
+					disabled={!newTableName.trim() || isPending}
+					className="rounded bg-blue-500 px-2 py-1 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
+				>
+					Add
+				</button>
+				<button
+					type="button"
+					onClick={() => {
+						setNewTableName("");
+						onCancel();
+					}}
+					className="rounded bg-red-500 px-2 py-1 text-sm text-white hover:bg-red-700"
+				>
+					Cancel
+				</button>
+			</div>
+		</div>
+	);
 };
