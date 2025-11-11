@@ -157,24 +157,19 @@ export function createColumnDefs({
 						<span className="font-medium">{col.name}</span>
 					</div>
 				),
-				cell: ({ getValue, row, column }: CellContext<TableData, unknown>) => {
-					const cells = getValue() as Cell | undefined;
-					const value = cells?.value || "";
-					return (
-						<EditableCell
-							value={value}
-							rowId={row.original.id}
-							column={{
-								...column,
-								columnDef: {
-									...column.columnDef,
-									meta: { ...column.columnDef.meta, type: col.type },
-								},
-							}}
-							handleCellUpdate={handleCellUpdate}
-						/>
-					);
-				},
+                cell: ({ getValue, row }: CellContext<TableData, unknown>) => {
+                    const cells = getValue() as Cell | undefined;
+                    const value = cells?.value || "";
+                    return (
+                        <EditableCell
+                            value={value}
+                            rowId={row.original.id}
+                            columnId={col.id}
+                            type={col.type}
+                            handleCellUpdate={handleCellUpdate}
+                        />
+                    );
+                },
 				accessorFn: (row: TableData) =>
 					row.cells.find(
 						(cv: { column: { id: string } }) => cv.column.id === col.id,

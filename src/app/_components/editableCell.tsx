@@ -1,4 +1,7 @@
 import { memo, useEffect, useRef, useState } from "react";
+import type React from "react";
+
+type ColumnType = "TEXT" | "NUMBER";
 
 interface EditableCellProps {
 	handleCellUpdate: (
@@ -8,45 +11,43 @@ interface EditableCellProps {
 	) => void;
 	value: string | number;
 	rowId: string;
-	column: { id: string; columnDef: { meta?: { type: "TEXT" | "NUMBER" } } };
+	columnId: string;
+	type: ColumnType;
 }
 
 function EditableCellComponent({
 	handleCellUpdate,
 	value,
 	rowId,
-	column,
+	columnId,
+	type,
 }: EditableCellProps) {
-	const initialValue = value;
-	const [cellValue, setCellValue] = useState(initialValue);
+	const [cellValue, setCellValue] = useState(String(value ?? ""));
 	const inputRef = useRef<HTMLInputElement>(null);
 	const committedRef = useRef(false);
 
 	// Keep local state in sync when external value changes
 	useEffect(() => {
-		setCellValue(initialValue);
-	}, [initialValue]);
+		setCellValue(String(value ?? ""));
+	}, [value]);
 
 	const commit = (val: string | number) => {
 		committedRef.current = true;
-		handleCellUpdate(rowId, column.id, val);
+		handleCellUpdate(rowId, columnId, val);
 	};
 
 	const onKeyDown = (e: React.KeyboardEvent) => {
 		if (e.key === "Enter" || e.key === "Escape") {
 			commit(cellValue);
-			// For Enter/Escape, manually blur; for Tab, let native tabbing move focus
-			if (e.key === "Enter" || e.key === "Escape") {
-				inputRef.current?.blur();
-				e.preventDefault();
-			}
+			inputRef.current?.blur();
+			e.preventDefault();
 		}
 	};
 
 	return (
 		<input
 			ref={inputRef}
-			type={column.columnDef.meta?.type === "NUMBER" ? "number" : "text"}
+			type={type === "NUMBER" ? "number" : "text"}
 			value={String(cellValue ?? "")}
 			onChange={(e) => {
 				const inputValue = e.target.value.toString();
@@ -70,5 +71,18 @@ function EditableCellComponent({
 	);
 }
 
-export const EditableCell = memo(EditableCellComponent)
-
+export const EditableCell = memo(
+	EditableCellComponent,
+	(prevProps, nextProps) => {
+		const prevId = prevProps.columnId;
+		const nextId = nextProps.columnId;
+		const prevType = prevProps.type;
+		const nextType = nextProps.type;
+		return (
+			prevProps.rowId === nextProps.rowId &&
+			prevId === nextId &&
+			prevType === nextType &&
+			String(prevProps.value ?? "") === String(nextProps.value ?? "")
+		);
+	},
+);
