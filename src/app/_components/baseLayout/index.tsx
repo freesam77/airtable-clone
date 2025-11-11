@@ -19,7 +19,6 @@ export function BaseLayout({
 	const router = useRouter();
 	const [selectedBaseId, setSelectedBaseId] = useState<string | null>(null);
 	const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
-	const [showCreateTable, setShowCreateTable] = useState(false);
 	const [newTableName, setNewTableName] = useState("");
 
 	const { base } = api;
@@ -41,7 +40,6 @@ export function BaseLayout({
 		onSuccess: (newTable) => {
 			void refetchBases();
 			if (newTable?.id) setSelectedTableId(newTable.id);
-			setShowCreateTable(false);
 			setNewTableName("");
 			// Navigate to the new table
 			if (selectedBaseId) {
@@ -146,8 +144,6 @@ export function BaseLayout({
 								selectedBase={selectedBase}
 								selectedTableId={selectedTableId}
 								handleTableSelect={handleTableSelect}
-								showCreateTable={showCreateTable}
-								setShowCreateTable={setShowCreateTable}
 								newTableName={newTableName}
 								setNewTableName={setNewTableName}
 								handleCreateTable={handleCreateTable}

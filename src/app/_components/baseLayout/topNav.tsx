@@ -7,16 +7,24 @@ import {
 	MoreHorizontal,
 	Plus,
 	Star,
+	Database,
+	FileSpreadsheet,
+	Calendar,
+	Cloud,
 } from "lucide-react";
 import { Check, Search } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuTrigger,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuTrigger,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
 } from "~/components/ui/dropdown-menu";
 import { Input } from "~/components/ui/input";
 import { showToast } from "~/components/ui/toast";
+import { cn } from "~/lib/utils";
 import { api } from "~/trpc/react";
 
 type Table = { id: string; name: string };
@@ -31,8 +39,6 @@ interface TopNavProps {
 	selectedBase: Base;
 	selectedTableId: string | null;
 	handleTableSelect: (tableId: string) => void;
-	showCreateTable: boolean;
-	setShowCreateTable: (show: boolean) => void;
 	newTableName: string;
 	setNewTableName: (name: string) => void;
 	handleCreateTable: () => void;
@@ -43,8 +49,6 @@ export const TopNav = ({
 	selectedBase,
 	selectedTableId,
 	handleTableSelect,
-	showCreateTable,
-	setShowCreateTable,
 	newTableName,
 	setNewTableName,
 	handleCreateTable,
@@ -74,7 +78,6 @@ export const TopNav = ({
 						: b,
 				);
 			});
-
 			return { previous };
 		},
 		onError: (_err, _vars, ctx) => {
@@ -87,6 +90,37 @@ export const TopNav = ({
 		},
 	});
 
+	// Delete table mutation
+	const deleteTable = api.table.delete.useMutation({
+		onSuccess: async (_res, variables) => {
+			// Try to switch to another available table if we deleted the active one
+			if (variables?.id && selectedTableId === variables.id) {
+				const fallback = selectedBase.tables.find((t) => t.id !== variables.id);
+				if (fallback) {
+					handleTableSelect(fallback.id);
+				}
+			}
+			await utils.base.getAll.invalidate();
+		},
+	});
+
+	// Rename table
+	const renameTable = api.table.update.useMutation({
+		onSuccess: async () => {
+			await utils.base.getAll.invalidate();
+		},
+	});
+
+	// Duplicate table
+	const duplicateTable = api.table.duplicate.useMutation({
+		onSuccess: async (newTable) => {
+			await utils.base.getAll.invalidate();
+			if (newTable?.id) {
+				handleTableSelect(newTable.id);
+			}
+		},
+	});
+
 	const [editingName, setEditingName] = useState(false);
 	const [nameDraft, setNameDraft] = useState(selectedBase.name);
 	const [editingDesc, setEditingDesc] = useState(false);
@@ -94,10 +128,12 @@ export const TopNav = ({
 	const [centerTab, setCenterTab] = useState<
 		"Data" | "Automations" | "Interfaces" | "Forms"
 	>("Data");
-	const [tableMenuOpen, setTableMenuOpen] = useState(false);
-	const [tableSearch, setTableSearch] = useState("");
-	const [showAddInline, setShowAddInline] = useState(false);
-	const [viewName, setViewName] = useState("Grid view");
+    const [tableMenuOpen, setTableMenuOpen] = useState(false);
+    const [tableSearch, setTableSearch] = useState("");
+    const [showAddInline, setShowAddInline] = useState(false);
+    // Add or import dropdown state
+    const [importMenuOpen, setImportMenuOpen] = useState(false);
+    const [importInlineOpen, setImportInlineOpen] = useState(false);
 
 	useEffect(() => {
 		setNameDraft(selectedBase.name);
@@ -356,22 +392,85 @@ export const TopNav = ({
 			</div>
 
 			{/* Table tabs + switcher */}
-			<div className="flex items-center justify-between border-gray-200 border-b bg-blue-50">
-				<div className="flex items-center gap-1">
-					{selectedBase.tables.map((table) => (
-						<button
-							type="button"
-							key={table.id}
-							onClick={() => handleTableSelect(table.id)}
-							className={`rounded-t-sm border-x border-t px-3 py-2 font-medium text-sm ${
-								selectedTableId === table.id
-									? "border-gray-300 bg-white text-gray-900"
-									: "border-transparent bg-transparent text-gray-600 hover:text-gray-900"
-							}`}
-						>
-							{table.name}
-						</button>
-					))}
+			<div className="flex items-center justify-between border-gray-200 border-b-2 bg-blue-50">
+				<div className="flex items-center">
+					{selectedBase.tables.map((table, tableIndex) => {
+						const isActive = selectedTableId === table.id;
+						// Active tab: render with trailing dropdown trigger, mirroring column menu styling
+						return (
+							<div
+								key={table.id}
+								className={cn(
+									"flex border-separate border-spacing-0 items-center justify-between gap-2 rounded-tr-sm border-x border-t px-3 py-2 font-medium text-sm",
+									isActive
+										? "border-gray-300 bg-white text-gray-900"
+										: "border-transparent bg-transparent text-gray-600 hover:bg-slate-200 hover:text-gray-900",
+									tableIndex !== 0 && "rounded-t-sm",
+								)}
+							>
+								<button
+									type="button"
+									onClick={() => handleTableSelect(table.id)}
+									className="cursor-pointer"
+								>
+									{table.name}
+								</button>
+								{isActive && (
+									<DropdownMenu>
+										<DropdownMenuTrigger asChild>
+											<button
+												type="button"
+												className="cursor-pointer"
+												aria-label="Table menu"
+											>
+												<ChevronDown size={16} />
+											</button>
+										</DropdownMenuTrigger>
+										<DropdownMenuContent
+											align="start"
+											className="w-64 bg-white p-0"
+										>
+											<div className="p-2">
+												<button
+													type="button"
+													className="w-full cursor-pointer rounded px-2 py-2 text-left hover:bg-gray-50"
+													onClick={() => {
+														const name = prompt("Rename table", table.name);
+														if (name?.trim()) {
+															renameTable.mutate({
+																id: table.id,
+																name: name.trim(),
+															});
+														}
+													}}
+													disabled={renameTable.isPending}
+												>
+													Rename table
+												</button>
+												<button
+													type="button"
+													className="w-full cursor-pointer rounded px-2 py-2 text-left hover:bg-gray-50"
+													onClick={() =>
+														duplicateTable.mutate({ id: table.id })
+													}
+													disabled={duplicateTable.isPending}
+												>
+													Duplicate table
+												</button>
+												<button
+													type="button"
+													className="w-full cursor-pointer rounded px-2 py-2 text-left text-red-600 hover:bg-red-50"
+													onClick={() => deleteTable.mutate({ id: table.id })}
+												>
+													Delete table
+												</button>
+											</div>
+										</DropdownMenuContent>
+									</DropdownMenu>
+								)}
+							</div>
+						);
+					})}
 
 					{/* Chevron opens table switcher */}
 					<DropdownMenu
@@ -387,7 +486,7 @@ export const TopNav = ({
 						<DropdownMenuTrigger asChild>
 							<button
 								type="button"
-								className="cursor-pointer border-gray-300 border-l pl-3 text-gray-600"
+								className="ml-4 cursor-pointer border-gray-300 border-l pl-3 text-gray-600"
 							>
 								<ChevronDown size={14} />
 							</button>
@@ -438,47 +537,106 @@ export const TopNav = ({
 										className="flex w-full cursor-pointer items-center gap-2 rounded px-3 py-2 text-left hover:bg-gray-50"
 										onClick={() => {
 											setShowAddInline(true);
-											setShowCreateTable(true);
 										}}
 									>
 										<Plus size={14} /> Add table
 									</button>
 								) : (
-									<div className="px-2 py-2">
-										<CreateTableInlineInput
-											newTableName={newTableName}
-											setNewTableName={setNewTableName}
-											handleCreateTable={() => {
-												handleCreateTable();
-												setTableMenuOpen(false);
-												setShowAddInline(false);
-											}}
-											setShowCreateTable={(v) => {
-												setShowCreateTable(v);
-												if (!v) {
-													setShowAddInline(false);
-												}
-											}}
-											isPending={createTable.isPending}
-										/>
-									</div>
+                            <div className="px-2 py-2">
+                                <CreateTableInlineInput
+                                    newTableName={newTableName}
+                                    setNewTableName={setNewTableName}
+                                    handleCreateTable={() => {
+                                        handleCreateTable();
+                                        setTableMenuOpen(false);
+                                        setShowAddInline(false);
+                                    }}
+                                    onCancel={() => setShowAddInline(false)}
+                                    isPending={createTable.isPending}
+                                />
+                            </div>
 								)}
 							</div>
 						</DropdownMenuContent>
 					</DropdownMenu>
 
-					{/* Add or import triggers same menu in add mode */}
-					<button
-						type="button"
-						onClick={() => {
-							setTableMenuOpen(true);
-							setShowAddInline(true);
-							setShowCreateTable(true);
+					{/* Add or import menu matching production layout */}
+					<DropdownMenu
+						open={importMenuOpen}
+						onOpenChange={(o) => {
+							setImportMenuOpen(o);
+							if (!o) setImportInlineOpen(false);
 						}}
-						className="flex cursor-pointer items-center gap-2 px-2 text-gray-600 text-sm"
 					>
-						<Plus size={14} /> Add or import
-					</button>
+						<DropdownMenuTrigger asChild>
+							<button
+								type="button"
+								className="ml-4 flex cursor-pointer items-center gap-2 px-2 text-gray-600 text-sm"
+							>
+								<Plus size={14} /> Add or import
+							</button>
+						</DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="w-[320px] bg-white p-0">
+                        <div className="py-2">
+                            <DropdownMenuLabel className="px-2 py-1">Add a blank table</DropdownMenuLabel>
+                            <div className="px-1">
+                                {importInlineOpen ? (
+                                    <CreateTableInlineInput
+                                        newTableName={newTableName}
+                                        setNewTableName={setNewTableName}
+                                        handleCreateTable={() => {
+                                            handleCreateTable();
+                                            setImportMenuOpen(false);
+                                            setImportInlineOpen(false);
+                                        }}
+                                        onCancel={() => setImportInlineOpen(false)}
+                                        isPending={createTable.isPending}
+                                    />
+                                ) : (
+                                    <DropdownMenuItem
+                                        onSelect={(e) => {
+                                            e.preventDefault();
+                                            setImportInlineOpen(true);
+                                        }}
+                                        className="cursor-pointer"
+                                    >
+                                        Start from scratch
+                                    </DropdownMenuItem>
+                                )}
+                            </div>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuLabel className="px-2 py-1">Add from other sources</DropdownMenuLabel>
+                            <DropdownMenuItem disabled className="cursor-not-allowed opacity-60">
+                                <Database className="mr-2 h-4 w-4" /> Airtable base
+                                <span className="ml-auto rounded bg-blue-50 px-1.5 py-0.5 text-blue-700 text-[10px]">Team</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem disabled className="cursor-not-allowed opacity-60">
+                                <FileSpreadsheet className="mr-2 h-4 w-4" /> CSV file
+                            </DropdownMenuItem>
+                            <DropdownMenuItem disabled className="cursor-not-allowed opacity-60">
+                                <Calendar className="mr-2 h-4 w-4" /> Google Calendar
+                                <span className="ml-auto rounded bg-blue-50 px-1.5 py-0.5 text-blue-700 text-[10px]">Team</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem disabled className="cursor-not-allowed opacity-60">
+                                <FileSpreadsheet className="mr-2 h-4 w-4" /> Google Sheets
+                            </DropdownMenuItem>
+                            <DropdownMenuItem disabled className="cursor-not-allowed opacity-60">
+                                <FileSpreadsheet className="mr-2 h-4 w-4" /> Microsoft Excel
+                            </DropdownMenuItem>
+                            <DropdownMenuItem disabled className="cursor-not-allowed opacity-60">
+                                <Cloud className="mr-2 h-4 w-4" /> Salesforce
+                                <span className="ml-auto rounded bg-amber-50 px-1.5 py-0.5 text-amber-800 text-[10px]">Business</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem disabled className="cursor-not-allowed opacity-60">
+                                <FileSpreadsheet className="mr-2 h-4 w-4" /> Smartsheet
+                            </DropdownMenuItem>
+                            <DropdownMenuItem disabled className="cursor-not-allowed opacity-60">
+                                <span className="mr-2 flex h-4 w-4 items-center justify-center"><ChevronRight className="h-3 w-3" /></span>
+                                26 more sources…
+                            </DropdownMenuItem>
+                        </div>
+                    </DropdownMenuContent>
+                </DropdownMenu>
 				</div>
 				<button
 					type="button"
@@ -488,68 +646,70 @@ export const TopNav = ({
 					<ChevronDown size={14} />
 				</button>
 			</div>
-
-			{/* Inner navbar removed (moved into DataTable) */}
 		</div>
 	);
 };
 
 interface CreateTableInlineInputProps {
-	newTableName: string;
-	setNewTableName: (name: string) => void;
-	handleCreateTable: () => void;
-	setShowCreateTable: (show: boolean) => void;
-	isPending: boolean;
+    newTableName: string;
+    setNewTableName: (name: string) => void;
+    handleCreateTable: () => void;
+    onCancel: () => void;
+    isPending: boolean;
 }
 
 const CreateTableInlineInput = ({
-	newTableName,
-	setNewTableName,
-	handleCreateTable,
-	setShowCreateTable,
-	isPending,
+    newTableName,
+    setNewTableName,
+    handleCreateTable,
+    onCancel,
+    isPending,
 }: CreateTableInlineInputProps) => {
 	const inputRef = useRef<HTMLInputElement>(null);
 	useEffect(() => {
 		inputRef.current?.focus();
 	}, []);
 
-	return (
-		<div className="ml-2 flex items-center gap-2">
-			<input
-				type="text"
-				placeholder="Table name"
-				value={newTableName}
-				onChange={(e) => setNewTableName(e.target.value)}
-				className="rounded border border-gray-300 px-2 py-1 text-sm"
-				onKeyDown={(e) => {
-					if (e.key === "Enter") {
-						handleCreateTable();
-					} else if (e.key === "Escape") {
-						setShowCreateTable(false);
-						setNewTableName("");
-					}
-				}}
-				ref={inputRef}
-			/>
-			<button
-				type="button"
-				onClick={handleCreateTable}
-				disabled={!newTableName.trim() || isPending}
-				className="rounded bg-blue-600 px-2 py-1 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
-			>
-				Add
-			</button>
-			<button
-				type="button"
-				onClick={() => {
-					setShowCreateTable(false);
-					setNewTableName("");
-				}}
-				className="rounded border border-gray-300 bg-white px-2 py-1 text-gray-600 text-sm hover:bg-gray-50"
-			>
-				Cancel
-			</button>
-		</div>
-	);
+    return (
+        <div className="py-1">
+            <DropdownMenuLabel className="px-2">Create table</DropdownMenuLabel>
+            <div className="px-2 pt-1 pb-2">
+                <Input
+                    type="text"
+                    placeholder="Table name"
+                    value={newTableName}
+                    onChange={(e) => setNewTableName(e.target.value)}
+                    onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                            handleCreateTable();
+                        } else if (e.key === "Escape") {
+                            setNewTableName("");
+                            onCancel();
+                        }
+                    }}
+                    ref={inputRef}
+                />
+            </div>
+            <div className="flex items-center gap-2 px-2 pb-2">
+                <button
+                    type="button"
+                    onClick={handleCreateTable}
+                    disabled={!newTableName.trim() || isPending}
+                    className="rounded bg-blue-500 px-2 py-1 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
+                >
+                    Add
+                </button>
+                <button
+                    type="button"
+                    onClick={() => {
+                        setNewTableName("");
+                        onCancel();
+                    }}
+                    className="rounded bg-red-500 px-2 py-1 text-sm text-white hover:bg-red-700"
+                >
+                    Cancel
+                </button>
+            </div>
+        </div>
+    );
 };

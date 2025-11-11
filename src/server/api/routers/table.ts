@@ -189,7 +189,113 @@ export const tableRouter = createTRPCRouter({
 				},
 			});
 
-			return row;
+		return row;
+		}),
+
+	// Delete a table (and cascade its rows/columns/cells)
+	delete: protectedProcedure
+		.input(z.object({ id: z.string() }))
+		.mutation(async ({ ctx, input }) => {
+			// Ensure the table belongs to the current user
+			const table = await ctx.db.table.findFirst({
+				where: {
+					id: input.id,
+					base: { createdById: ctx.session.user.id },
+				},
+			});
+
+			if (!table) {
+				throw new Error("Table not found or access denied");
+			}
+
+			await ctx.db.table.delete({ where: { id: input.id } });
+
+			return { success: true } as const;
+		}),
+
+	// Update a table's metadata (e.g., name/description)
+	update: protectedProcedure
+		.input(
+			z.object({
+				id: z.string(),
+				name: z.string().min(1).optional(),
+				description: z.string().optional(),
+			}),
+		)
+		.mutation(async ({ ctx, input }) => {
+			const table = await ctx.db.table.findFirst({
+				where: { id: input.id, base: { createdById: ctx.session.user.id } },
+			});
+			if (!table) throw new Error("Table not found or access denied");
+			return ctx.db.table.update({
+				where: { id: input.id },
+				data: { name: input.name, description: input.description },
+			});
+		}),
+
+	// Duplicate a table with its columns and rows
+	duplicate: protectedProcedure
+		.input(z.object({ id: z.string() }))
+		.mutation(async ({ ctx, input }) => {
+			const original = await ctx.db.table.findFirst({
+				where: { id: input.id, base: { createdById: ctx.session.user.id } },
+				include: {
+					columns: true,
+					rows: { include: { cells: true } },
+				},
+			});
+			if (!original) throw new Error("Table not found or access denied");
+
+			const newName = `${original.name} copy`;
+
+			const newTable = await ctx.db.$transaction(async (tx) => {
+				// 1) Create table
+				const created = await tx.table.create({
+					data: {
+						baseId: original.baseId,
+						name: newName,
+						description: original.description,
+					},
+				});
+
+				// 2) Duplicate columns (preserve order and props)
+				const columnMap = new Map<string, string>();
+				const sortedCols = [...original.columns].sort((a, b) => a.position - b.position);
+				for (const col of sortedCols) {
+					const c = await tx.column.create({
+						data: {
+							tableId: created.id,
+							name: col.name,
+							type: col.type,
+							required: col.required,
+							position: col.position,
+						},
+					});
+					columnMap.set(col.id, c.id);
+				}
+
+				// 3) Duplicate rows and cells
+				const sortedRows = [...original.rows].sort((a, b) => a.position - b.position);
+				for (const row of sortedRows) {
+					const r = await tx.row.create({
+						data: { tableId: created.id, position: row.position },
+					});
+					if (row.cells.length) {
+						await tx.cell.createMany({
+							data: row.cells.map((cell) => ({
+								rowId: r.id,
+								columnId: columnMap.get(cell.columnId)!,
+								value: cell.value ?? null,
+							})),
+							skipDuplicates: true,
+						});
+					}
+				}
+
+				return created;
+			});
+
+			return newTable;
 		}),
 
 	// Add a new column to a table
