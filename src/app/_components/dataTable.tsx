@@ -246,7 +246,7 @@ export function DataTable({ tableId }: DataTableProps) {
 		count: filteredRowsCount,
 		getScrollElement: () => scrollParentRef.current,
 		estimateSize: () => 37,
-		overscan: 8,
+		overscan: 10,
 		useAnimationFrameWithResizeObserver: true,
 		onChange: (instance) => {
 			const vItems = instance.getVirtualItems();
@@ -352,11 +352,11 @@ export function DataTable({ tableId }: DataTableProps) {
 					gotoNextMatch={gotoNextMatch}
 				/>
 
-				<div className="flex h-full">
+				<div className="flex">
 					{/* Left views sidebar inside table area */}
 					{viewSidebarOpen && <ViewsSidebar viewName={viewName} />}
 
-					<div className="flex h-[90vh] flex-col justify-between overflow-auto">
+					<div className="flex h-[88vh] w-full flex-col justify-between">
 						<div
 							className="relative flex min-h-0 overflow-x-auto overflow-y-auto border-gray-200"
 							ref={scrollParentRef}
@@ -534,13 +534,11 @@ export function DataTable({ tableId }: DataTableProps) {
 																						"h-8 w-[150px] truncate whitespace-nowrap border-gray-200 border-r border-b p-2 text-gray-900 text-sm",
 																						cell.column.columnDef.meta
 																							?.className,
-																						(() => {
-																							return isActiveCell
-																								? "bg-yellow-200"
-																								: isMatch
-																									? "bg-yellow-100"
-																									: "";
-																						})(),
+																						isActiveCell
+																							? "bg-yellow-200"
+																							: isMatch
+																								? "bg-yellow-100"
+																								: "",
 																					)}
 																					data-cell={key}
 																				>
@@ -629,7 +627,7 @@ export function DataTable({ tableId }: DataTableProps) {
 								trigger={
 									<button
 										type="button"
-										className="sticky top-0 h-[41px] w-[200px] cursor-pointer border-t border-r border-b bg-white text-gray-900 text-lg hover:bg-gray-100"
+										className="sticky top-0 h-[41.5px] w-[200px] border-separate border-spacing-0 cursor-pointer border-t border-r border-b border-l-0 bg-white text-gray-900 text-lg hover:bg-gray-100"
 										aria-label="Add column"
 									>
 										+

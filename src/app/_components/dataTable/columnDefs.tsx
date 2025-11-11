@@ -140,23 +140,23 @@ export function createColumnDefs({
 			.sort((a, b) => a.position - b.position)
 			.map((col) => ({
 				id: col.id,
-				header: () => (
-					<div className="flex items-center">
-						<TooltipProvider>
-							<Tooltip>
-								<TooltipTrigger asChild>
-									<span className="flex size-6 items-center justify-center text-md text-muted-foreground">
-										{getColumnTypeIcon(col.type)}
-									</span>
-								</TooltipTrigger>
-								<TooltipContent>
-									<p>{getColumnTypeLabel(col.type)}</p>
-								</TooltipContent>
-							</Tooltip>
-						</TooltipProvider>
-						<span className="font-medium">{col.name}</span>
-					</div>
-				),
+            header: () => (
+                <div className="flex min-w-0 items-center">
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <span className="flex size-6 flex-none items-center justify-center text-md text-muted-foreground">
+                                    {getColumnTypeIcon(col.type)}
+                                </span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>{getColumnTypeLabel(col.type)}</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                    <span className="flex-1 truncate whitespace-nowrap font-medium">{col.name}</span>
+                </div>
+            ),
                 cell: ({ getValue, row }: CellContext<TableData, unknown>) => {
                     const cells = getValue() as Cell | undefined;
                     const value = cells?.value || "";

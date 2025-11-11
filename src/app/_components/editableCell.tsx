@@ -66,7 +66,7 @@ function EditableCellComponent({
 					commit(inputValue);
 				}
 			}}
-			className="w-full cursor-text border-gray-200 bg-transparent px-1 hover:bg-gray-50 focus:bg-blue-50 focus:outline-none"
+			className=" w-full cursor-text overflow-hidden truncate whitespace-nowrap border-gray-200 bg-transparent px-1 hover:bg-gray-50 focus:bg-blue-50 focus:outline-none"
 		/>
 	);
 }

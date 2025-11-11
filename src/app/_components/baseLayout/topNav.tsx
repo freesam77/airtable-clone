@@ -400,13 +400,13 @@ export const TopNav = ({
 						return (
 							<div
 								key={table.id}
-								className={cn(
-									"flex border-separate border-spacing-0 items-center justify-between gap-2 rounded-tr-sm border-x border-t px-3 py-2 font-medium text-sm",
-									isActive
-										? "border-gray-300 bg-white text-gray-900"
-										: "border-transparent bg-transparent text-gray-600 hover:bg-slate-200 hover:text-gray-900",
-									tableIndex !== 0 && "rounded-t-sm",
-								)}
+									className={cn(
+										"flex border-separate border-spacing-0 items-center justify-between gap-2 rounded-tr-sm border-x border-t px-3 py-2 font-medium text-sm",
+										isActive
+											? "-mb-0.5 z-10 border-gray-300 bg-white text-gray-900"
+											: "border-transparent bg-transparent text-gray-600 hover:bg-slate-200 hover:text-gray-900",
+										tableIndex !== 0 && "rounded-t-sm",
+									)}
 							>
 								<button
 									type="button"
