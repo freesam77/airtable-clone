@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 
 interface EditableCellProps {
 	handleCellUpdate: (
@@ -11,7 +11,7 @@ interface EditableCellProps {
 	column: { id: string; columnDef: { meta?: { type: "TEXT" | "NUMBER" } } };
 }
 
-export function EditableCell({
+function EditableCellComponent({
 	handleCellUpdate,
 	value,
 	rowId,
@@ -69,3 +69,6 @@ export function EditableCell({
 		/>
 	);
 }
+
+export const EditableCell = memo(EditableCellComponent)
+

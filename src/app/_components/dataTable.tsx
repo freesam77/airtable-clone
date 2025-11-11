@@ -4,7 +4,6 @@ import {
 	type ColumnDef,
 	flexRender,
 	getCoreRowModel,
-	getFilteredRowModel,
 	useReactTable,
 } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
@@ -102,14 +101,13 @@ export function DataTable({ tableId }: DataTableProps) {
 			},
 		);
 
-	// Fetch rows via infinite query (page size 50)
-	const infiniteInput = {
+	const infiniteQueryInput = {
 		id: tableId,
-		limit: 50 as const,
+		limit: 200 as const,
 		direction: "forward" as const,
 	};
 	const rowsInfinite = api.table.getInfiniteRows.useInfiniteQuery(
-		infiniteInput,
+		infiniteQueryInput,
 		{
 			getNextPageParam: (lastPage) => lastPage.nextCursor,
 			getPreviousPageParam: (firstPage) => firstPage.prevCursor,
@@ -138,7 +136,7 @@ export function DataTable({ tableId }: DataTableProps) {
 		(rowId: string, columnId: string, value?: string | number) => {
 			const stringValue = typeof value === "number" ? String(value) : value;
 			const normalized = stringValue === "" ? null : stringValue;
-			utils.table.getInfiniteRows.setInfiniteData(infiniteInput, (old) => {
+			utils.table.getInfiniteRows.setInfiniteData(infiniteQueryInput, (old) => {
 				if (!old) return old;
 				return {
 					...old,
@@ -174,7 +172,7 @@ export function DataTable({ tableId }: DataTableProps) {
 		duplicateColumnMutation,
 	} = useTableMutations({
 		tableId,
-		infiniteInput,
+		infiniteInput: infiniteQueryInput,
 		onOptimisticUpdate: handleOptimisticUpdate,
 	});
 
@@ -221,7 +219,6 @@ export function DataTable({ tableId }: DataTableProps) {
 		data: displayData,
 		columns: columnDefs,
 		getCoreRowModel: getCoreRowModel(),
-		getFilteredRowModel: getFilteredRowModel(),
 		// Drive TanStack's global filter from our searchValue state
 		state: { globalFilter: searchValue },
 		onGlobalFilterChange: setSearchValue,
@@ -236,12 +233,6 @@ export function DataTable({ tableId }: DataTableProps) {
 		},
 	});
 
-	useEffect(() => {
-		if (rowsInfinite.hasNextPage && !rowsInfinite.isFetchingNextPage) {
-			void rowsInfinite.fetchNextPage();
-		}
-	}, [rowsInfinite.hasNextPage, rowsInfinite.isFetchingNextPage]);
-
 	// Use filtered rows for match nav/highlight (already reflects search filtering)
 	const filteredRows = table.getRowModel().rows.map((r) => r.original);
 
@@ -255,13 +246,14 @@ export function DataTable({ tableId }: DataTableProps) {
 		count: filteredRowsCount,
 		getScrollElement: () => scrollParentRef.current,
 		estimateSize: () => 37,
-		overscan: 10,
+		overscan: 8,
+		useAnimationFrameWithResizeObserver: true,
 		onChange: (instance) => {
 			const vItems = instance.getVirtualItems();
 			if (!vItems.length) return;
 			const last = vItems[vItems.length - 1];
 			if (!last) return;
-			const reachedEnd = last.index >= filteredRows.length - 1;
+			const reachedEnd = last.index >= filteredRows.length - 10;
 			if (
 				reachedEnd &&
 				rowsInfinite.hasNextPage &&
@@ -269,6 +261,10 @@ export function DataTable({ tableId }: DataTableProps) {
 			) {
 				rowsInfinite.fetchNextPage();
 			}
+			utils.table.getInfiniteRows.setInfiniteData(infiniteQueryInput, (old) => {
+				if (!old) return old;
+				return { ...old, pages: old.pages.slice(-5) };
+			});
 		},
 	});
 
@@ -279,7 +275,6 @@ export function DataTable({ tableId }: DataTableProps) {
 		activeMatch,
 		gotoNextMatch,
 		gotoPrevMatch,
-		getCellKey,
 	} = useTableSearchNavigation({
 		rows: filteredRows,
 		columns: orderedColumns,
@@ -322,7 +317,7 @@ export function DataTable({ tableId }: DataTableProps) {
 		);
 		setSelectedRowIds(new Set());
 		utils.table.getTableColumnType.invalidate({ id: tableId });
-		utils.table.getInfiniteRows.invalidate(infiniteInput);
+		utils.table.getInfiniteRows.invalidate(infiniteQueryInput);
 	};
 
 	if (tableColumnLoading || rowsInfinite.isLoading) {
@@ -382,15 +377,19 @@ export function DataTable({ tableId }: DataTableProps) {
 									{table.getHeaderGroups().map((headerGroup) => (
 										<tr key={headerGroup.id}>
 											{headerGroup.headers.map((header) => (
-                                        <th
-                                            key={header.id}
-                                            className={cn(
-                                                "sticky top-0 z-40 border-gray-200 border-r border-b bg-white p-2 text-left text-gray-700 text-sm",
-                                                header.column.columnDef.meta?.className,
-                                            )}
-                                        >
-                                            <div className={cn("flex items-center gap-2", header.column.id === "row-number" && "inline")}
-                                            >
+												<th
+													key={header.id}
+													className={cn(
+														"sticky top-0 z-40 border-gray-200 border-r border-b bg-white p-2 text-left text-gray-700 text-sm",
+														header.column.columnDef.meta?.className,
+													)}
+												>
+													<div
+														className={cn(
+															"flex items-center gap-2",
+															header.column.id === "row-number" && "inline",
+														)}
+													>
 														{header.isPlaceholder
 															? null
 															: flexRender(
@@ -409,44 +408,61 @@ export function DataTable({ tableId }: DataTableProps) {
 																		<ChevronDown className="size-4" />
 																	</button>
 																</DropdownMenuTrigger>
-																<DropdownMenuContent align="start" className="w-64 bg-white p-0">
+																<DropdownMenuContent
+																	align="start"
+																	className="w-64 bg-white p-0"
+																>
 																	<div className="p-2">
 																		<button
 																			type="button"
 																			className="w-full rounded px-2 py-2 text-left hover:bg-gray-50"
 																			onClick={() => {
-																			const current = header.column.columnDef.header as any;
-																			const name = prompt(
-																				"Rename column",
-																				String(current instanceof Function ? header.column.id : current) || header.column.id,
-																			);
-																			if (name && name.trim()) {
-																				renameColumnMutation.mutate({ colId: header.column.id, name: name.trim() });
+																				const current = header.column.columnDef
+																					.header as any;
+																				const name = prompt(
+																					"Rename column",
+																					String(
+																						current instanceof Function
+																							? header.column.id
+																							: current,
+																					) || header.column.id,
+																				);
+																				if (name && name.trim()) {
+																					renameColumnMutation.mutate({
+																						colId: header.column.id,
+																						name: name.trim(),
+																					});
+																				}
+																			}}
+																		>
+																			Rename column
+																		</button>
+																		<button
+																			type="button"
+																			className="w-full rounded px-2 py-2 text-left hover:bg-gray-50"
+																			onClick={() => {
+																				duplicateColumnMutation.mutate({
+																					colId: header.column.id,
+																				});
+																			}}
+																		>
+																			Duplicate column
+																		</button>
+																		<button
+																			type="button"
+																			className="w-full rounded px-2 py-2 text-left text-red-600 hover:bg-red-50"
+																			onClick={() =>
+																				deleteColumnMutation.mutate({
+																					colId: header.column.id,
+																				})
 																			}
-																		}}
-																	>
-																		Rename column
-																	</button>
-																	<button
-																		type="button"
-																		className="w-full rounded px-2 py-2 text-left hover:bg-gray-50"
-																		onClick={() => {
-																			duplicateColumnMutation.mutate({ colId: header.column.id });
-																		}}
-																	>
-																		Duplicate column
-																	</button>
-																	<button
-																		type="button"
-																		className="w-full rounded px-2 py-2 text-left text-red-600 hover:bg-red-50"
-																		onClick={() => deleteColumnMutation.mutate({ colId: header.column.id })}
-																	>
-																		Delete column
-																	</button>
-																</div>
-															</DropdownMenuContent>
-														</DropdownMenu>
-													)}
+																		>
+																			Delete column
+																		</button>
+																	</div>
+																</DropdownMenuContent>
+															</DropdownMenu>
+														)}
 													</div>
 												</th>
 											))}
@@ -476,17 +492,18 @@ export function DataTable({ tableId }: DataTableProps) {
 														/>
 													</tr>
 												)}
-												{virtualItems.map((vi) => {
-													const isLoader = vi.index >= filteredRows.length;
-													const row = table.getRowModel().rows[vi.index];
+												{virtualItems.map((vItem) => {
+													const isLoader =
+														vItem.index >= table.getRowModel().rows.length;
+													const row = table.getRowModel().rows[vItem.index];
 
 													return (
-														<ContextMenu key={vi.key}>
+														<ContextMenu key={vItem.key}>
 															<ContextMenuTrigger asChild>
 																<tr
-																	data-index={vi.index}
-																	className={cn("cursor-default")}
-																	style={{ height: `${vi.size}px` }}
+																	data-index={vItem.index}
+																	className="cursor-default"
+																	style={{ height: `${vItem.size}px` }}
 																>
 																	{isLoader ? (
 																		// Loader row spans all columns
@@ -499,44 +516,41 @@ export function DataTable({ tableId }: DataTableProps) {
 																				: "Load more…"}
 																		</td>
 																	) : (
-																		row?.getVisibleCells().map((cell) => (
-																			<td
-																				key={cell.id}
-																				className={cn(
-																					"h-8 w-[150px] truncate whitespace-nowrap border-gray-200 border-r border-b p-2 text-gray-900 text-sm",
-																					cell.column.columnDef.meta?.className,
-																					(() => {
-																						const key = getCellKey(
-																							row?.original.id,
-																							cell.column.id,
-																						);
-																						const isMatch =
-																							Boolean(searchValue) &&
-																							matchKeys.has(key);
-																						const isActiveCell =
-																							Boolean(activeMatch) &&
-																							activeMatch?.rowId ===
-																								row?.original.id &&
-																							activeMatch?.columnId ===
-																								cell.column.id;
-																						return isActiveCell
-																							? "bg-yellow-200"
-																							: isMatch
-																								? "bg-yellow-100"
-																								: "";
-																					})(),
-																				)}
-																				data-cell={getCellKey(
-																					row?.original.id,
-																					cell.column.id,
-																				)}
-																			>
-																				{flexRender(
-																					cell.column.columnDef.cell,
-																					cell.getContext(),
-																				)}
-																			</td>
-																		))
+																		row?.getVisibleCells().map((cell) => {
+																			const key = `${row?.original.id}|${cell.column.id}`;
+																			const isMatch =
+																				Boolean(searchValue) &&
+																				matchKeys.has(key);
+																			const isActiveCell =
+																				Boolean(activeMatch) &&
+																				activeMatch?.rowId ===
+																					row?.original.id &&
+																				activeMatch?.columnId ===
+																					cell.column.id;
+																			return (
+																				<td
+																					key={cell.id}
+																					className={cn(
+																						"h-8 w-[150px] truncate whitespace-nowrap border-gray-200 border-r border-b p-2 text-gray-900 text-sm",
+																						cell.column.columnDef.meta
+																							?.className,
+																						(() => {
+																							return isActiveCell
+																								? "bg-yellow-200"
+																								: isMatch
+																									? "bg-yellow-100"
+																									: "";
+																						})(),
+																					)}
+																					data-cell={key}
+																				>
+																					{flexRender(
+																						cell.column.columnDef.cell,
+																						cell.getContext(),
+																					)}
+																				</td>
+																			);
+																		})
 																	)}
 																</tr>
 															</ContextMenuTrigger>
@@ -625,7 +639,7 @@ export function DataTable({ tableId }: DataTableProps) {
 						</div>
 						{/* Footer with record count */}
 						<div className="w-full border-t bg-white p-4 text-xs">
-							<span> {table.getRowModel().rows.length} records</span>
+							<span> {filteredRowsCount} records</span>
 						</div>
 					</div>
 				</div>

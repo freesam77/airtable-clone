@@ -32,12 +32,6 @@ export function useTableSearchNavigation({
 	searchValue,
 	scrollIntoView = true,
 }: UseTableSearchNavigationOptions) {
-	// Helpers
-	const getCellKey = useCallback(
-		(rowId: string, columnId: string) => `${rowId}|${columnId}`,
-		[],
-	);
-
 	// Normalize inputs
 	const query = useMemo(() => searchValue.trim().toLowerCase(), [searchValue]);
 	const columnIdSet = useMemo(
@@ -66,8 +60,8 @@ export function useTableSearchNavigation({
 
 	// Fast lookup for highlighting
 	const matchKeys = useMemo(
-		() => new Set(matches.map((m) => getCellKey(m.rowId, m.columnId))),
-		[matches, getCellKey],
+		() => new Set(matches.map((m) => `${m.rowId}|${m.columnId}`)),
+		[matches],
 	);
 
 	// Active match state
@@ -97,7 +91,8 @@ export function useTableSearchNavigation({
 	// Auto-scroll active match into view
 	useEffect(() => {
 		if (!scrollIntoView || !activeMatch) return;
-		const key = getCellKey(activeMatch.rowId, activeMatch.columnId);
+		const { rowId, columnId } = activeMatch;
+		const key = `${rowId}|${columnId}`;
 		const el = document.querySelector(
 			`[data-cell="${key}"]`,
 		) as HTMLElement | null;
@@ -106,7 +101,7 @@ export function useTableSearchNavigation({
 			inline: "nearest",
 			behavior: "smooth",
 		});
-	}, [activeMatch, scrollIntoView, getCellKey]);
+	}, [activeMatch, scrollIntoView]);
 
 	return {
 		matches,
@@ -115,7 +110,6 @@ export function useTableSearchNavigation({
 		activeMatch,
 		gotoNextMatch,
 		gotoPrevMatch,
-		getCellKey,
 		setActiveMatchIndex,
 	} as const;
 }
