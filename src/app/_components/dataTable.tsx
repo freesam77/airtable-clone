@@ -16,11 +16,17 @@ import {
 	ContextMenuTrigger,
 } from "~/components/ui/context-menu";
 import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuTrigger,
+} from "~/components/ui/dropdown-menu";
+import {
 	Tooltip,
 	TooltipContent,
 	TooltipProvider,
 	TooltipTrigger,
 } from "~/components/ui/tooltip";
+import { ChevronDown } from "lucide-react";
 import { useTableMutations } from "~/hooks/useTableMutations";
 import { useTableSearchNavigation } from "~/hooks/useTableSearchNavigation";
 import { detectOS } from "~/lib/detectOS";
@@ -163,6 +169,9 @@ export function DataTable({ tableId }: DataTableProps) {
 		addRowMutation,
 		addColumnMutation,
 		deleteRowMutation,
+		deleteColumnMutation,
+		renameColumnMutation,
+		duplicateColumnMutation,
 	} = useTableMutations({
 		tableId,
 		infiniteInput,
@@ -373,19 +382,72 @@ export function DataTable({ tableId }: DataTableProps) {
 									{table.getHeaderGroups().map((headerGroup) => (
 										<tr key={headerGroup.id}>
 											{headerGroup.headers.map((header) => (
-												<th
-													key={header.id}
-													className={cn(
-														"sticky top-0 z-40 border-gray-200 border-r border-b bg-white p-2 text-left text-gray-700 text-sm",
-														header.column.columnDef.meta?.className,
+                                        <th
+                                            key={header.id}
+                                            className={cn(
+                                                "sticky top-0 z-40 border-gray-200 border-r border-b bg-white p-2 text-left text-gray-700 text-sm",
+                                                header.column.columnDef.meta?.className,
+                                            )}
+                                        >
+                                            <div className={cn("flex items-center gap-2", header.column.id === "row-number" && "inline")}
+                                            >
+														{header.isPlaceholder
+															? null
+															: flexRender(
+																	header.column.columnDef.header,
+																	header.getContext(),
+																)}
+
+														{header.column.id !== "row-number" && (
+															<DropdownMenu>
+																<DropdownMenuTrigger asChild>
+																	<button
+																		type="button"
+																		className="ml-auto opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100"
+																		aria-label="Column menu"
+																	>
+																		<ChevronDown className="size-4" />
+																	</button>
+																</DropdownMenuTrigger>
+																<DropdownMenuContent align="start" className="w-64 bg-white p-0">
+																	<div className="p-2">
+																		<button
+																			type="button"
+																			className="w-full rounded px-2 py-2 text-left hover:bg-gray-50"
+																			onClick={() => {
+																			const current = header.column.columnDef.header as any;
+																			const name = prompt(
+																				"Rename column",
+																				String(current instanceof Function ? header.column.id : current) || header.column.id,
+																			);
+																			if (name && name.trim()) {
+																				renameColumnMutation.mutate({ colId: header.column.id, name: name.trim() });
+																			}
+																		}}
+																	>
+																		Rename column
+																	</button>
+																	<button
+																		type="button"
+																		className="w-full rounded px-2 py-2 text-left hover:bg-gray-50"
+																		onClick={() => {
+																			duplicateColumnMutation.mutate({ colId: header.column.id });
+																		}}
+																	>
+																		Duplicate column
+																	</button>
+																	<button
+																		type="button"
+																		className="w-full rounded px-2 py-2 text-left text-red-600 hover:bg-red-50"
+																		onClick={() => deleteColumnMutation.mutate({ colId: header.column.id })}
+																	>
+																		Delete column
+																	</button>
+																</div>
+															</DropdownMenuContent>
+														</DropdownMenu>
 													)}
-												>
-													{header.isPlaceholder
-														? null
-														: flexRender(
-																header.column.columnDef.header,
-																header.getContext(),
-															)}
+													</div>
 												</th>
 											))}
 										</tr>

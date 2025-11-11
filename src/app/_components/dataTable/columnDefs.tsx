@@ -120,12 +120,14 @@ export function createColumnDefs({
 							<input
 								type="checkbox"
 								aria-label="Select row"
-								className="-translate-y-1/2 absolute top-1/2 left-1 size-4"
+								className="size-4"
 								checked={checked}
 								onChange={onToggle}
 							/>
 						)}
-						<span className="text-gray-500 text-xs">{row.index + 1}</span>
+						{!showCheckboxes && (
+							<span className="text-gray-500 text-xs">{row.index + 1}</span>
+						)}
 					</div>
 				);
 			},

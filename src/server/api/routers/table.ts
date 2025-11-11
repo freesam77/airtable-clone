@@ -320,6 +320,112 @@ export const tableRouter = createTRPCRouter({
 
 			return { success: true };
 		}),
+    
+  // Delete a column
+  deleteColumn: protectedProcedure
+    .input(z.object({ colId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+			// First verify the row belongs to a table owned by the user
+			const col = await ctx.db.column.findFirst({
+				where: {
+					id: input.colId,
+					table: {
+						base: {
+							createdById: ctx.session.user.id,
+						},
+					},
+				},
+			});
+
+			if (!col) {
+				throw new Error("Row not found or access denied");
+			}
+
+			// Delete the column (cascade will handle cell values)
+			await ctx.db.column.delete({
+				where: { id: input.colId },
+			});
+
+			// Update positions of remaining rows
+			await ctx.db.column.updateMany({
+				where: {
+					tableId: col.tableId,
+					position: { gt: col.position },
+				},
+				data: {
+					position: { decrement: 1 },
+				},
+			});
+
+      return { success: true };
+    }),
+
+  // Update (rename) a column
+  updateColumn: protectedProcedure
+    .input(
+      z.object({
+        colId: z.string(),
+        name: z.string().min(1),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      // verify access
+      const col = await ctx.db.column.findFirst({
+        where: {
+          id: input.colId,
+          table: { base: { createdById: ctx.session.user.id } },
+        },
+      });
+      if (!col) throw new Error("Column not found or access denied");
+
+      const updated = await ctx.db.column.update({
+        where: { id: input.colId },
+        data: { name: input.name },
+      });
+      return updated;
+    }),
+
+  // Duplicate a column (including copying cell values)
+  duplicateColumn: protectedProcedure
+    .input(z.object({ colId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const original = await ctx.db.column.findFirst({
+        where: {
+          id: input.colId,
+          table: { base: { createdById: ctx.session.user.id } },
+        },
+      });
+      if (!original) throw new Error("Column not found or access denied");
+
+      // compute next position
+      const colCount = await ctx.db.column.count({ where: { tableId: original.tableId } });
+      const newName = `${original.name} copy`;
+
+      // create new column
+      const newCol = await ctx.db.column.create({
+        data: {
+          tableId: original.tableId,
+          name: newName,
+          type: original.type,
+          position: colCount,
+          required: false,
+        },
+      });
+
+      // copy cells values
+      const cells = await ctx.db.cell.findMany({
+        where: { columnId: original.id },
+        select: { rowId: true, value: true },
+      });
+      if (cells.length) {
+        await ctx.db.cell.createMany({
+          data: cells.map((c) => ({ rowId: c.rowId, columnId: newCol.id, value: c.value ?? null })),
+          skipDuplicates: true,
+        });
+      }
+
+      return newCol;
+    }),
 
 	// Generate random rows
 	generateRows: protectedProcedure
