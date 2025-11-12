@@ -28,6 +28,7 @@ import { cn } from "~/lib/utils";
 import { api } from "~/trpc/react";
 import { ColumnHeaderMenu } from "./ColumnHeaderMenu";
 import { type FilterCondition, applyFilters } from "./Filters";
+import { type SortCondition, applySorts } from "./Sorts";
 import { ViewsHeader } from "./ViewsHeader";
 import { ViewsSidebar } from "./ViewsSidebar";
 import { AddColumnDropdown } from "./addColumnDropdown";
@@ -123,6 +124,8 @@ export function DataTable({ tableId }: DataTableProps) {
 	);
 
 	const [filters, setFilters] = useState<FilterCondition[]>([]);
+	const [sorts, setSorts] = useState<SortCondition[]>([]);
+	const [autoSort, setAutoSort] = useState(true);
 
 	const utils = api.useUtils();
 
@@ -193,13 +196,15 @@ export function DataTable({ tableId }: DataTableProps) {
 			orderedColumns,
 			searchValue,
 		) as unknown as TableData[];
-		return applyFilters<TableData>(
+		const filtered = applyFilters<TableData>(
 			data,
 			orderedColumns,
 			pre,
 			filters,
 		) as unknown as TableData[];
-	}, [data, orderedColumns, searchValue, filters]);
+		return applySorts<TableData>(filtered, orderedColumns, sorts, autoSort);
+	}, [data, orderedColumns, searchValue, filters, sorts, autoSort]);
+
 	// Pre-filter rows using the same logic as the global filter so non-matching rows are hidden at the data level too
 
 	// Create column definitions dynamically based on the table structure
@@ -357,6 +362,10 @@ export function DataTable({ tableId }: DataTableProps) {
 					columns={orderedColumns}
 					filters={filters}
 					setFilters={setFilters}
+					sorts={sorts}
+					setSorts={setSorts}
+					autoSort={autoSort}
+					setAutoSort={setAutoSort}
 				/>
 
 				<div className="flex">

@@ -22,6 +22,8 @@ import {
 import { Input } from "~/components/ui/input";
 import type { FilterCondition } from "./Filters";
 import { FiltersDropdown } from "./FiltersDropdown";
+import type { SortCondition } from "./Sorts";
+import { SortsDropdown } from "./SortsDropdown";
 
 type ViewsHeaderProps = {
 	viewName: string;
@@ -38,6 +40,10 @@ type ViewsHeaderProps = {
 	columns: Array<{ id: string; name: string; type: "TEXT" | "NUMBER" }>;
 	filters: FilterCondition[];
 	setFilters: (updater: any) => void;
+	sorts?: SortCondition[];
+	setSorts?: (updater: any) => void;
+	autoSort?: boolean;
+	setAutoSort?: (updater: any) => void;
 };
 
 export function ViewsHeader({
@@ -54,6 +60,10 @@ export function ViewsHeader({
 	columns,
 	filters,
 	setFilters,
+	sorts = [],
+	setSorts = () => {},
+	autoSort = true,
+	setAutoSort = () => {},
 }: ViewsHeaderProps) {
 	// filter UI moved to FiltersDropdown
 	return (
@@ -130,14 +140,13 @@ export function ViewsHeader({
 					<FolderTree className="size-4" />
 					<span className="text-sm">Group</span>
 				</Button>
-				<Button
-					variant="ghost"
-					size="sm"
-					className="cursor-pointer gap-2 px-2 hover:bg-gray-100"
-				>
-					<ArrowUpDown className="size-4" />
-					<span className="text-sm">Sort</span>
-				</Button>
+				<SortsDropdown
+					columns={columns}
+					sorts={sorts}
+					setSorts={setSorts}
+					autoSort={autoSort}
+					setAutoSort={setAutoSort}
+				/>
 				<Button
 					variant="ghost"
 					size="sm"
