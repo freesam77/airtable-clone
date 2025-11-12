@@ -126,6 +126,25 @@ export function DataTable({ tableId }: DataTableProps) {
 	const [filters, setFilters] = useState<FilterCondition[]>([]);
 	const [sorts, setSorts] = useState<SortCondition[]>([]);
 	const [autoSort, setAutoSort] = useState(true);
+	const [hiddenColumnIds, setHiddenColumnIds] = useState<string[]>([]);
+
+	const hiddenColumnSet = useMemo(
+		() => new Set(hiddenColumnIds),
+		[hiddenColumnIds],
+	);
+
+	const visibleColumns = useMemo(
+		() => orderedColumns.filter((col) => !hiddenColumnSet.has(col.id)),
+		[orderedColumns, hiddenColumnSet],
+	);
+
+	useEffect(() => {
+		setHiddenColumnIds((prev) => {
+			const available = new Set(orderedColumns.map((col) => col.id));
+			const filtered = prev.filter((id) => available.has(id));
+			return filtered.length === prev.length ? prev : filtered;
+		});
+	}, [orderedColumns]);
 
 	const utils = api.useUtils();
 
@@ -215,7 +234,7 @@ export function DataTable({ tableId }: DataTableProps) {
 		[addColumnMutation, tableId],
 	);
 	const columnDefs: ColumnDef<TableRowData>[] = createColumnDefs({
-		columns: orderedColumns,
+		columns: visibleColumns,
 		displayData: displayData,
 		selectedRowIds,
 		setSelectedRowIds,
@@ -366,6 +385,8 @@ export function DataTable({ tableId }: DataTableProps) {
 					setSorts={setSorts}
 					autoSort={autoSort}
 					setAutoSort={setAutoSort}
+					hiddenColumnIds={hiddenColumnIds}
+					setHiddenColumnIds={setHiddenColumnIds}
 				/>
 
 				<div className="flex">
@@ -567,8 +588,7 @@ export function DataTable({ tableId }: DataTableProps) {
 								{/* Add Row button row */}
 								<tfoot>
 									<tr className="border-gray-200 border-r bg-white">
-										{columns
-											.sort((a, b) => a.position - b.position)
+										{visibleColumns
 											.map((col, index) => (
 												<td
 													key={col.id}

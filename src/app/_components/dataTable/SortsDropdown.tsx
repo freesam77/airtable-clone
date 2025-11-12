@@ -7,6 +7,7 @@ import {
 	DropdownMenuContent,
 	DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
+import { Switch } from "~/components/ui/switch";
 import { cn } from "~/lib/utils";
 import type { SortCondition } from "./Sorts";
 
@@ -166,23 +167,12 @@ export function SortsDropdown({
 					</div>
 
 					<div className="mt-4 flex items-center gap-2">
-						<button
-							type="button"
-							onClick={() => setAutoSort((prev: boolean) => !prev)}
-							className={cn(
-								"relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
-								autoSort ? "bg-green-600" : "bg-gray-300",
-							)}
-							aria-pressed={autoSort}
+						<Switch
+							checked={autoSort}
+							onCheckedChange={() => setAutoSort((prev: boolean) => !prev)}
 							aria-label="Toggle automatic sort"
-						>
-							<span
-								className={cn(
-									"inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
-									autoSort ? "translate-x-6" : "translate-x-1",
-								)}
-							/>
-						</button>
+							className="data-[state=checked]:bg-green-600 data-[state=unchecked]:bg-gray-300"
+						/>
 						<span className="text-gray-700 text-sm">
 							Automatically sort records
 						</span>

@@ -1,10 +1,10 @@
 "use client";
 
+import type { Dispatch, SetStateAction } from "react";
 import {
 	ArrowUpDown,
 	ChevronDown,
 	ChevronUp,
-	EyeOff,
 	FolderTree,
 	Menu,
 	Palette,
@@ -22,6 +22,7 @@ import {
 import { Input } from "~/components/ui/input";
 import type { FilterCondition } from "./Filters";
 import { FiltersDropdown } from "./FiltersDropdown";
+import { HiddenFieldsDropdown } from "./HiddenFieldsDropdown";
 import type { SortCondition } from "./Sorts";
 import { SortsDropdown } from "./SortsDropdown";
 
@@ -44,6 +45,8 @@ type ViewsHeaderProps = {
 	setSorts?: (updater: any) => void;
 	autoSort?: boolean;
 	setAutoSort?: (updater: any) => void;
+	hiddenColumnIds: string[];
+	setHiddenColumnIds: Dispatch<SetStateAction<string[]>>;
 };
 
 export function ViewsHeader({
@@ -64,6 +67,8 @@ export function ViewsHeader({
 	setSorts = () => {},
 	autoSort = true,
 	setAutoSort = () => {},
+	hiddenColumnIds,
+	setHiddenColumnIds,
 }: ViewsHeaderProps) {
 	// filter UI moved to FiltersDropdown
 	return (
@@ -119,14 +124,11 @@ export function ViewsHeader({
 			</div>
 
 			<div className="flex items-center justify-end gap-1 p-1 text-gray-500">
-				<Button
-					variant="ghost"
-					size="sm"
-					className="cursor-pointer gap-2 px-2 hover:bg-gray-100"
-				>
-					<EyeOff className="size-4" />
-					<span className="text-sm">Hide fields</span>
-				</Button>
+				<HiddenFieldsDropdown
+					columns={columns}
+					hiddenColumnIds={hiddenColumnIds}
+					setHiddenColumnIds={setHiddenColumnIds}
+				/>
 				<FiltersDropdown
 					columns={columns}
 					filters={filters}
