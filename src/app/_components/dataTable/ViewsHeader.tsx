@@ -1,6 +1,6 @@
 "use client";
 
-import type { Dispatch, SetStateAction } from "react";
+
 import {
 	ArrowUpDown,
 	ChevronDown,
@@ -20,15 +20,19 @@ import {
 	DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
 import { Input } from "~/components/ui/input";
-import type { FilterCondition } from "./Filters";
-import { FiltersDropdown } from "./FiltersDropdown";
-import { HiddenFieldsDropdown } from "./HiddenFieldsDropdown";
-import type { SortCondition } from "./Sorts";
-import { SortsDropdown } from "./SortsDropdown";
+import type { FilterCondition } from "./filter/Filters";
+import { FiltersDropdown } from "./filter/FiltersDropdown";
+import { HiddenFieldsDropdown } from "./filter/HiddenFieldsDropdown";
+import type { SortCondition } from "./filter/Sorts";
+import { SortsDropdown } from "./filter/SortsDropdown";
+import type { ViewUpdatePatch } from "./filter/useViewFilter";
 
 type ViewsHeaderProps = {
 	viewName: string;
 	onRenameView: (name: string) => void;
+	onDuplicateView: () => void;
+	onDeleteView: () => void;
+	canDeleteView: boolean;
 	onToggleSidebar: () => void;
 	searchOpen: boolean;
 	setSearchOpen: (open: boolean) => void;
@@ -40,18 +44,18 @@ type ViewsHeaderProps = {
 	gotoNextMatch: () => void;
 	columns: Array<{ id: string; name: string; type: "TEXT" | "NUMBER" }>;
 	filters: FilterCondition[];
-	setFilters: (updater: any) => void;
 	sorts?: SortCondition[];
-	setSorts?: (updater: any) => void;
 	autoSort?: boolean;
-	setAutoSort?: (updater: any) => void;
 	hiddenColumnIds: string[];
-	setHiddenColumnIds: Dispatch<SetStateAction<string[]>>;
+	onUpdateView: (patch: ViewUpdatePatch) => void;
 };
 
 export function ViewsHeader({
 	viewName,
 	onRenameView,
+	onDuplicateView,
+	onDeleteView,
+	canDeleteView,
 	onToggleSidebar,
 	searchOpen,
 	setSearchOpen,
@@ -62,13 +66,10 @@ export function ViewsHeader({
 	gotoNextMatch,
 	columns,
 	filters,
-	setFilters,
 	sorts = [],
-	setSorts = () => {},
 	autoSort = true,
-	setAutoSort = () => {},
 	hiddenColumnIds,
-	setHiddenColumnIds,
+	onUpdateView,
 }: ViewsHeaderProps) {
 	// filter UI moved to FiltersDropdown
 	return (
@@ -108,14 +109,21 @@ export function ViewsHeader({
 							<button
 								type="button"
 								className="w-full rounded px-2 py-2 text-left hover:bg-gray-50"
-								onClick={() => onRenameView(`${viewName} copy`)}
+								onClick={onDuplicateView}
 							>
 								Duplicate view
 							</button>
-							<button
-								type="button"
-								className="w-full rounded px-2 py-2 text-left text-red-600 hover:bg-red-50"
-							>
+						<button
+							type="button"
+							className="w-full rounded px-2 py-2 text-left text-red-600 hover:bg-red-50 disabled:opacity-50"
+							disabled={!canDeleteView}
+							onClick={() => {
+								if (!canDeleteView) return;
+								if (confirm(`Delete view "${viewName}"? This cannot be undone.`)) {
+									onDeleteView();
+								}
+							}}
+						>
 								Delete view
 							</button>
 						</div>
@@ -127,12 +135,12 @@ export function ViewsHeader({
 				<HiddenFieldsDropdown
 					columns={columns}
 					hiddenColumnIds={hiddenColumnIds}
-					setHiddenColumnIds={setHiddenColumnIds}
+					onChange={(next) => onUpdateView({ hiddenColumnIds: next })}
 				/>
 				<FiltersDropdown
 					columns={columns}
 					filters={filters}
-					setFilters={setFilters}
+					onChange={(next) => onUpdateView({ filters: next })}
 				/>
 				<Button
 					variant="ghost"
@@ -145,9 +153,9 @@ export function ViewsHeader({
 				<SortsDropdown
 					columns={columns}
 					sorts={sorts}
-					setSorts={setSorts}
 					autoSort={autoSort}
-					setAutoSort={setAutoSort}
+					onChange={(next) => onUpdateView({ sorts: next })}
+					onAutoSortChange={(value) => onUpdateView({ autoSort: value })}
 				/>
 				<Button
 					variant="ghost"

@@ -14,17 +14,17 @@ import type { SortCondition } from "./Sorts";
 type Props = {
 	columns: Array<{ id: string; name: string; type: "TEXT" | "NUMBER" }>;
 	sorts: SortCondition[];
-	setSorts: (updater: any) => void;
+	onChange: (sorts: SortCondition[]) => void;
 	autoSort: boolean;
-	setAutoSort: (updater: any) => void;
+	onAutoSortChange: (value: boolean) => void;
 };
 
 export function SortsDropdown({
 	columns,
 	sorts,
-	setSorts,
 	autoSort,
-	setAutoSort,
+	onChange,
+	onAutoSortChange,
 }: Props) {
 	const isActive = sorts.length > 0;
 	const label = isActive
@@ -34,13 +34,13 @@ export function SortsDropdown({
 	const addSort = () => {
 		const first = columns[0];
 		if (!first) return;
-		setSorts((prev: any) => [
-			...prev,
+		onChange([
+			...sorts,
 			{
 				id: `s-${Date.now()}`,
 				columnId: first.id,
 				type: first.type,
-				dir: "asc" as const,
+				dir: "asc",
 			},
 		]);
 	};
@@ -53,13 +53,11 @@ export function SortsDropdown({
 			dir: "asc" | "desc";
 		}>,
 	) => {
-		setSorts((prev: any) =>
-			prev.map((s: any) => (s.id === id ? { ...s, ...patch } : s)),
-		);
+		onChange(sorts.map((s) => (s.id === id ? { ...s, ...patch } : s)));
 	};
 
 	const removeSort = (id: string) => {
-		setSorts((prev: any) => prev.filter((s: any) => s.id !== id));
+		onChange(sorts.filter((s) => s.id !== id));
 	};
 
 	return (
@@ -167,12 +165,12 @@ export function SortsDropdown({
 					</div>
 
 					<div className="mt-4 flex items-center gap-2">
-						<Switch
-							checked={autoSort}
-							onCheckedChange={() => setAutoSort((prev: boolean) => !prev)}
-							aria-label="Toggle automatic sort"
-							className="data-[state=checked]:bg-green-600 data-[state=unchecked]:bg-gray-300"
-						/>
+				<Switch
+					checked={autoSort}
+					onCheckedChange={(checked) => onAutoSortChange(checked)}
+					aria-label="Toggle automatic sort"
+					className="data-[state=checked]:bg-green-600 data-[state=unchecked]:bg-gray-300"
+				/>
 						<span className="text-gray-700 text-sm">
 							Automatically sort records
 						</span>

@@ -39,6 +39,7 @@ model Table {
     updatedAt   DateTime @updatedAt
     columns     Column[]
     rows        Row[]
+    views       View[]
     base        Base     @relation(fields: [baseId], references: [id])
     baseId      String
 
@@ -67,6 +68,20 @@ model Row {
     tableId   String
     cells     Cell[]
     table     Table    @relation(fields: [tableId], references: [id], onDelete: Cascade)
+
+    @@index([tableId, position])
+}
+
+model View {
+    id        String   @id @default(cuid())
+    name      String
+    type      String   @default("grid")
+    position  Int
+    settings  Json
+    tableId   String
+    table     Table    @relation(fields: [tableId], references: [id], onDelete: Cascade)
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
 
     @@index([tableId, position])
 }

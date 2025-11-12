@@ -3,6 +3,7 @@ import orderBy from "lodash-es/orderBy";
 export type SortDirection = "asc" | "desc";
 
 export type SortCondition = {
+	id: string;
 	columnId: string;
 	type: "TEXT" | "NUMBER";
 	dir: SortDirection;

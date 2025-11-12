@@ -25,14 +25,15 @@ import { useTableSearchNavigation } from "~/hooks/useTableSearchNavigation";
 import { detectOS } from "~/lib/detectOS";
 import { filterRowsByQuery, rowMatchesQuery } from "~/lib/tableFilter";
 import { cn } from "~/lib/utils";
-import { api } from "~/trpc/react";
+import { api, type RouterOutputs } from "~/trpc/react";
 import { ColumnHeaderMenu } from "./ColumnHeaderMenu";
-import { type FilterCondition, applyFilters } from "./Filters";
-import { type SortCondition, applySorts } from "./Sorts";
+import { type FilterCondition, applyFilters } from "./filter/Filters";
+import { type SortCondition, applySorts } from "./filter/Sorts";
 import { ViewsHeader } from "./ViewsHeader";
 import { ViewsSidebar } from "./ViewsSidebar";
 import { AddColumnDropdown } from "./addColumnDropdown";
 import { type TableData as TableRowData, createColumnDefs } from "./columnDefs";
+import { useViewFilter } from "./filter/useViewFilter";
 
 // Column helpers and definitions extracted to dataTable/columnDefs
 
@@ -77,7 +78,6 @@ export function DataTable({ tableId }: DataTableProps) {
 	const [searchOpen, setSearchOpen] = useState(false);
 	const [searchValue, setSearchValue] = useState("");
 	const [viewSidebarOpen, setViewSidebarOpen] = useState(true);
-	const [viewName, setViewName] = useState("Grid view");
 	const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(new Set());
 	const [showCheckboxes, setShowCheckboxes] = useState(false);
 
@@ -123,10 +123,23 @@ export function DataTable({ tableId }: DataTableProps) {
 		[columns],
 	);
 
-	const [filters, setFilters] = useState<FilterCondition[]>([]);
-	const [sorts, setSorts] = useState<SortCondition[]>([]);
-	const [autoSort, setAutoSort] = useState(true);
-	const [hiddenColumnIds, setHiddenColumnIds] = useState<string[]>([]);
+	const {
+		views,
+		viewsLoading,
+		activeView,
+		filters,
+		sorts,
+		hiddenColumnIds,
+		autoSort,
+		canDeleteView,
+		handleUpdateView,
+		handleSelectView,
+		handleCreateView,
+		handleRenameView,
+		handleDuplicateView,
+		handleDeleteView,
+		handleReorderView,
+	} = useViewFilter(tableId);
 
 	const hiddenColumnSet = useMemo(
 		() => new Set(hiddenColumnIds),
@@ -139,12 +152,12 @@ export function DataTable({ tableId }: DataTableProps) {
 	);
 
 	useEffect(() => {
-		setHiddenColumnIds((prev) => {
-			const available = new Set(orderedColumns.map((col) => col.id));
-			const filtered = prev.filter((id) => available.has(id));
-			return filtered.length === prev.length ? prev : filtered;
-		});
-	}, [orderedColumns]);
+		const available = new Set(orderedColumns.map((col) => col.id));
+		const filtered = hiddenColumnIds.filter((id) => available.has(id));
+		if (filtered.length !== hiddenColumnIds.length) {
+			handleUpdateView({ hiddenColumnIds: filtered });
+		}
+	}, [orderedColumns, hiddenColumnIds, handleUpdateView]);
 
 	const utils = api.useUtils();
 
@@ -348,10 +361,10 @@ export function DataTable({ tableId }: DataTableProps) {
 		utils.table.getInfiniteRows.invalidate(infiniteQueryInput);
 	};
 
-	if (tableColumnLoading || rowsInfinite.isLoading) {
+	if (tableColumnLoading || rowsInfinite.isLoading || viewsLoading || !activeView) {
 		return (
 			<div className="flex h-64 items-center justify-center">
-				<div className="text-gray-500">Loading table...</div>
+				<div className="text-gray-500">Loading view…</div>
 			</div>
 		);
 	}
@@ -368,8 +381,20 @@ export function DataTable({ tableId }: DataTableProps) {
 		<div className="flex h-full">
 			<div className="min-w-0 flex-1">
 				<ViewsHeader
-					viewName={viewName}
-					onRenameView={(name) => setViewName(name)}
+					viewName={activeView?.name ?? "View"}
+					onRenameView={(name) => {
+						if (!activeView) return;
+						handleRenameView(activeView.id, name);
+					}}
+					onDuplicateView={() => {
+						if (!activeView) return;
+						handleDuplicateView(activeView.id);
+					}}
+					onDeleteView={() => {
+						if (!activeView) return;
+						handleDeleteView(activeView.id);
+					}}
+					canDeleteView={canDeleteView}
 					onToggleSidebar={() => setViewSidebarOpen((v) => !v)}
 					searchOpen={searchOpen}
 					setSearchOpen={setSearchOpen}
@@ -380,18 +405,27 @@ export function DataTable({ tableId }: DataTableProps) {
 					gotoNextMatch={gotoNextMatch}
 					columns={orderedColumns}
 					filters={filters}
-					setFilters={setFilters}
 					sorts={sorts}
-					setSorts={setSorts}
 					autoSort={autoSort}
-					setAutoSort={setAutoSort}
 					hiddenColumnIds={hiddenColumnIds}
-					setHiddenColumnIds={setHiddenColumnIds}
+					onUpdateView={handleUpdateView}
 				/>
 
 				<div className="flex">
 					{/* Left views sidebar inside table area */}
-					{viewSidebarOpen && <ViewsSidebar viewName={viewName} />}
+					{viewSidebarOpen && (
+						<ViewsSidebar
+							views={views}
+							activeViewId={activeView?.id ?? null}
+							onSelectView={handleSelectView}
+							onCreateView={handleCreateView}
+							onRenameView={handleRenameView}
+							onDuplicateView={handleDuplicateView}
+							onDeleteView={handleDeleteView}
+							onReorderView={handleReorderView}
+							canDeleteView={canDeleteView}
+						/>
+					)}
 
 					<div className="flex h-[88vh] w-full flex-col justify-between">
 						<div

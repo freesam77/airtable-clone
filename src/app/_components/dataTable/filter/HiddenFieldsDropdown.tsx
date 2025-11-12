@@ -1,7 +1,7 @@
 "use client";
 
 import { EyeOff, GripVertical, HelpCircle, Search } from "lucide-react";
-import { type Dispatch, type SetStateAction, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "~/components/ui/button";
 import {
 	DropdownMenu,
@@ -17,12 +17,12 @@ type Column = { id: string; name: string; type: "TEXT" | "NUMBER" };
 type Props = {
 	columns: Column[];
 	hiddenColumnIds: string[];
-	setHiddenColumnIds: Dispatch<SetStateAction<string[]>>;
+	onChange: (hiddenIds: string[]) => void;
 };
 
 const columnTypeSymbol = (type: "TEXT" | "NUMBER") => (type === "TEXT" ? "A" : "#");
 
-export function HiddenFieldsDropdown({ columns, hiddenColumnIds, setHiddenColumnIds }: Props) {
+export function HiddenFieldsDropdown({ columns, hiddenColumnIds, onChange }: Props) {
 	const [query, setQuery] = useState("");
 	const hiddenCount = hiddenColumnIds.length;
 	const hiddenSet = useMemo(() => new Set(hiddenColumnIds), [hiddenColumnIds]);
@@ -38,15 +38,15 @@ export function HiddenFieldsDropdown({ columns, hiddenColumnIds, setHiddenColumn
 	}, [columns, query]);
 
 	const toggleColumn = (columnId: string) => {
-		setHiddenColumnIds((prev) =>
-			prev.includes(columnId)
-				? prev.filter((id) => id !== columnId)
-				: [...prev, columnId],
+		onChange(
+			hiddenColumnIds.includes(columnId)
+				? hiddenColumnIds.filter((id) => id !== columnId)
+				: [...hiddenColumnIds, columnId],
 		);
 	};
 
-	const hideAll = () => setHiddenColumnIds(columns.map((c) => c.id));
-	const showAll = () => setHiddenColumnIds([]);
+	const hideAll = () => onChange(columns.map((c) => c.id));
+	const showAll = () => onChange([]);
 
 	const disableHideAll = columns.length === 0 || hiddenCount === columns.length;
 	const disableShowAll = columns.length === 0 || hiddenCount === 0;

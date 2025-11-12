@@ -14,10 +14,10 @@ import type { FilterCondition } from "./Filters";
 type Props = {
 	columns: Array<{ id: string; name: string; type: "TEXT" | "NUMBER" }>;
 	filters: FilterCondition[];
-	setFilters: (updater: any) => void;
+	onChange: (filters: FilterCondition[]) => void;
 };
 
-export function FiltersDropdown({ columns, filters, setFilters }: Props) {
+export function FiltersDropdown({ columns, filters, onChange }: Props) {
 	const isActive = filters.length > 0;
 	const activeColumns = Array.from(
 		new Set(
@@ -32,8 +32,8 @@ export function FiltersDropdown({ columns, filters, setFilters }: Props) {
 	const addCondition = () => {
 		const first = columns[0];
 		if (!first) return;
-		setFilters((prev: any) => [
-			...prev,
+		onChange([
+			...filters,
 			{
 				id: `f-${Date.now()}`,
 				columnId: first.id,
@@ -49,17 +49,15 @@ export function FiltersDropdown({ columns, filters, setFilters }: Props) {
 		patch: Partial<{
 			columnId: string;
 			type: "TEXT" | "NUMBER";
-			op: string;
+			op: FilterCondition["op"];
 			value?: string;
 		}>,
 	) => {
-		setFilters((prev: any) =>
-			prev.map((f: any) => (f.id === id ? { ...f, ...patch } : f)),
-		);
+		onChange(filters.map((f) => (f.id === id ? { ...f, ...patch } : f)));
 	};
 
 	const removeFilter = (id: string) => {
-		setFilters((prev: any) => prev.filter((f: any) => f.id !== id));
+		onChange(filters.filter((f) => f.id !== id));
 	};
 
 	const textOps = [
@@ -138,11 +136,15 @@ export function FiltersDropdown({ columns, filters, setFilters }: Props) {
 											</option>
 										))}
 									</select>
-									<select
-										className="h-8 rounded-none border border-gray-300 bg-white px-2 text-sm"
-										value={f.op}
-										onChange={(e) => updateFilter(f.id, { op: e.target.value })}
-									>
+				<select
+					className="h-8 rounded-none border border-gray-300 bg-white px-2 text-sm"
+					value={f.op}
+					onChange={(e) =>
+						updateFilter(f.id, {
+							op: e.target.value as FilterCondition["op"],
+						})
+					}
+				>
 										{ops.map((o) => (
 											<option key={o.v} value={o.v}>
 												{o.l}

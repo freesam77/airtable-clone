@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { defaultViewSettings } from "./view";
 
 export const tableRouter = createTRPCRouter({
 	// Get table columns (for headers/typing)
@@ -126,6 +127,14 @@ export const tableRouter = createTRPCRouter({
 					baseId: input.baseId,
 					columns: {
 						create: input.columns,
+					},
+					views: {
+						create: {
+							name: "Grid view",
+							type: "grid",
+							position: 0,
+							settings: defaultViewSettings as Prisma.JsonObject,
+						},
 					},
 				},
 				include: {
