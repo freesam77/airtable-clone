@@ -27,22 +27,28 @@ export function parseViewSettings(raw: unknown): ViewSettingsPayload {
 
 	const sorts = Array.isArray(viewSettings.sorts)
 		? viewSettings.sorts.map((sort, index) => ({
-			...sort,
-			id:
-				typeof sort.id === "string"
-					? sort.id
-					: `sort-${sort.columnId ?? index}-${index}-${Math.random().toString(36).slice(2, 6)}`,
-		}))
+				...sort,
+				id:
+					typeof sort.id === "string"
+						? sort.id
+						: `sort-${sort.columnId ?? index}-${index}-${Math.random().toString(36).slice(2, 6)}`,
+			}))
 		: [];
 
 	return {
-		version: typeof viewSettings.version === "number" ? viewSettings.version : 1,
+		version:
+			typeof viewSettings.version === "number" ? viewSettings.version : 1,
 		filters: Array.isArray(viewSettings.filters) ? viewSettings.filters : [],
 		sorts,
 		hiddenColumnIds: Array.isArray(viewSettings.hiddenColumnIds)
-			? viewSettings.hiddenColumnIds.filter((id): id is string => typeof id === "string")
+			? viewSettings.hiddenColumnIds.filter(
+					(id): id is string => typeof id === "string",
+				)
 			: [],
-		autoSort: typeof viewSettings.autoSort === "boolean" ? viewSettings.autoSort : true,
-		groups: Array.isArray(viewSettings.groups) ? viewSettings.groups : undefined,
+		autoSort:
+			typeof viewSettings.autoSort === "boolean" ? viewSettings.autoSort : true,
+		groups: Array.isArray(viewSettings.groups)
+			? viewSettings.groups
+			: undefined,
 	};
 }

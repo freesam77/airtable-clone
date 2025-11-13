@@ -26,17 +26,26 @@ type Action =
 	| { type: "SET_EDITING_CELL"; value: ValueOrUpdater<GridCell | null> }
 	| { type: "SET_FILL_PREVIEW"; value: ValueOrUpdater<FillPreview | null> };
 
-const resolveUpdate = <T,>(current: T, value: ValueOrUpdater<T>) =>
+const resolveUpdate = <T>(current: T, value: ValueOrUpdater<T>) =>
 	typeof value === "function" ? (value as (prev: T) => T)(current) : value;
 
 function reducer(state: DataTableState, action: Action): DataTableState {
 	switch (action.type) {
 		case "SET_ACTIVE_CELL":
-			return { ...state, activeCell: resolveUpdate(state.activeCell, action.value) };
+			return {
+				...state,
+				activeCell: resolveUpdate(state.activeCell, action.value),
+			};
 		case "SET_SELECTION":
-			return { ...state, selection: resolveUpdate(state.selection, action.value) };
+			return {
+				...state,
+				selection: resolveUpdate(state.selection, action.value),
+			};
 		case "SET_EDITING_CELL":
-			return { ...state, editingCell: resolveUpdate(state.editingCell, action.value) };
+			return {
+				...state,
+				editingCell: resolveUpdate(state.editingCell, action.value),
+			};
 		case "SET_FILL_PREVIEW":
 			return {
 				...state,
@@ -48,10 +57,10 @@ function reducer(state: DataTableState, action: Action): DataTableState {
 }
 
 export function useDataTableState(initial?: Partial<DataTableState>) {
-	const [state, dispatch] = useReducer(
-		reducer,
-		{ ...initialState, ...initial },
-	);
+	const [state, dispatch] = useReducer(reducer, {
+		...initialState,
+		...initial,
+	});
 
 	const setActiveCell = useCallback(
 		(value: ValueOrUpdater<GridCell | null>) =>

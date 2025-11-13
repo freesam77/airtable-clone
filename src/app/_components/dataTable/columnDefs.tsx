@@ -57,6 +57,14 @@ type CreateColumnDefsParams = {
 		previousValue: string | number | null,
 	) => void;
 	onCancelEdit: () => void;
+	onNavigate: (
+		cell: { rowId: string; columnId: string },
+		direction: "forward" | "backward",
+	) => void;
+	getInitialEditValue: (cell: { rowId: string; columnId: string }) =>
+		| string
+		| null;
+	onInitialValueConsumed: () => void;
 };
 
 export function createColumnDefs({
@@ -69,6 +77,9 @@ export function createColumnDefs({
 	editingCell,
 	onCommitEdit,
 	onCancelEdit,
+	onNavigate,
+	getInitialEditValue,
+	onInitialValueConsumed,
 }: CreateColumnDefsParams): ColumnDef<TableData>[] {
 	return [
 		{
@@ -174,6 +185,9 @@ export function createColumnDefs({
 					const isEditing =
 						editingCell?.rowId === cellIdentity.rowId &&
 						editingCell?.columnId === cellIdentity.columnId;
+					const initialValue = isEditing
+						? getInitialEditValue(cellIdentity)
+						: null;
 					return (
 						<EditableCell
 							value={value}
@@ -189,6 +203,9 @@ export function createColumnDefs({
 								)
 							}
 							onCancel={onCancelEdit}
+							onNavigate={(direction) => onNavigate(cellIdentity, direction)}
+							initialValue={initialValue ?? undefined}
+							onInitialValueConsumed={onInitialValueConsumed}
 						/>
 					);
 				},

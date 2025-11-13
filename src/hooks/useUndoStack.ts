@@ -13,14 +13,17 @@ export function useUndoStack(limit = 100) {
 	const stackRef = useRef<UndoStep[]>([]);
 	const [canUndo, setCanUndo] = useState(false);
 
-	const pushStep = useCallback((changes: UndoStep) => {
-		if (changes.length === 0) return;
-		stackRef.current.push(changes);
-		if (stackRef.current.length > limit) {
-			stackRef.current.shift();
-		}
-		setCanUndo(stackRef.current.length > 0);
-	}, [limit]);
+	const pushStep = useCallback(
+		(changes: UndoStep) => {
+			if (changes.length === 0) return;
+			stackRef.current.push(changes);
+			if (stackRef.current.length > limit) {
+				stackRef.current.shift();
+			}
+			setCanUndo(stackRef.current.length > 0);
+		},
+		[limit],
+	);
 
 	const popStep = useCallback(() => {
 		const step = stackRef.current.pop();

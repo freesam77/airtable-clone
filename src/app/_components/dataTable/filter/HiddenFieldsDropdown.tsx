@@ -20,9 +20,14 @@ type Props = {
 	onChange: (hiddenIds: string[]) => void;
 };
 
-const columnTypeSymbol = (type: "TEXT" | "NUMBER") => (type === "TEXT" ? "A" : "#");
+const columnTypeSymbol = (type: "TEXT" | "NUMBER") =>
+	type === "TEXT" ? "A" : "#";
 
-export function HiddenFieldsDropdown({ columns, hiddenColumnIds, onChange }: Props) {
+export function HiddenFieldsDropdown({
+	columns,
+	hiddenColumnIds,
+	onChange,
+}: Props) {
 	const [query, setQuery] = useState("");
 	const hiddenCount = hiddenColumnIds.length;
 	const hiddenSet = useMemo(() => new Set(hiddenColumnIds), [hiddenColumnIds]);
@@ -59,7 +64,9 @@ export function HiddenFieldsDropdown({ columns, hiddenColumnIds, onChange }: Pro
 					size="sm"
 					className={cn(
 						"cursor-pointer gap-2 px-2",
-						isActive ? "bg-blue-100 text-blue-900 hover:bg-blue-100" : "hover:bg-gray-100",
+						isActive
+							? "bg-blue-100 text-blue-900 hover:bg-blue-100"
+							: "hover:bg-gray-100",
 					)}
 					aria-pressed={isActive}
 				>
@@ -67,7 +74,10 @@ export function HiddenFieldsDropdown({ columns, hiddenColumnIds, onChange }: Pro
 					<span className="text-sm">{buttonLabel}</span>
 				</Button>
 			</DropdownMenuTrigger>
-			<DropdownMenuContent align="end" className="w-[320px] bg-white p-0 text-sm">
+			<DropdownMenuContent
+				align="end"
+				className="w-[320px] bg-white p-0 text-sm"
+			>
 				<div className="p-3">
 					<div className="relative mb-3">
 						<Search className="-translate-y-1/2 pointer-events-none absolute top-1/2 left-2 size-4 text-gray-400" />
@@ -81,7 +91,9 @@ export function HiddenFieldsDropdown({ columns, hiddenColumnIds, onChange }: Pro
 					</div>
 					<div className="max-h-64 space-y-1 overflow-auto">
 						{filteredColumns.length === 0 ? (
-							<div className="py-6 text-center text-gray-500 text-xs">No fields found</div>
+							<div className="py-6 text-center text-gray-500 text-xs">
+								No fields found
+							</div>
 						) : (
 							filteredColumns.map((col) => {
 								const isHidden = hiddenSet.has(col.id);
@@ -99,7 +111,14 @@ export function HiddenFieldsDropdown({ columns, hiddenColumnIds, onChange }: Pro
 										<span className="flex h-6 w-6 flex-none items-center justify-center rounded-full border border-gray-200 bg-gray-50 font-semibold text-gray-600 text-xs">
 											{columnTypeSymbol(col.type)}
 										</span>
-										<span className={cn("flex-1 truncate", isHidden ? "text-gray-400" : "text-gray-800")}>{col.name}</span>
+										<span
+											className={cn(
+												"flex-1 truncate",
+												isHidden ? "text-gray-400" : "text-gray-800",
+											)}
+										>
+											{col.name}
+										</span>
 										<GripVertical className="size-4 text-gray-300" />
 									</div>
 								);

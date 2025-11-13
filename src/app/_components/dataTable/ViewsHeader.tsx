@@ -1,6 +1,5 @@
 "use client";
 
-
 import {
 	ArrowUpDown,
 	ChevronDown,
@@ -113,17 +112,19 @@ export function ViewsHeader({
 							>
 								Duplicate view
 							</button>
-						<button
-							type="button"
-							className="w-full rounded px-2 py-2 text-left text-red-600 hover:bg-red-50 disabled:opacity-50"
-							disabled={!canDeleteView}
-							onClick={() => {
-								if (!canDeleteView) return;
-								if (confirm(`Delete view "${viewName}"? This cannot be undone.`)) {
-									onDeleteView();
-								}
-							}}
-						>
+							<button
+								type="button"
+								className="w-full rounded px-2 py-2 text-left text-red-600 hover:bg-red-50 disabled:opacity-50"
+								disabled={!canDeleteView}
+								onClick={() => {
+									if (!canDeleteView) return;
+									if (
+										confirm(`Delete view "${viewName}"? This cannot be undone.`)
+									) {
+										onDeleteView();
+									}
+								}}
+							>
 								Delete view
 							</button>
 						</div>

@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { defaultViewSettings } from "./view";
@@ -6,72 +6,7 @@ import { defaultViewSettings } from "./view";
 export const baseRouter = createTRPCRouter({
 	// Get all bases for the current user
 	getAll: protectedProcedure.query(async ({ ctx }) => {
-	const bases = await ctx.db.base.findMany({
-		where: { createdById: ctx.session.user.id },
-		include: {
-			tables: {
-				include: {
-					columns: {
-						orderBy: { position: "asc" },
-					},
-					rows: {
-						include: {
-							cells: {
-								include: {
-									column: true,
-								},
-							},
-						},
-						orderBy: { position: "asc" },
-					},
-					views: {
-						orderBy: { position: "asc" },
-					},
-				},
-			},
-		},
-		orderBy: { createdAt: "desc" },
-		});
-
-		// If no bases exist, create a default base
-		if (bases.length === 0) {
-			await ctx.db.base.create({
-			data: {
-				name: "My First Base",
-				description: "Welcome to your first base!",
-				createdById: ctx.session.user.id,
-				tables: {
-					create: {
-						name: "Contacts",
-						description: "this becomes the Base name",
-						columns: {
-							create: [
-								{
-									name: "Full Name",
-									type: "TEXT",
-									position: 0,
-									required: false,
-								},
-								{ name: "Email", type: "TEXT", position: 1, required: false },
-								{ name: "Phone", type: "TEXT", position: 2, required: false },
-								{ name: "Age", type: "NUMBER", position: 3, required: false },
-							],
-						},
-						views: {
-							create: {
-								name: "Grid view",
-								type: "grid",
-								position: 0,
-								settings: defaultViewSettings as Prisma.JsonObject,
-							},
-						},
-					},
-				},
-			},
-		});
-
-			// Return the created base
-		return ctx.db.base.findMany({
+		const bases = await ctx.db.base.findMany({
 			where: { createdById: ctx.session.user.id },
 			include: {
 				tables: {
@@ -95,6 +30,71 @@ export const baseRouter = createTRPCRouter({
 					},
 				},
 			},
+			orderBy: { createdAt: "desc" },
+		});
+
+		// If no bases exist, create a default base
+		if (bases.length === 0) {
+			await ctx.db.base.create({
+				data: {
+					name: "My First Base",
+					description: "Welcome to your first base!",
+					createdById: ctx.session.user.id,
+					tables: {
+						create: {
+							name: "Contacts",
+							description: "this becomes the Base name",
+							columns: {
+								create: [
+									{
+										name: "Full Name",
+										type: "TEXT",
+										position: 0,
+										required: false,
+									},
+									{ name: "Email", type: "TEXT", position: 1, required: false },
+									{ name: "Phone", type: "TEXT", position: 2, required: false },
+									{ name: "Age", type: "NUMBER", position: 3, required: false },
+								],
+							},
+							views: {
+								create: {
+									name: "Grid view",
+									type: "grid",
+									position: 0,
+									settings: defaultViewSettings as Prisma.JsonObject,
+								},
+							},
+						},
+					},
+				},
+			});
+
+			// Return the created base
+			return ctx.db.base.findMany({
+				where: { createdById: ctx.session.user.id },
+				include: {
+					tables: {
+						include: {
+							columns: {
+								orderBy: { position: "asc" },
+							},
+							rows: {
+								include: {
+									cells: {
+										include: {
+											column: true,
+										},
+									},
+								},
+								orderBy: { position: "asc" },
+							},
+							views: {
+								orderBy: { position: "asc" },
+							},
+						},
+					},
+				},
 				orderBy: { createdAt: "desc" },
 			});
 		}
@@ -106,35 +106,35 @@ export const baseRouter = createTRPCRouter({
 	getById: protectedProcedure
 		.input(z.object({ id: z.string() }))
 		.query(async ({ ctx, input }) => {
-		return ctx.db.base.findFirst({
-			where: {
-				id: input.id,
-				createdById: ctx.session.user.id,
-			},
-			include: {
-				tables: {
-					include: {
-						columns: {
-							orderBy: { position: "asc" },
-						},
-						rows: {
-							include: {
-								cells: {
-									include: {
-										column: true,
+			return ctx.db.base.findFirst({
+				where: {
+					id: input.id,
+					createdById: ctx.session.user.id,
+				},
+				include: {
+					tables: {
+						include: {
+							columns: {
+								orderBy: { position: "asc" },
+							},
+							rows: {
+								include: {
+									cells: {
+										include: {
+											column: true,
+										},
 									},
 								},
+								orderBy: { position: "asc" },
 							},
-							orderBy: { position: "asc" },
+							views: {
+								orderBy: { position: "asc" },
+							},
 						},
-						views: {
-							orderBy: { position: "asc" },
-						},
+						orderBy: { createdAt: "desc" },
 					},
-					orderBy: { createdAt: "desc" },
 				},
-			},
-		});
+			});
 		}),
 
 	// Create a new base
@@ -239,29 +239,29 @@ export const baseRouter = createTRPCRouter({
 			}
 
 			// 1) Create table with columns
-		const created = await ctx.db.table.create({
-			data: {
-				name: input.name,
-				description: input.description,
-				baseId: input.baseId,
-				columns: {
-					create: input.columns,
-				},
-				views: {
-					create: {
-						name: "Grid view",
-						type: "grid",
-						position: 0,
-						settings: defaultViewSettings as Prisma.JsonObject,
+			const created = await ctx.db.table.create({
+				data: {
+					name: input.name,
+					description: input.description,
+					baseId: input.baseId,
+					columns: {
+						create: input.columns,
+					},
+					views: {
+						create: {
+							name: "Grid view",
+							type: "grid",
+							position: 0,
+							settings: defaultViewSettings as Prisma.JsonObject,
+						},
 					},
 				},
-			},
-			include: {
-				columns: {
-					orderBy: { position: "asc" },
+				include: {
+					columns: {
+						orderBy: { position: "asc" },
+					},
 				},
-			},
-		});
+			});
 
 			// 2) Create an initial empty row so the table isn't blank
 			await ctx.db.row.create({

@@ -8,13 +8,13 @@ import {
 } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
+	type KeyboardEvent as ReactKeyboardEvent,
+	type PointerEvent as ReactPointerEvent,
 	useCallback,
 	useEffect,
 	useMemo,
 	useRef,
 	useState,
-	type KeyboardEvent as ReactKeyboardEvent,
-	type PointerEvent as ReactPointerEvent,
 } from "react";
 import {
 	ContextMenu,
@@ -29,25 +29,25 @@ import {
 	TooltipTrigger,
 } from "~/components/ui/tooltip";
 import { useTableMutations } from "~/hooks/useTableMutations";
-import { useUndoStack, type CellHistoryChange } from "~/hooks/useUndoStack";
 import { useTableSearchNavigation } from "~/hooks/useTableSearchNavigation";
+import { type CellHistoryChange, useUndoStack } from "~/hooks/useUndoStack";
 import { detectOS } from "~/lib/detectOS";
 import { filterRowsByQuery, rowMatchesQuery } from "~/lib/tableFilter";
 import { cn } from "~/lib/utils";
 import { api } from "~/trpc/react";
 import { ColumnHeaderMenu } from "./ColumnHeaderMenu";
-import { applyFilters } from "./filter/Filters";
-import { applySorts } from "./filter/Sorts";
 import { ViewsHeader } from "./ViewsHeader";
 import { ViewsSidebar } from "./ViewsSidebar";
 import { AddColumnDropdown } from "./addColumnDropdown";
 import { type TableData as TableRowData, createColumnDefs } from "./columnDefs";
+import { applyFilters } from "./filter/Filters";
+import { applySorts } from "./filter/Sorts";
 import { useViewFilter } from "./filter/useViewFilter";
 import {
-	useDataTableState,
 	type FillPreview,
 	type GridCell,
 	type SelectionRange,
+	useDataTableState,
 } from "./hooks/useDataTableState";
 
 // Column helpers and definitions extracted to dataTable/columnDefs
@@ -132,6 +132,10 @@ export function DataTable({ tableId }: DataTableProps) {
 	const activeCellRef = useRef<GridCell | null>(null);
 	const selectionRef = useRef<SelectionRange | null>(null);
 	const scrollParentRef = useRef<HTMLDivElement | null>(null);
+	const handleNavigateFromCellRef = useRef<
+		((cell: GridCell, direction: "forward" | "backward") => void) | null
+	>(null);
+	const initialEditValueRef = useRef<string | null>(null);
 
 	useEffect(() => {
 		activeCellRef.current = activeCell;
@@ -140,6 +144,12 @@ export function DataTable({ tableId }: DataTableProps) {
 	useEffect(() => {
 		selectionRef.current = selection;
 	}, [selection]);
+
+	useEffect(() => {
+		if (!editingCell) {
+			initialEditValueRef.current = null;
+		}
+	}, [editingCell]);
 
 	// Fetch table metadata for columns
 	const { data: tableColumn, isLoading: tableColumnLoading } =
@@ -363,6 +373,24 @@ export function DataTable({ tableId }: DataTableProps) {
 		},
 		[addColumnMutation, tableId],
 	);
+	const getInitialEditValue = useCallback(
+		(cell: GridCell) => {
+			if (
+				!editingCell ||
+				editingCell.rowId !== cell.rowId ||
+				editingCell.columnId !== cell.columnId
+			) {
+				return null;
+			}
+			return initialEditValueRef.current;
+		},
+		[editingCell],
+	);
+
+	const consumeInitialEditValue = useCallback(() => {
+		initialEditValueRef.current = null;
+	}, []);
+
 	const columnDefs: ColumnDef<TableRowData>[] = createColumnDefs({
 		columns: visibleColumns,
 		displayData: displayData,
@@ -373,6 +401,10 @@ export function DataTable({ tableId }: DataTableProps) {
 		editingCell,
 		onCommitEdit: handleCommitEdit,
 		onCancelEdit: handleCancelEdit,
+		onNavigate: (cell, direction) =>
+			handleNavigateFromCellRef.current?.(cell, direction),
+		getInitialEditValue,
+		onInitialValueConsumed: consumeInitialEditValue,
 	}) as unknown as ColumnDef<TableData>[];
 
 	const table = useReactTable<TableData>({
@@ -539,11 +571,11 @@ export function DataTable({ tableId }: DataTableProps) {
 			}
 			const originRow = rowIndexLookup.get(origin.rowId);
 			const targetRow = rowIndexLookup.get(target.rowId);
-			if (
-				originRow === undefined ||
-				targetRow === undefined ||
-				originRow === targetRow
-			) {
+			if (originRow === undefined || targetRow === undefined) {
+				setFillPreview(null);
+				return;
+			}
+			if (originRow === targetRow) {
 				setFillPreview(null);
 				return;
 			}
@@ -576,6 +608,7 @@ export function DataTable({ tableId }: DataTableProps) {
 					?.value ?? null;
 			const historyChanges: CellHistoryChange[] = [];
 			const nextHistoryValue = toHistoryValue(sourceValue);
+
 			for (const rowIndex of preview.rows) {
 				const targetRow = filteredRows[rowIndex];
 				if (!targetRow) continue;
@@ -583,17 +616,22 @@ export function DataTable({ tableId }: DataTableProps) {
 					targetRow.cells.find((cell) => cell.columnId === preview.columnId)
 						?.value ?? null;
 				const previousHistoryValue = toHistoryValue(previousValue);
-				if (previousHistoryValue !== nextHistoryValue) {
-					historyChanges.push({
-						rowId: targetRow.id,
-						columnId: preview.columnId,
-						previousValue: previousHistoryValue,
-						nextValue: nextHistoryValue,
-					});
-				}
+				if (previousHistoryValue === nextHistoryValue) continue;
+
+				historyChanges.push({
+					rowId: targetRow.id,
+					columnId: preview.columnId,
+					previousValue: previousHistoryValue,
+					nextValue: nextHistoryValue,
+				});
+
 				handleCellUpdate(targetRow.id, preview.columnId, sourceValue ?? "");
 			}
-			recordUndoStep(historyChanges);
+
+			if (historyChanges.length > 0) {
+				recordUndoStep(historyChanges);
+			}
+
 			const focusRowIndex = preview.rows[preview.rows.length - 1];
 			if (focusRowIndex === undefined) return;
 			const columnIndex = columnIndexLookup.get(preview.columnId);
@@ -613,6 +651,8 @@ export function DataTable({ tableId }: DataTableProps) {
 			handleCellUpdate,
 			recordUndoStep,
 			rowIndexLookup,
+			setActiveCell,
+			setSelection,
 		],
 	);
 
@@ -666,10 +706,6 @@ export function DataTable({ tableId }: DataTableProps) {
 		return keys;
 	}, [fillPreview, filteredRows]);
 
-	const isSingleCellSelection =
-		Boolean(selection) &&
-		selection?.anchor.rowId === selection?.focus.rowId &&
-		selection?.anchor.columnId === selection?.focus.columnId;
 	const hasRangeSelection =
 		Boolean(selection) &&
 		(selection?.anchor.rowId !== selection?.focus.rowId ||
@@ -680,7 +716,7 @@ export function DataTable({ tableId }: DataTableProps) {
 		: null;
 
 	const startEditing = useCallback(
-		(cell: GridCell | null) => {
+		(cell: GridCell | null, initialValue?: string) => {
 			if (!cell) return;
 			if (
 				!rowIndexLookup.has(cell.rowId) ||
@@ -688,6 +724,8 @@ export function DataTable({ tableId }: DataTableProps) {
 			) {
 				return;
 			}
+			initialEditValueRef.current =
+				initialValue !== undefined ? initialValue : null;
 			setEditingCell(cell);
 		},
 		[columnIndexLookup, rowIndexLookup],
@@ -964,6 +1002,55 @@ export function DataTable({ tableId }: DataTableProps) {
 		],
 	);
 
+	const moveHorizontallyFromCell = useCallback(
+		(cell: GridCell | null, deltaCol: number) => {
+			if (!cell) return;
+			const rowIndex = rowIndexLookup.get(cell.rowId);
+			const colIndex = columnIndexLookup.get(cell.columnId);
+			if (
+				rowIndex === undefined ||
+				colIndex === undefined ||
+				visibleColumns.length === 0
+			) {
+				return;
+			}
+			const nextColIndex = clamp(
+				colIndex + deltaCol,
+				0,
+				Math.max(visibleColumns.length - 1, 0),
+			);
+			const nextCell = getCellByIndex(rowIndex, nextColIndex);
+			if (!nextCell) return;
+			setEditingCell(null);
+			setActiveCell(nextCell);
+			setSelection({ anchor: nextCell, focus: nextCell });
+			rowVirtualizer.scrollToIndex(rowIndex, { align: "auto" });
+			scrollParentRef.current?.focus();
+		},
+		[
+			columnIndexLookup,
+			getCellByIndex,
+			rowIndexLookup,
+			rowVirtualizer,
+			setActiveCell,
+			setEditingCell,
+			setSelection,
+			visibleColumns.length,
+			scrollParentRef,
+		],
+	);
+
+	const handleNavigateFromCell = useCallback(
+		(cell: GridCell, direction: "forward" | "backward") => {
+			moveHorizontallyFromCell(cell, direction === "forward" ? 1 : -1);
+		},
+		[moveHorizontallyFromCell],
+	);
+
+	useEffect(() => {
+		handleNavigateFromCellRef.current = handleNavigateFromCell;
+	}, [handleNavigateFromCell]);
+
 	const undoLastStep = useCallback(() => {
 		const step = popStep();
 		if (!step) return;
@@ -975,6 +1062,13 @@ export function DataTable({ tableId }: DataTableProps) {
 			);
 		}
 	}, [handleCellUpdate, popStep]);
+
+	const isPrintableKey = (event: ReactKeyboardEvent<HTMLDivElement>) =>
+		event.key.length === 1 &&
+		!event.ctrlKey &&
+		!event.metaKey &&
+		!event.altKey &&
+		!event.repeat;
 
 	const handleGridKeyDown = useCallback(
 		(event: ReactKeyboardEvent<HTMLDivElement>) => {
@@ -1010,6 +1104,11 @@ export function DataTable({ tableId }: DataTableProps) {
 					event.preventDefault();
 					startEditing(activeCell);
 					return;
+				case "Tab":
+					event.preventDefault();
+					moveHorizontallyFromCell(activeCell, event.shiftKey ? -1 : 1);
+					scrollParentRef.current?.focus();
+					return;
 				case "ArrowDown":
 					event.preventDefault();
 					moveSelection(1, 0, event.shiftKey);
@@ -1027,6 +1126,11 @@ export function DataTable({ tableId }: DataTableProps) {
 					moveSelection(0, 1, event.shiftKey);
 					return;
 				default:
+					if (isPrintableKey(event)) {
+						event.preventDefault();
+						startEditing(activeCell, event.key);
+						return;
+					}
 					break;
 			}
 		},
@@ -1035,10 +1139,12 @@ export function DataTable({ tableId }: DataTableProps) {
 			copySelectionToClipboard,
 			editingCell,
 			moveSelection,
+			moveHorizontallyFromCell,
 			osName,
 			pasteClipboardData,
 			startEditing,
 			undoLastStep,
+			isPrintableKey,
 		],
 	);
 
@@ -1168,7 +1274,6 @@ export function DataTable({ tableId }: DataTableProps) {
 						<div
 							className="relative flex min-h-0 overflow-x-auto overflow-y-auto border-gray-200 outline-none"
 							ref={scrollParentRef}
-							tabIndex={0}
 							onKeyDown={handleGridKeyDown}
 							onMouseDown={() => scrollParentRef.current?.focus()}
 						>
@@ -1288,6 +1393,8 @@ export function DataTable({ tableId }: DataTableProps) {
 																		<td
 																			colSpan={visibleColCount}
 																			className="h-8 text-center text-gray-500 text-sm"
+																			// biome-ignore lint/a11y/noNoninteractiveTabindex: <explanation>
+																			tabIndex={0}
 																		>
 																			{rowsInfinite.isFetchingNextPage
 																				? "Loading…"
@@ -1370,7 +1477,7 @@ export function DataTable({ tableId }: DataTableProps) {
 																				>
 																					{isGridActive && (
 																						<>
-																							<div className="pointer-events-none absolute inset-[-2px] rounded-xs border-2 border-blue-500" />
+																							<div className="-inset-0.5 pointer-events-none absolute border-2 border-blue-500" />
 																							<span
 																								data-fill-handle
 																								className="absolute right-0 bottom-0 z-30 size-2 translate-x-1/2 translate-y-1/2 cursor-crosshair border border-blue-600 bg-white shadow-sm"
@@ -1384,12 +1491,12 @@ export function DataTable({ tableId }: DataTableProps) {
 																							/>
 																						</>
 																					)}
-																					<p className="truncate">
+																					<div className="truncate">
 																						{flexRender(
 																							cell.column.columnDef.cell,
 																							cell.getContext(),
 																						)}
-																					</p>
+																					</div>
 																				</td>
 																			);
 																		})

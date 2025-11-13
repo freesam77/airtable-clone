@@ -9,6 +9,9 @@ interface EditableCellProps {
 	isEditing: boolean;
 	onCommit: (value: string, previousValue: string | number | null) => void;
 	onCancel: () => void;
+	onNavigate?: (direction: "forward" | "backward") => void;
+	initialValue?: string | null;
+	onInitialValueConsumed?: () => void;
 }
 
 function EditableCellComponent({
@@ -18,8 +21,12 @@ function EditableCellComponent({
 	isEditing,
 	onCommit,
 	onCancel,
+	onNavigate,
+	initialValue,
+	onInitialValueConsumed,
 }: EditableCellProps) {
-	const stringValue = value === null || value === undefined ? "" : String(value);
+	const stringValue =
+		value === null || value === undefined ? "" : String(value);
 	const [draft, setDraft] = useState(stringValue);
 	const inputRef = useRef<HTMLInputElement>(null);
 	const committedRef = useRef(false);
@@ -30,12 +37,24 @@ function EditableCellComponent({
 
 	useEffect(() => {
 		if (!isEditing) return;
+		const nextValue =
+			initialValue !== undefined && initialValue !== null
+				? initialValue
+				: stringValue;
+		setDraft(nextValue);
 		const frame = requestAnimationFrame(() => {
-			inputRef.current?.focus();
-			inputRef.current?.select();
+			if (!inputRef.current) return;
+			inputRef.current.focus();
+			if (initialValue !== undefined && initialValue !== null) {
+				const pos = nextValue.length;
+				inputRef.current.setSelectionRange(pos, pos);
+				onInitialValueConsumed?.();
+			} else {
+				inputRef.current.select();
+			}
 		});
 		return () => cancelAnimationFrame(frame);
-	}, [isEditing]);
+	}, [initialValue, isEditing, onInitialValueConsumed, stringValue]);
 
 	const commit = (nextValue: string) => {
 		if (committedRef.current) return;
@@ -67,6 +86,12 @@ function EditableCellComponent({
 				if (e.key === "Enter") {
 					e.preventDefault();
 					commit((e.target as HTMLInputElement).value);
+				} else if (e.key === "Tab") {
+					e.preventDefault();
+					const target = e.target as HTMLInputElement;
+					commit(target.value);
+					inputRef.current?.blur();
+					onNavigate?.(e.shiftKey ? "backward" : "forward");
 				} else if (e.key === "Escape") {
 					e.preventDefault();
 					committedRef.current = true;
@@ -84,5 +109,6 @@ export const EditableCell = memo(
 	(prevProps, nextProps) =>
 		prevProps.type === nextProps.type &&
 		prevProps.isEditing === nextProps.isEditing &&
+		prevProps.initialValue === nextProps.initialValue &&
 		String(prevProps.value ?? "") === String(nextProps.value ?? ""),
 );

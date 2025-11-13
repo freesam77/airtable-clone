@@ -1,6 +1,12 @@
 "use client";
 
-import { GripVertical, MoreHorizontal, Plus, Search, Sheet } from "lucide-react";
+import {
+	GripVertical,
+	MoreHorizontal,
+	Plus,
+	Search,
+	Sheet,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 import { Button } from "~/components/ui/button";
 import {
@@ -47,12 +53,18 @@ export function ViewsSidebar({
 		);
 	}, [query, views]);
 
-	const handleDragStart = (event: React.DragEvent<HTMLButtonElement>, viewId: string) => {
+	const handleDragStart = (
+		event: React.DragEvent<HTMLButtonElement>,
+		viewId: string,
+	) => {
 		event.dataTransfer.effectAllowed = "move";
 		event.dataTransfer.setData("text/plain", viewId);
 	};
 
-	const handleDrop = (event: React.DragEvent<HTMLLIElement>, targetId: string) => {
+	const handleDrop = (
+		event: React.DragEvent<HTMLLIElement>,
+		targetId: string,
+	) => {
 		event.preventDefault();
 		const sourceId = event.dataTransfer.getData("text/plain");
 		if (sourceId) {
@@ -63,7 +75,7 @@ export function ViewsSidebar({
 	return (
 		<nav className="flex w-[260px] shrink-0 flex-col gap-3 border-gray-200 border-r bg-white px-4 py-3 text-xs">
 			<div className="flex items-center justify-between px-1">
-				<h2 className="text-gray-500 text-[11px] uppercase">Views</h2>
+				<h2 className="text-[11px] text-gray-500 uppercase">Views</h2>
 				<Button
 					variant="ghost"
 					size="sm"
@@ -143,9 +155,11 @@ export function ViewsSidebar({
 												)}
 												onSelect={() => {
 													if (!canDeleteView) return;
-												if (
-													confirm(`Delete view "${view.name}"? This cannot be undone.`)
-												) {
+													if (
+														confirm(
+															`Delete view "${view.name}"? This cannot be undone.`,
+														)
+													) {
 														onDeleteView(view.id);
 													}
 												}}

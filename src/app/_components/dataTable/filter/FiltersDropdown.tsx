@@ -136,15 +136,15 @@ export function FiltersDropdown({ columns, filters, onChange }: Props) {
 											</option>
 										))}
 									</select>
-				<select
-					className="h-8 rounded-none border border-gray-300 bg-white px-2 text-sm"
-					value={f.op}
-					onChange={(e) =>
-						updateFilter(f.id, {
-							op: e.target.value as FilterCondition["op"],
-						})
-					}
-				>
+									<select
+										className="h-8 rounded-none border border-gray-300 bg-white px-2 text-sm"
+										value={f.op}
+										onChange={(e) =>
+											updateFilter(f.id, {
+												op: e.target.value as FilterCondition["op"],
+											})
+										}
+									>
 										{ops.map((o) => (
 											<option key={o.v} value={o.v}>
 												{o.l}

@@ -123,9 +123,12 @@ export function SortsDropdown({
 											})
 										}
 									>
-                                       
-										<option value="asc">{s.type === "TEXT" ? "A → Z" : "1 → 9"}</option>
-										<option value="desc">{s.type === "TEXT" ? "Z → A" : "9 → 1"}</option>
+										<option value="asc">
+											{s.type === "TEXT" ? "A → Z" : "1 → 9"}
+										</option>
+										<option value="desc">
+											{s.type === "TEXT" ? "Z → A" : "9 → 1"}
+										</option>
 									</select>
 									<ChevronDown className="-translate-y-1/2 pointer-events-none absolute top-1/2 right-2 size-4 text-gray-500" />
 								</div>
@@ -165,12 +168,12 @@ export function SortsDropdown({
 					</div>
 
 					<div className="mt-4 flex items-center gap-2">
-				<Switch
-					checked={autoSort}
-					onCheckedChange={(checked) => onAutoSortChange(checked)}
-					aria-label="Toggle automatic sort"
-					className="data-[state=checked]:bg-green-600 data-[state=unchecked]:bg-gray-300"
-				/>
+						<Switch
+							checked={autoSort}
+							onCheckedChange={(checked) => onAutoSortChange(checked)}
+							aria-label="Toggle automatic sort"
+							className="data-[state=checked]:bg-green-600 data-[state=unchecked]:bg-gray-300"
+						/>
 						<span className="text-gray-700 text-sm">
 							Automatically sort records
 						</span>

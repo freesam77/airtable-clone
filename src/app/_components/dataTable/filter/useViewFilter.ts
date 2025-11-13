@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
+import { type RouterOutputs, api } from "~/trpc/react";
 import type { FilterCondition } from "./Filters";
 import type { SortCondition } from "./Sorts";
 import { defaultViewSettings, parseViewSettings } from "./viewSettings";
-import { api, type RouterOutputs } from "~/trpc/react";
 
 export type ViewRecord = RouterOutputs["view"]["listByTable"][number];
 type ViewList = RouterOutputs["view"]["listByTable"];
@@ -57,13 +57,12 @@ const ensureSortIds = (sorts: SortCondition[]): SortCondition[] =>
 			].join("-"),
 	}));
 
-
 const buildSettingsObject = (state: FilterState) => ({
-		version: 1,
-		filters: state.filters,
-		sorts: state.sorts,
-		hiddenColumnIds: state.hiddenColumnIds,
-		autoSort: state.autoSort,
+	version: 1,
+	filters: state.filters,
+	sorts: state.sorts,
+	hiddenColumnIds: state.hiddenColumnIds,
+	autoSort: state.autoSort,
 });
 
 const toJsonSettings = (state: FilterState): ViewRecord["settings"] =>
@@ -149,8 +148,7 @@ export function useViewFilter(tableId: string) {
 			const nextState: FilterState = {
 				filters: normalized.filters ?? state.filters,
 				sorts: normalized.sorts ?? state.sorts,
-				hiddenColumnIds:
-					normalized.hiddenColumnIds ?? state.hiddenColumnIds,
+				hiddenColumnIds: normalized.hiddenColumnIds ?? state.hiddenColumnIds,
 				autoSort: normalized.autoSort ?? state.autoSort,
 			};
 			dispatch({ type: "UPDATE_STATE", patch: normalized });
@@ -202,7 +200,7 @@ export function useViewFilter(tableId: string) {
 	const handleCreateView = useCallback(() => {
 		const tempId = `temp-view-${Math.random().toString(36).slice(2, 8)}`;
 		const name = "Grid " + (views.length + 1);
-	const tempView: ViewRecord = {
+		const tempView: ViewRecord = {
 			id: tempId,
 			name,
 			type: "grid",
@@ -216,13 +214,16 @@ export function useViewFilter(tableId: string) {
 			const list = (prev ?? []) as ViewList;
 			return [...list, tempView];
 		});
-		createViewMutation.mutate({ tableId, name }, {
-			onSuccess: (created) => {
-				utils.view.listByTable.setData({ tableId }, (prev) =>
-					prev?.map((view) => (view.id === tempId ? created : view)),
-				);
+		createViewMutation.mutate(
+			{ tableId, name },
+			{
+				onSuccess: (created) => {
+					utils.view.listByTable.setData({ tableId }, (prev) =>
+						prev?.map((view) => (view.id === tempId ? created : view)),
+					);
+				},
 			},
-		});
+		);
 	}, [createViewMutation, tableId, views.length, utils.view.listByTable]);
 
 	useEffect(() => {
@@ -265,13 +266,16 @@ export function useViewFilter(tableId: string) {
 				const list = (prev ?? []) as ViewList;
 				return [...list, tempView];
 			});
-			duplicateViewMutation.mutate({ viewId }, {
-				onSuccess: (created) => {
-					utils.view.listByTable.setData({ tableId }, (prev) =>
-						prev?.map((view) => (view.id === tempId ? created : view)),
-					);
+			duplicateViewMutation.mutate(
+				{ viewId },
+				{
+					onSuccess: (created) => {
+						utils.view.listByTable.setData({ tableId }, (prev) =>
+							prev?.map((view) => (view.id === tempId ? created : view)),
+						);
+					},
 				},
-			});
+			);
 		},
 		[duplicateViewMutation, tableId, views, utils.view.listByTable],
 	);

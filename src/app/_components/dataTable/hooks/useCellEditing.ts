@@ -1,6 +1,6 @@
 import { useCallback } from "react";
-import type { ColumnMeta, TableData } from "../columnDefs";
 import type { CellHistoryChange } from "~/hooks/useUndoStack";
+import type { ColumnMeta, TableData } from "../columnDefs";
 import type {
 	FillPreview,
 	GridCell,
@@ -11,7 +11,11 @@ type ValueOrUpdater<T> = T | ((prev: T) => T);
 
 interface UseCellEditingParams {
 	columns: ColumnMeta[];
-	queueCellUpdate: (rowId: string, columnId: string, value?: string | number) => void;
+	queueCellUpdate: (
+		rowId: string,
+		columnId: string,
+		value?: string | number,
+	) => void;
 	flushPendingUpdates: () => void;
 	recordUndoStep: (changes: CellHistoryChange | CellHistoryChange[]) => void;
 	scrollParentRef: React.RefObject<HTMLDivElement | null>;
@@ -47,7 +51,10 @@ export function useCellEditing({
 	setActiveCell,
 }: UseCellEditingParams) {
 	const normalizeValueForColumn = useCallback(
-		(columnId: string, input: string | number | null | undefined): string | null => {
+		(
+			columnId: string,
+			input: string | number | null | undefined,
+		): string | null => {
 			const column = columns.find((col) => col.id === columnId);
 			if (!column) {
 				if (input === null || input === undefined) return null;
@@ -145,7 +152,9 @@ export function useCellEditing({
 
 	const copySelectionToClipboard = useCallback(async () => {
 		if (typeof navigator === "undefined" || !navigator.clipboard) return;
-		const range = selection ?? (activeCell ? { anchor: activeCell, focus: activeCell } : null);
+		const range =
+			selection ??
+			(activeCell ? { anchor: activeCell, focus: activeCell } : null);
 		if (!range) return;
 		const anchorRow = rowIndexLookup.get(range.anchor.rowId);
 		const focusRow = rowIndexLookup.get(range.focus.rowId);
@@ -210,11 +219,7 @@ export function useCellEditing({
 		const rawRows = text.replace(/\r/g, "").split("\n");
 		const rows = rawRows.filter(
 			(line, idx) =>
-				!(
-					line === "" &&
-					idx === rawRows.length - 1 &&
-					rawRows.length > 1
-				),
+				!(line === "" && idx === rawRows.length - 1 && rawRows.length > 1),
 		);
 		let furthestRow = startRowIndex;
 		let furthestCol = startColIndex;
@@ -240,10 +245,7 @@ export function useCellEditing({
 					previousValue === null || previousValue === undefined
 						? null
 						: String(previousValue);
-				const normalizedNext = normalizeValueForColumn(
-					targetCol.id,
-					cellValue,
-				);
+				const normalizedNext = normalizeValueForColumn(targetCol.id, cellValue);
 				const nextHistoryValue = normalizedNext;
 				if (previousHistoryValue !== nextHistoryValue) {
 					historyChanges.push({
