@@ -30,7 +30,7 @@ import {
 } from "~/components/ui/tooltip";
 import { useTableMutations } from "~/hooks/useTableMutations";
 import { useTableSearchNavigation } from "~/hooks/useTableSearchNavigation";
-import { type CellHistoryChange, useUndoStack } from "~/hooks/useUndoStack";
+import { type CellHistoryChange, useSteps } from "~/hooks/useSteps";
 import { detectOS } from "~/lib/detectOS";
 import { filterRowsByQuery, rowMatchesQuery } from "~/lib/tableFilter";
 import { cn } from "~/lib/utils";
@@ -114,7 +114,7 @@ export function DataTable({ tableId }: DataTableProps) {
 		setFillPreview,
 	} = useDataTableState();
 	const { activeCell, selection, editingCell, fillPreview } = interactionState;
-	const { pushStep, popStep } = useUndoStack();
+	const { pushStep, popUndoStep, popRedoStep } = useSteps();
 	const recordUndoStep = useCallback(
 		(changes: CellHistoryChange | CellHistoryChange[]) => {
 			const arr = Array.isArray(changes) ? changes : [changes];
@@ -1052,7 +1052,7 @@ export function DataTable({ tableId }: DataTableProps) {
 	}, [handleNavigateFromCell]);
 
 	const undoLastStep = useCallback(() => {
-		const step = popStep();
+		const step = popUndoStep();
 		if (!step) return;
 		for (const change of [...step].reverse()) {
 			handleCellUpdate(
@@ -1061,7 +1061,19 @@ export function DataTable({ tableId }: DataTableProps) {
 				change.previousValue ?? "",
 			);
 		}
-	}, [handleCellUpdate, popStep]);
+	}, [handleCellUpdate, popUndoStep]);
+
+	const redoLastStep = useCallback(() => {
+		const step = popRedoStep();
+		if (!step) return;
+		for (const change of step) {
+			handleCellUpdate(
+				change.rowId,
+				change.columnId,
+				change.nextValue ?? "",
+			);
+		}
+	}, [handleCellUpdate, popRedoStep]);
 
 	const isPrintableKey = (event: ReactKeyboardEvent<HTMLDivElement>) =>
 		event.key.length === 1 &&
@@ -1079,7 +1091,11 @@ export function DataTable({ tableId }: DataTableProps) {
 
 			if (isMod && key.toLowerCase() === "z" && !editingCell) {
 				event.preventDefault();
-				undoLastStep();
+				if (event.shiftKey) {
+					redoLastStep();
+				} else {
+					undoLastStep();
+				}
 				return;
 			}
 
@@ -1144,6 +1160,7 @@ export function DataTable({ tableId }: DataTableProps) {
 			pasteClipboardData,
 			startEditing,
 			undoLastStep,
+			redoLastStep,
 			isPrintableKey,
 		],
 	);
