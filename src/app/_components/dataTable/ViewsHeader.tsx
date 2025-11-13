@@ -7,10 +7,8 @@ import {
 	FolderTree,
 	Menu,
 	Palette,
-	Search,
 	Share2,
 	Sheet,
-	X,
 } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import {
@@ -18,7 +16,7 @@ import {
 	DropdownMenuContent,
 	DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
-import { Input } from "~/components/ui/input";
+import { SearchMenu } from "./SearchMenu";
 import type { FilterCondition } from "./filter/Filters";
 import { FiltersDropdown } from "./filter/FiltersDropdown";
 import { HiddenFieldsDropdown } from "./filter/HiddenFieldsDropdown";
@@ -35,8 +33,8 @@ type ViewsHeaderProps = {
 	onToggleSidebar: () => void;
 	searchOpen: boolean;
 	setSearchOpen: (open: boolean) => void;
-	// Minimal shape for the table object we use
-	table: { getState: () => any; setGlobalFilter: (v: any) => void };
+	searchValue: string;
+	onSearchValueChange: (value: string) => void;
 	matchesCount: number;
 	activeMatchIndex: number;
 	gotoPrevMatch: () => void;
@@ -58,7 +56,8 @@ export function ViewsHeader({
 	onToggleSidebar,
 	searchOpen,
 	setSearchOpen,
-	table,
+	searchValue,
+	onSearchValueChange,
 	matchesCount,
 	activeMatchIndex,
 	gotoPrevMatch,
@@ -174,64 +173,16 @@ export function ViewsHeader({
 					<Share2 className="size-4" />
 					<span className="text-sm">Share and sync</span>
 				</Button>
-				<DropdownMenu open={searchOpen} onOpenChange={setSearchOpen}>
-					<DropdownMenuTrigger asChild>
-						<Button variant="ghost" className="cursor-pointer">
-							<Search />
-						</Button>
-					</DropdownMenuTrigger>
-					<DropdownMenuContent align="end" className="w-full bg-white">
-						<div className="flex items-center gap-3">
-							<Input
-								id="table-search"
-								type="text"
-								value={String(table.getState().globalFilter ?? "")}
-								onChange={(e) => table.setGlobalFilter(e.target.value)}
-								onKeyDown={(e) => {
-									if (e.key === "Enter" || e.key === "NumpadEnter") {
-										e.preventDefault();
-										e.stopPropagation();
-										if (e.shiftKey) gotoPrevMatch();
-										else gotoNextMatch();
-									}
-								}}
-								placeholder="Find in view"
-								autoFocus
-							/>
-							<div className="min-w-20 text-center text-gray-500 text-xs">
-								{matchesCount > 0 &&
-									`${activeMatchIndex + 1} / ${matchesCount}`}
-							</div>
-							<div className="flex gap-1">
-								<Button
-									variant="outline"
-									size="icon"
-									onClick={gotoPrevMatch}
-									disabled={matchesCount === 0}
-									aria-label="Previous match"
-								>
-									<ChevronUp className="size-4" />
-								</Button>
-								<Button
-									variant="outline"
-									size="icon"
-									onClick={gotoNextMatch}
-									disabled={matchesCount === 0}
-									aria-label="Next match"
-								>
-									<ChevronDown className="size-4" />
-								</Button>
-							</div>
-							<Button
-								variant="ghost"
-								className="cursor-pointer"
-								onClick={() => setSearchOpen(false)}
-							>
-								<X />
-							</Button>
-						</div>
-					</DropdownMenuContent>
-				</DropdownMenu>
+				<SearchMenu
+					open={searchOpen}
+					onOpenChange={setSearchOpen}
+					value={searchValue}
+					onValueChange={onSearchValueChange}
+					matchesCount={matchesCount}
+					activeMatchIndex={activeMatchIndex}
+					gotoPrevMatch={gotoPrevMatch}
+					gotoNextMatch={gotoNextMatch}
+				/>
 			</div>
 		</div>
 	);

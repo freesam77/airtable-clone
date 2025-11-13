@@ -73,29 +73,27 @@ export function ViewsSidebar({
 	};
 
 	return (
-		<nav className="flex w-[260px] shrink-0 flex-col gap-3 border-gray-200 border-r bg-white px-4 py-3 text-xs">
-			<div className="flex items-center justify-between px-1">
-				<h2 className="text-[11px] text-gray-500 uppercase">Views</h2>
-				<Button
-					variant="ghost"
-					size="sm"
+		<nav className="flex w-[263px] flex-col gap-3 border-gray-200 border-r bg-white px-2 py-3 text-xs">
+			<div className="flex w-full items-center justify-between">
+				<button
+					type="button"
 					className="flex items-center gap-1 px-2 text-gray-700"
 					onClick={onCreateView}
 				>
 					<Plus className="size-4" />
-					New view
-				</Button>
+					Create new...
+				</button>
 			</div>
-			<div className="flex items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-2 py-1">
+			<div className="flex items-center gap-1 rounded-xs px-2 focus-within:ring-2 focus-within:ring-blue-500">
 				<Search className="size-4 text-gray-400" />
 				<Input
 					value={query}
 					onChange={(event) => setQuery(event.target.value)}
 					placeholder="Find a view"
-					className="h-7 border-0 bg-transparent p-0 text-xs shadow-none focus-visible:ring-0"
+					className="h-7 border-0 bg-transparent p-0 text-xs! shadow-none"
 				/>
 			</div>
-			<ul className="space-y-1">
+			<ul className="space-y-0">
 				{filteredViews.map((view) => {
 					const isActive = view.id === activeViewId;
 					return (
@@ -104,18 +102,16 @@ export function ViewsSidebar({
 							onDragOver={(event) => event.preventDefault()}
 							onDrop={(event) => handleDrop(event, view.id)}
 							className={cn(
-								"rounded md:text-xs",
-								isActive ? "bg-blue-50" : "bg-transparent",
+								"text-xs",
+								isActive ? "bg-gray-100" : "bg-transparent",
+								isActive ? "text-gray-900" : "text-gray-600 hover:bg-gray-100",
 							)}
 						>
-							<div className="flex items-center gap-2 px-2 py-1.5">
+							<div className="flex items-center gap-2 px-2 py-0.5">
 								<button
 									type="button"
 									className={cn(
-										"flex flex-1 items-center gap-2 rounded px-1 py-1 text-left",
-										isActive
-											? "text-gray-900"
-											: "text-gray-600 hover:bg-gray-100",
+										"flex flex-1 items-center gap-2 px-1 py-1 text-left",
 									)}
 									onClick={() => onSelectView(view.id)}
 								>

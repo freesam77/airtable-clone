@@ -28,9 +28,9 @@ import {
 	TooltipProvider,
 	TooltipTrigger,
 } from "~/components/ui/tooltip";
+import { type CellHistoryChange, useSteps } from "~/hooks/useSteps";
 import { useTableMutations } from "~/hooks/useTableMutations";
 import { useTableSearchNavigation } from "~/hooks/useTableSearchNavigation";
-import { type CellHistoryChange, useSteps } from "~/hooks/useSteps";
 import { detectOS } from "~/lib/detectOS";
 import { filterRowsByQuery, rowMatchesQuery } from "~/lib/tableFilter";
 import { cn } from "~/lib/utils";
@@ -347,20 +347,29 @@ export function DataTable({ tableId }: DataTableProps) {
 		scrollParentRef.current?.focus();
 	}, []);
 
-	const displayData = useMemo<TableData[]>(() => {
-		const pre = filterRowsByQuery(
-			data,
-			orderedColumns,
-			searchValue,
-		) as unknown as TableData[];
+	const viewRows = useMemo<TableData[]>(() => {
 		const filtered = applyFilters<TableData>(
 			data,
 			orderedColumns,
-			pre,
+			data as unknown as TableData[],
 			filters,
 		) as unknown as TableData[];
 		return applySorts<TableData>(filtered, orderedColumns, sorts, autoSort);
-	}, [data, orderedColumns, searchValue, filters, sorts, autoSort]);
+	}, [data, orderedColumns, filters, sorts, autoSort]);
+
+	const rowNumberMap = useMemo(() => {
+		const map = new Map<string, number>();
+		viewRows.forEach((row, index) => map.set(row.id, index + 1));
+		return map;
+	}, [viewRows]);
+
+	const displayData = useMemo<TableData[]>(() => {
+		return filterRowsByQuery(
+			viewRows,
+			orderedColumns,
+			searchValue,
+		) as unknown as TableData[];
+	}, [viewRows, orderedColumns, searchValue]);
 
 	const filteredRows = displayData;
 
@@ -394,6 +403,7 @@ export function DataTable({ tableId }: DataTableProps) {
 	const columnDefs: ColumnDef<TableRowData>[] = createColumnDefs({
 		columns: visibleColumns,
 		displayData: displayData,
+		rowNumberMap,
 		selectedRowIds,
 		setSelectedRowIds,
 		showCheckboxes,
@@ -411,10 +421,8 @@ export function DataTable({ tableId }: DataTableProps) {
 		data: displayData,
 		columns: columnDefs,
 		getCoreRowModel: getCoreRowModel(),
-		// Drive TanStack's global filter from our searchValue state
 		state: { globalFilter: searchValue },
 		onGlobalFilterChange: setSearchValue,
-		// Use a custom global filter that hides rows with no matching cells
 		globalFilterFn: (row, _columnId, filterValue) =>
 			rowMatchesQuery(row.original, orderedColumns, String(filterValue ?? "")),
 		enableColumnPinning: true,
@@ -1067,11 +1075,7 @@ export function DataTable({ tableId }: DataTableProps) {
 		const step = popRedoStep();
 		if (!step) return;
 		for (const change of step) {
-			handleCellUpdate(
-				change.rowId,
-				change.columnId,
-				change.nextValue ?? "",
-			);
+			handleCellUpdate(change.rowId, change.columnId, change.nextValue ?? "");
 		}
 	}, [handleCellUpdate, popRedoStep]);
 
@@ -1258,7 +1262,8 @@ export function DataTable({ tableId }: DataTableProps) {
 					onToggleSidebar={() => setViewSidebarOpen((v) => !v)}
 					searchOpen={searchOpen}
 					setSearchOpen={setSearchOpen}
-					table={table}
+					searchValue={searchValue}
+					onSearchValueChange={setSearchValue}
 					matchesCount={matches.length}
 					activeMatchIndex={activeMatchIndex}
 					gotoPrevMatch={gotoPrevMatch}

@@ -45,6 +45,7 @@ const getColumnTypeLabel = (type: ColumnType) =>
 type CreateColumnDefsParams = {
 	columns: ColumnMeta[];
 	displayData: TableData[];
+	rowNumberMap: Map<string, number>;
 	selectedRowIds: Set<string>;
 	setSelectedRowIds: React.Dispatch<React.SetStateAction<Set<string>>>;
 	showCheckboxes: boolean;
@@ -70,6 +71,7 @@ type CreateColumnDefsParams = {
 export function createColumnDefs({
 	columns,
 	displayData,
+	rowNumberMap,
 	selectedRowIds,
 	setSelectedRowIds,
 	showCheckboxes,
@@ -123,6 +125,7 @@ export function createColumnDefs({
 			},
 			cell: ({ row }) => {
 				const checked = selectedRowIds.has(row.original.id);
+				const rowNumber = rowNumberMap.get(row.original.id) ?? row.index + 1;
 				const onToggle = () =>
 					setSelectedRowIds((prev) => {
 						const next = new Set(prev);
@@ -142,7 +145,7 @@ export function createColumnDefs({
 							/>
 						)}
 						{!showCheckboxes && (
-							<span className="text-gray-500 text-xs">{row.index + 1}</span>
+							<span className="text-gray-500 text-xs">{rowNumber}</span>
 						)}
 					</div>
 				);
