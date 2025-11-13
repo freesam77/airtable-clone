@@ -7,7 +7,15 @@ import {
 	useReactTable,
 } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+	useCallback,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+	type KeyboardEvent as ReactKeyboardEvent,
+	type PointerEvent as ReactPointerEvent,
+} from "react";
 import {
 	ContextMenu,
 	ContextMenuContent,
@@ -21,19 +29,26 @@ import {
 	TooltipTrigger,
 } from "~/components/ui/tooltip";
 import { useTableMutations } from "~/hooks/useTableMutations";
+import { useUndoStack, type CellHistoryChange } from "~/hooks/useUndoStack";
 import { useTableSearchNavigation } from "~/hooks/useTableSearchNavigation";
 import { detectOS } from "~/lib/detectOS";
 import { filterRowsByQuery, rowMatchesQuery } from "~/lib/tableFilter";
 import { cn } from "~/lib/utils";
-import { api, type RouterOutputs } from "~/trpc/react";
+import { api } from "~/trpc/react";
 import { ColumnHeaderMenu } from "./ColumnHeaderMenu";
-import { type FilterCondition, applyFilters } from "./filter/Filters";
-import { type SortCondition, applySorts } from "./filter/Sorts";
+import { applyFilters } from "./filter/Filters";
+import { applySorts } from "./filter/Sorts";
 import { ViewsHeader } from "./ViewsHeader";
 import { ViewsSidebar } from "./ViewsSidebar";
 import { AddColumnDropdown } from "./addColumnDropdown";
 import { type TableData as TableRowData, createColumnDefs } from "./columnDefs";
 import { useViewFilter } from "./filter/useViewFilter";
+import {
+	useDataTableState,
+	type FillPreview,
+	type GridCell,
+	type SelectionRange,
+} from "./hooks/useDataTableState";
 
 // Column helpers and definitions extracted to dataTable/columnDefs
 
@@ -70,6 +85,16 @@ type TableData = {
 	cells: Array<Cell>;
 };
 
+const clamp = (value: number, min: number, max: number) =>
+	Math.min(Math.max(value, min), max);
+
+const toHistoryValue = (
+	value: string | number | null | undefined,
+): string | null => {
+	if (value === null || value === undefined) return null;
+	return String(value);
+};
+
 interface DataTableProps {
 	tableId: string;
 }
@@ -80,6 +105,41 @@ export function DataTable({ tableId }: DataTableProps) {
 	const [viewSidebarOpen, setViewSidebarOpen] = useState(true);
 	const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(new Set());
 	const [showCheckboxes, setShowCheckboxes] = useState(false);
+	const osName = useMemo(() => detectOS(), []);
+	const {
+		state: interactionState,
+		setActiveCell,
+		setSelection,
+		setEditingCell,
+		setFillPreview,
+	} = useDataTableState();
+	const { activeCell, selection, editingCell, fillPreview } = interactionState;
+	const { pushStep, popStep } = useUndoStack();
+	const recordUndoStep = useCallback(
+		(changes: CellHistoryChange | CellHistoryChange[]) => {
+			const arr = Array.isArray(changes) ? changes : [changes];
+			const filtered = arr.filter(
+				(change) => change.previousValue !== change.nextValue,
+			);
+			if (filtered.length === 0) return;
+			pushStep(filtered);
+		},
+		[pushStep],
+	);
+
+	const pointerModeRef = useRef<"range" | "fill" | null>(null);
+	const pointerAnchorRef = useRef<GridCell | null>(null);
+	const activeCellRef = useRef<GridCell | null>(null);
+	const selectionRef = useRef<SelectionRange | null>(null);
+	const scrollParentRef = useRef<HTMLDivElement | null>(null);
+
+	useEffect(() => {
+		activeCellRef.current = activeCell;
+	}, [activeCell]);
+
+	useEffect(() => {
+		selectionRef.current = selection;
+	}, [selection]);
 
 	// Fetch table metadata for columns
 	const { data: tableColumn, isLoading: tableColumnLoading } =
@@ -207,20 +267,75 @@ export function DataTable({ tableId }: DataTableProps) {
 	});
 
 	// Handle cell value updates using the queue
-	const handleCellUpdate = useCallback(
-		(rowId: string, columnId: string, value: string | number) => {
-			// Find the column to determine the type
+	const normalizeValueForColumn = useCallback(
+		(
+			columnId: string,
+			input: string | number | null | undefined,
+		): string | null => {
 			const column = columns.find((col) => col.id === columnId);
-			if (!column) return;
+			if (!column) {
+				if (input === null || input === undefined) return null;
+				return typeof input === "number" ? String(input) : input;
+			}
 
-			// Queue the update with proper typing
-			// Always queue. Empty string means clear the cell
-			queueCellUpdate(rowId, columnId, value);
-			// Flush pending updates immediately after a committed edit
+			if (input === null || input === undefined) {
+				return null;
+			}
+
+			if (column.type === "NUMBER") {
+				const raw = typeof input === "number" ? String(input) : input.trim();
+				if (raw === "") return null;
+				const parsed = Number(raw);
+				if (!Number.isFinite(parsed)) {
+					return null;
+				}
+				return String(parsed);
+			}
+
+			return typeof input === "number" ? String(input) : input;
+		},
+		[columns],
+	);
+
+	const handleCellUpdate = useCallback(
+		(rowId: string, columnId: string, value: string | number | null) => {
+			const nextValue = normalizeValueForColumn(columnId, value);
+			const payload = nextValue ?? "";
+			queueCellUpdate(rowId, columnId, payload);
 			flushPendingUpdates();
 		},
-		[columns, queueCellUpdate, flushPendingUpdates],
+		[flushPendingUpdates, normalizeValueForColumn, queueCellUpdate],
 	);
+
+	const handleCommitEdit = useCallback(
+		(
+			rowId: string,
+			columnId: string,
+			nextValue: string,
+			previousValue: string | number | null,
+		) => {
+			const normalizedNext = normalizeValueForColumn(columnId, nextValue);
+			const previousHistoryValue = toHistoryValue(previousValue);
+			const nextHistoryValue = normalizedNext;
+			if (previousHistoryValue !== nextHistoryValue) {
+				recordUndoStep({
+					rowId,
+					columnId,
+					previousValue: previousHistoryValue,
+					nextValue: nextHistoryValue,
+				});
+			}
+			handleCellUpdate(rowId, columnId, normalizedNext);
+			setEditingCell(null);
+			scrollParentRef.current?.focus();
+		},
+		[handleCellUpdate, normalizeValueForColumn, recordUndoStep],
+	);
+
+	const handleCancelEdit = useCallback(() => {
+		setEditingCell(null);
+		scrollParentRef.current?.focus();
+	}, []);
 
 	const displayData = useMemo<TableData[]>(() => {
 		const pre = filterRowsByQuery(
@@ -236,6 +351,8 @@ export function DataTable({ tableId }: DataTableProps) {
 		) as unknown as TableData[];
 		return applySorts<TableData>(filtered, orderedColumns, sorts, autoSort);
 	}, [data, orderedColumns, searchValue, filters, sorts, autoSort]);
+
+	const filteredRows = displayData;
 
 	// Pre-filter rows using the same logic as the global filter so non-matching rows are hidden at the data level too
 
@@ -253,7 +370,9 @@ export function DataTable({ tableId }: DataTableProps) {
 		setSelectedRowIds,
 		showCheckboxes,
 		setShowCheckboxes,
-		handleCellUpdate,
+		editingCell,
+		onCommitEdit: handleCommitEdit,
+		onCancelEdit: handleCancelEdit,
 	}) as unknown as ColumnDef<TableData>[];
 
 	const table = useReactTable<TableData>({
@@ -273,15 +392,509 @@ export function DataTable({ tableId }: DataTableProps) {
 			},
 		},
 	});
+	const rowIndexLookup = useMemo(() => {
+		const map = new Map<string, number>();
+		filteredRows.forEach((row, index) => map.set(row.id, index));
+		return map;
+	}, [filteredRows]);
 
-	// Use filtered rows for match nav/highlight (already reflects search filtering)
-	const filteredRows = table.getRowModel().rows.map((r) => r.original);
+	const columnIndexLookup = useMemo(() => {
+		const map = new Map<string, number>();
+		visibleColumns.forEach((col, index) => map.set(col.id, index));
+		return map;
+	}, [visibleColumns]);
+
+	const getCellByIndex = useCallback(
+		(rowIndex: number, columnIndex: number): GridCell | null => {
+			const row = filteredRows[rowIndex];
+			const column = visibleColumns[columnIndex];
+			if (!row || !column) return null;
+			return { rowId: row.id, columnId: column.id };
+		},
+		[filteredRows, visibleColumns],
+	);
+
+	const getSelectionBounds = useCallback(
+		(sel: SelectionRange | null) => {
+			if (!sel) return null;
+			const anchorRow = rowIndexLookup.get(sel.anchor.rowId);
+			const focusRow = rowIndexLookup.get(sel.focus.rowId);
+			const anchorCol = columnIndexLookup.get(sel.anchor.columnId);
+			const focusCol = columnIndexLookup.get(sel.focus.columnId);
+			if (
+				anchorRow === undefined ||
+				focusRow === undefined ||
+				anchorCol === undefined ||
+				focusCol === undefined
+			) {
+				return null;
+			}
+			return {
+				rowStart: Math.min(anchorRow, focusRow),
+				rowEnd: Math.max(anchorRow, focusRow),
+				colStart: Math.min(anchorCol, focusCol),
+				colEnd: Math.max(anchorCol, focusCol),
+			};
+		},
+		[rowIndexLookup, columnIndexLookup],
+	);
+
+	useEffect(() => {
+		if (
+			activeCell ||
+			filteredRows.length === 0 ||
+			visibleColumns.length === 0
+		) {
+			return;
+		}
+		const firstRow = filteredRows[0];
+		const firstColumn = visibleColumns[0];
+		if (!firstRow || !firstColumn) return;
+		const first = { rowId: firstRow.id, columnId: firstColumn.id };
+		setActiveCell(first);
+		setSelection({ anchor: first, focus: first });
+	}, [activeCell, filteredRows, visibleColumns]);
+
+	useEffect(() => {
+		if (
+			!activeCell ||
+			(rowIndexLookup.has(activeCell.rowId) &&
+				columnIndexLookup.has(activeCell.columnId))
+		) {
+			return;
+		}
+		if (filteredRows.length === 0 || visibleColumns.length === 0) {
+			setActiveCell(null);
+			setSelection(null);
+			return;
+		}
+		const fallbackRow = filteredRows[0];
+		const fallbackColumn = visibleColumns[0];
+		if (!fallbackRow || !fallbackColumn) {
+			setActiveCell(null);
+			setSelection(null);
+			return;
+		}
+		const fallback = { rowId: fallbackRow.id, columnId: fallbackColumn.id };
+		setActiveCell(fallback);
+		setSelection({ anchor: fallback, focus: fallback });
+	}, [
+		activeCell,
+		rowIndexLookup,
+		columnIndexLookup,
+		filteredRows,
+		visibleColumns,
+	]);
+
+	useEffect(() => {
+		if (!editingCell) return;
+		if (
+			!rowIndexLookup.has(editingCell.rowId) ||
+			!columnIndexLookup.has(editingCell.columnId)
+		) {
+			setEditingCell(null);
+			return;
+		}
+		const key = `${editingCell.rowId}|${editingCell.columnId}`;
+		const input = document.querySelector(
+			`[data-cell-input="${key}"]`,
+		) as HTMLInputElement | null;
+		if (!input) return;
+		const frame = requestAnimationFrame(() => {
+			input.focus();
+			input.select();
+		});
+		return () => cancelAnimationFrame(frame);
+	}, [editingCell, rowIndexLookup, columnIndexLookup]);
+
+	const selectCell = useCallback(
+		(
+			cell: GridCell,
+			options: { extend?: boolean; anchorOverride?: GridCell } = {},
+		) => {
+			if (
+				!rowIndexLookup.has(cell.rowId) ||
+				!columnIndexLookup.has(cell.columnId)
+			) {
+				return;
+			}
+			const anchor = options.extend
+				? (options.anchorOverride ??
+					selectionRef.current?.anchor ??
+					activeCellRef.current ??
+					cell)
+				: cell;
+			setEditingCell(null);
+			setActiveCell(anchor);
+			setSelection({ anchor, focus: cell });
+		},
+		[rowIndexLookup, columnIndexLookup, setEditingCell],
+	);
+
+	const updateFillPreview = useCallback(
+		(origin: GridCell, target: GridCell) => {
+			if (origin.columnId !== target.columnId) {
+				setFillPreview(null);
+				return;
+			}
+			const originRow = rowIndexLookup.get(origin.rowId);
+			const targetRow = rowIndexLookup.get(target.rowId);
+			if (
+				originRow === undefined ||
+				targetRow === undefined ||
+				originRow === targetRow
+			) {
+				setFillPreview(null);
+				return;
+			}
+			const step = originRow < targetRow ? 1 : -1;
+			const rows: number[] = [];
+			for (
+				let idx = originRow + step;
+				step === 1 ? idx <= targetRow : idx >= targetRow;
+				idx += step
+			) {
+				rows.push(idx);
+			}
+			setFillPreview({ columnId: origin.columnId, rows });
+		},
+		[rowIndexLookup],
+	);
+
+	const applyFillFromPreview = useCallback(
+		(preview: FillPreview | null) => {
+			if (!preview || preview.rows.length === 0 || !pointerAnchorRef.current) {
+				return;
+			}
+			const anchor = pointerAnchorRef.current;
+			const anchorRowIndex = rowIndexLookup.get(anchor.rowId);
+			if (anchorRowIndex === undefined) return;
+			const anchorRow = filteredRows[anchorRowIndex];
+			if (!anchorRow) return;
+			const sourceValue =
+				anchorRow.cells.find((cell) => cell.columnId === preview.columnId)
+					?.value ?? null;
+			const historyChanges: CellHistoryChange[] = [];
+			const nextHistoryValue = toHistoryValue(sourceValue);
+			for (const rowIndex of preview.rows) {
+				const targetRow = filteredRows[rowIndex];
+				if (!targetRow) continue;
+				const previousValue =
+					targetRow.cells.find((cell) => cell.columnId === preview.columnId)
+						?.value ?? null;
+				const previousHistoryValue = toHistoryValue(previousValue);
+				if (previousHistoryValue !== nextHistoryValue) {
+					historyChanges.push({
+						rowId: targetRow.id,
+						columnId: preview.columnId,
+						previousValue: previousHistoryValue,
+						nextValue: nextHistoryValue,
+					});
+				}
+				handleCellUpdate(targetRow.id, preview.columnId, sourceValue ?? "");
+			}
+			recordUndoStep(historyChanges);
+			const focusRowIndex = preview.rows[preview.rows.length - 1];
+			if (focusRowIndex === undefined) return;
+			const columnIndex = columnIndexLookup.get(preview.columnId);
+			const focusCell =
+				columnIndex !== undefined
+					? getCellByIndex(focusRowIndex, columnIndex)
+					: null;
+			if (focusCell) {
+				setSelection({ anchor, focus: focusCell });
+				setActiveCell(anchor);
+			}
+		},
+		[
+			columnIndexLookup,
+			filteredRows,
+			getCellByIndex,
+			handleCellUpdate,
+			recordUndoStep,
+			rowIndexLookup,
+		],
+	);
+
+	const finalizePointer = useCallback(() => {
+		if (pointerModeRef.current === "fill") {
+			applyFillFromPreview(fillPreview);
+		}
+		pointerModeRef.current = null;
+		pointerAnchorRef.current = null;
+		setFillPreview(null);
+	}, [applyFillFromPreview, fillPreview]);
+
+	useEffect(() => {
+		const handlePointerUp = () => finalizePointer();
+		window.addEventListener("pointerup", handlePointerUp);
+		return () => window.removeEventListener("pointerup", handlePointerUp);
+	}, [finalizePointer]);
+
+	const selectedCellKeys = useMemo(() => {
+		const bounds = getSelectionBounds(selection);
+		if (!bounds) return new Set<string>();
+		const keys = new Set<string>();
+		for (
+			let rowIndex = bounds.rowStart;
+			rowIndex <= bounds.rowEnd;
+			rowIndex++
+		) {
+			const row = filteredRows[rowIndex];
+			if (!row) continue;
+			for (
+				let colIndex = bounds.colStart;
+				colIndex <= bounds.colEnd;
+				colIndex++
+			) {
+				const column = visibleColumns[colIndex];
+				if (!column) continue;
+				keys.add(`${row.id}|${column.id}`);
+			}
+		}
+		return keys;
+	}, [selection, getSelectionBounds, filteredRows, visibleColumns]);
+
+	const fillPreviewKeys = useMemo(() => {
+		if (!fillPreview) return new Set<string>();
+		const keys = new Set<string>();
+		for (const rowIndex of fillPreview.rows) {
+			const row = filteredRows[rowIndex];
+			if (!row) continue;
+			keys.add(`${row.id}|${fillPreview.columnId}`);
+		}
+		return keys;
+	}, [fillPreview, filteredRows]);
+
+	const isSingleCellSelection =
+		Boolean(selection) &&
+		selection?.anchor.rowId === selection?.focus.rowId &&
+		selection?.anchor.columnId === selection?.focus.columnId;
+	const hasRangeSelection =
+		Boolean(selection) &&
+		(selection?.anchor.rowId !== selection?.focus.rowId ||
+			selection?.anchor.columnId !== selection?.focus.columnId);
+
+	const activeCellKey = activeCell
+		? `${activeCell.rowId}|${activeCell.columnId}`
+		: null;
+
+	const startEditing = useCallback(
+		(cell: GridCell | null) => {
+			if (!cell) return;
+			if (
+				!rowIndexLookup.has(cell.rowId) ||
+				!columnIndexLookup.has(cell.columnId)
+			) {
+				return;
+			}
+			setEditingCell(cell);
+		},
+		[columnIndexLookup, rowIndexLookup],
+	);
+
+	const handleCellPointerDown = useCallback(
+		(
+			event: ReactPointerEvent<HTMLTableCellElement>,
+			cell: GridCell,
+			isSelectable: boolean,
+		) => {
+			if (!isSelectable || event.button !== 0) return;
+			const target = event.target as HTMLElement | null;
+			if (target?.closest("[data-fill-handle]")) return;
+			if (target?.closest("input,textarea,select,[contenteditable='true']")) {
+				return;
+			}
+			event.preventDefault();
+			scrollParentRef.current?.focus();
+			setEditingCell(null);
+			const anchorOverride = event.shiftKey
+				? (selectionRef.current?.anchor ?? activeCellRef.current ?? cell)
+				: undefined;
+			pointerModeRef.current = "range";
+			pointerAnchorRef.current = anchorOverride ?? cell;
+			selectCell(cell, { extend: event.shiftKey, anchorOverride });
+			if (event.detail === 2 && !event.shiftKey) {
+				startEditing(cell);
+			}
+		},
+		[selectCell, startEditing],
+	);
+
+	const handleCellPointerEnter = useCallback(
+		(cell: GridCell, isSelectable: boolean) => {
+			if (!isSelectable) return;
+			if (pointerModeRef.current === "range" && pointerAnchorRef.current) {
+				setEditingCell(null);
+				setActiveCell(cell);
+				setSelection({ anchor: pointerAnchorRef.current, focus: cell });
+			} else if (
+				pointerModeRef.current === "fill" &&
+				pointerAnchorRef.current
+			) {
+				updateFillPreview(pointerAnchorRef.current, cell);
+			}
+		},
+		[updateFillPreview],
+	);
+
+	const handleFillPointerDown = useCallback(
+		(event: ReactPointerEvent<HTMLSpanElement>, cell: GridCell) => {
+			event.stopPropagation();
+			event.preventDefault();
+			if (
+				!rowIndexLookup.has(cell.rowId) ||
+				!columnIndexLookup.has(cell.columnId)
+			) {
+				return;
+			}
+			scrollParentRef.current?.focus();
+			pointerModeRef.current = "fill";
+			pointerAnchorRef.current = cell;
+			setFillPreview(null);
+			setEditingCell(null);
+		},
+		[rowIndexLookup, columnIndexLookup],
+	);
+
+	const getCellDisplayValue = useCallback(
+		(row: TableData, columnId: string) =>
+			row.cells.find((cell) => cell.columnId === columnId)?.value ?? null,
+		[],
+	);
+
+	const copySelectionToClipboard = useCallback(async () => {
+		if (typeof navigator === "undefined" || !navigator.clipboard) return;
+		const targetSelection =
+			selection ??
+			(activeCell ? { anchor: activeCell, focus: activeCell } : null);
+		const bounds = getSelectionBounds(targetSelection);
+		if (!bounds) return;
+
+		const lines: string[] = [];
+		for (
+			let rowIndex = bounds.rowStart;
+			rowIndex <= bounds.rowEnd;
+			rowIndex++
+		) {
+			const row = filteredRows[rowIndex];
+			if (!row) continue;
+			const values: string[] = [];
+			for (
+				let colIndex = bounds.colStart;
+				colIndex <= bounds.colEnd;
+				colIndex++
+			) {
+				const column = visibleColumns[colIndex];
+				if (!column) continue;
+				const value = getCellDisplayValue(row, column.id);
+				values.push(value === null || value === undefined ? "" : String(value));
+			}
+			lines.push(values.join("\t"));
+		}
+
+		try {
+			await navigator.clipboard.writeText(lines.join("\n"));
+		} catch (error) {
+			console.error("Copy failed", error);
+		}
+	}, [
+		activeCell,
+		filteredRows,
+		getCellDisplayValue,
+		getSelectionBounds,
+		selection,
+		visibleColumns,
+	]);
+
+	const pasteClipboardData = useCallback(async () => {
+		if (
+			typeof navigator === "undefined" ||
+			!navigator.clipboard ||
+			!activeCell
+		) {
+			return;
+		}
+		const startRowIndex = rowIndexLookup.get(activeCell.rowId);
+		const startColIndex = columnIndexLookup.get(activeCell.columnId);
+		if (
+			startRowIndex === undefined ||
+			startColIndex === undefined ||
+			filteredRows.length === 0 ||
+			visibleColumns.length === 0
+		) {
+			return;
+		}
+		try {
+			const text = await navigator.clipboard.readText();
+			if (!text) return;
+			const rawRows = text.replace(/\r/g, "").split("\n");
+			const rows = rawRows.filter(
+				(line, idx) =>
+					!(line === "" && idx === rawRows.length - 1 && rawRows.length > 1),
+			);
+			let furthestRow = startRowIndex;
+			let furthestCol = startColIndex;
+			const historyChanges: CellHistoryChange[] = [];
+			rows.forEach((line, rowOffset) => {
+				const values = line.split("\t");
+				values.forEach((cellValue, colOffset) => {
+					const targetRowIndex = startRowIndex + rowOffset;
+					const targetColIndex = startColIndex + colOffset;
+					if (
+						targetRowIndex >= filteredRows.length ||
+						targetColIndex >= visibleColumns.length
+					) {
+						return;
+					}
+					const targetRow = filteredRows[targetRowIndex];
+					const targetCol = visibleColumns[targetColIndex];
+					if (!targetRow || !targetCol) return;
+					const previousValue =
+						targetRow.cells.find((cell) => cell.columnId === targetCol.id)
+							?.value ?? null;
+					const previousHistoryValue = toHistoryValue(previousValue);
+					const normalizedNext = normalizeValueForColumn(
+						targetCol.id,
+						cellValue,
+					);
+					const nextHistoryValue = normalizedNext;
+					if (previousHistoryValue !== nextHistoryValue) {
+						historyChanges.push({
+							rowId: targetRow.id,
+							columnId: targetCol.id,
+							previousValue: previousHistoryValue,
+							nextValue: nextHistoryValue,
+						});
+					}
+					handleCellUpdate(targetRow.id, targetCol.id, normalizedNext);
+					furthestRow = Math.max(furthestRow, targetRowIndex);
+					furthestCol = Math.max(furthestCol, targetColIndex);
+				});
+			});
+			recordUndoStep(historyChanges);
+			const focusCell = getCellByIndex(furthestRow, furthestCol);
+			if (focusCell) {
+				setSelection({ anchor: activeCell, focus: focusCell });
+			}
+		} catch (error) {
+			console.error("Paste failed", error);
+		}
+	}, [
+		activeCell,
+		columnIndexLookup,
+		filteredRows,
+		getCellByIndex,
+		handleCellUpdate,
+		normalizeValueForColumn,
+		recordUndoStep,
+		rowIndexLookup,
+		visibleColumns,
+	]);
 
 	const filteredRowsCount = rowsInfinite.hasNextPage
 		? filteredRows.length + 1
 		: filteredRows.length;
-
-	const scrollParentRef = useRef<HTMLDivElement | null>(null);
 
 	const rowVirtualizer = useVirtualizer({
 		count: filteredRowsCount,
@@ -309,6 +922,126 @@ export function DataTable({ tableId }: DataTableProps) {
 		},
 	});
 
+	const moveSelection = useCallback(
+		(deltaRow: number, deltaCol: number, extend: boolean) => {
+			const baseCell = extend
+				? (selectionRef.current?.focus ?? activeCellRef.current)
+				: activeCellRef.current;
+			if (!baseCell) return;
+			const currentRowIndex = rowIndexLookup.get(baseCell.rowId);
+			const currentColIndex = columnIndexLookup.get(baseCell.columnId);
+			if (
+				currentRowIndex === undefined ||
+				currentColIndex === undefined ||
+				filteredRows.length === 0 ||
+				visibleColumns.length === 0
+			) {
+				return;
+			}
+			const nextRowIndex = clamp(
+				currentRowIndex + deltaRow,
+				0,
+				Math.max(filteredRows.length - 1, 0),
+			);
+			const nextColIndex = clamp(
+				currentColIndex + deltaCol,
+				0,
+				Math.max(visibleColumns.length - 1, 0),
+			);
+			const nextCell = getCellByIndex(nextRowIndex, nextColIndex);
+			if (!nextCell) return;
+			selectCell(nextCell, { extend });
+			rowVirtualizer.scrollToIndex(nextRowIndex, { align: "auto" });
+		},
+		[
+			rowIndexLookup,
+			columnIndexLookup,
+			filteredRows.length,
+			visibleColumns.length,
+			getCellByIndex,
+			selectCell,
+			rowVirtualizer,
+		],
+	);
+
+	const undoLastStep = useCallback(() => {
+		const step = popStep();
+		if (!step) return;
+		for (const change of [...step].reverse()) {
+			handleCellUpdate(
+				change.rowId,
+				change.columnId,
+				change.previousValue ?? "",
+			);
+		}
+	}, [handleCellUpdate, popStep]);
+
+	const handleGridKeyDown = useCallback(
+		(event: ReactKeyboardEvent<HTMLDivElement>) => {
+			if (!activeCell) return;
+			const useMeta = osName === "macOS" || osName === "iOS";
+			const isMod = useMeta ? event.metaKey : event.ctrlKey;
+			const key = event.key;
+
+			if (isMod && key.toLowerCase() === "z" && !editingCell) {
+				event.preventDefault();
+				undoLastStep();
+				return;
+			}
+
+			if (isMod) {
+				const lowered = key.toLowerCase();
+				if (lowered === "c") {
+					event.preventDefault();
+					copySelectionToClipboard();
+					return;
+				}
+				if (lowered === "v") {
+					event.preventDefault();
+					pasteClipboardData();
+					return;
+				}
+			}
+
+			if (editingCell) return;
+
+			switch (key) {
+				case "Enter":
+					event.preventDefault();
+					startEditing(activeCell);
+					return;
+				case "ArrowDown":
+					event.preventDefault();
+					moveSelection(1, 0, event.shiftKey);
+					return;
+				case "ArrowUp":
+					event.preventDefault();
+					moveSelection(-1, 0, event.shiftKey);
+					return;
+				case "ArrowLeft":
+					event.preventDefault();
+					moveSelection(0, -1, event.shiftKey);
+					return;
+				case "ArrowRight":
+					event.preventDefault();
+					moveSelection(0, 1, event.shiftKey);
+					return;
+				default:
+					break;
+			}
+		},
+		[
+			activeCell,
+			copySelectionToClipboard,
+			editingCell,
+			moveSelection,
+			osName,
+			pasteClipboardData,
+			startEditing,
+			undoLastStep,
+		],
+	);
+
 	const {
 		matches,
 		matchKeys,
@@ -325,8 +1058,7 @@ export function DataTable({ tableId }: DataTableProps) {
 	// Keyboard shortcut: Ctrl/Cmd+F opens the table search
 	useEffect(() => {
 		const handler = (e: KeyboardEvent) => {
-			const os = detectOS();
-			const useMeta = os === "macOS" || os === "iOS";
+			const useMeta = osName === "macOS" || osName === "iOS";
 			const mod = useMeta ? e.metaKey : e.ctrlKey;
 			const key = e.key.toLowerCase();
 			if (mod && key === "f") {
@@ -343,7 +1075,7 @@ export function DataTable({ tableId }: DataTableProps) {
 		};
 		window.addEventListener("keydown", handler);
 		return () => window.removeEventListener("keydown", handler);
-	}, []);
+	}, [osName]);
 
 	const handleAddRow = () => {
 		const cells = columns.map((col) => ({ columnId: col.id, value: "" }));
@@ -361,7 +1093,12 @@ export function DataTable({ tableId }: DataTableProps) {
 		utils.table.getInfiniteRows.invalidate(infiniteQueryInput);
 	};
 
-	if (tableColumnLoading || rowsInfinite.isLoading || viewsLoading || !activeView) {
+	if (
+		tableColumnLoading ||
+		rowsInfinite.isLoading ||
+		viewsLoading ||
+		!activeView
+	) {
 		return (
 			<div className="flex h-64 items-center justify-center">
 				<div className="text-gray-500">Loading view…</div>
@@ -429,8 +1166,11 @@ export function DataTable({ tableId }: DataTableProps) {
 
 					<div className="flex h-[88vh] w-full flex-col justify-between">
 						<div
-							className="relative flex min-h-0 overflow-x-auto overflow-y-auto border-gray-200"
+							className="relative flex min-h-0 overflow-x-auto overflow-y-auto border-gray-200 outline-none"
 							ref={scrollParentRef}
+							tabIndex={0}
+							onKeyDown={handleGridKeyDown}
+							onMouseDown={() => scrollParentRef.current?.focus()}
 						>
 							<table
 								className="border-separate border-spacing-0 border bg-white"
@@ -559,31 +1299,97 @@ export function DataTable({ tableId }: DataTableProps) {
 																			const isMatch =
 																				Boolean(searchValue) &&
 																				matchKeys.has(key);
-																			const isActiveCell =
+																			const isActiveSearchCell =
 																				Boolean(activeMatch) &&
 																				activeMatch?.rowId ===
 																					row?.original.id &&
 																				activeMatch?.columnId ===
 																					cell.column.id;
+																			const rowId = row?.original.id;
+																			const isSelectableCell =
+																				Boolean(rowId) &&
+																				columnIndexLookup.has(cell.column.id);
+																			const isGridActive =
+																				isSelectableCell &&
+																				activeCellKey === key;
+																			const isSelected =
+																				isSelectableCell &&
+																				selectedCellKeys.has(key);
+																			const isFillHighlighted =
+																				isSelectableCell &&
+																				fillPreviewKeys.has(key);
+																			const backgroundClass = isFillHighlighted
+																				? "bg-blue-100"
+																				: hasRangeSelection && isSelected
+																					? "bg-blue-50"
+																					: isActiveSearchCell
+																						? "bg-yellow-200"
+																						: isMatch
+																							? "bg-yellow-100"
+																							: "";
 																			return (
 																				<td
 																					key={cell.id}
 																					className={cn(
-																						"h-8 w-[150px] truncate whitespace-nowrap border-gray-200 border-r border-b p-2 text-gray-900 text-sm",
+																						"relative h-8 w-[150px] overflow-visible whitespace-nowrap border-gray-200 border-r border-b px-2 text-gray-900 text-sm",
 																						cell.column.columnDef.meta
 																							?.className,
-																						isActiveCell
-																							? "bg-yellow-200"
-																							: isMatch
-																								? "bg-yellow-100"
-																								: "",
+																						backgroundClass,
 																					)}
 																					data-cell={key}
+																					onPointerDown={(event) => {
+																						if (!rowId) return;
+																						handleCellPointerDown(
+																							event,
+																							{
+																								rowId,
+																								columnId: cell.column.id,
+																							},
+																							isSelectableCell,
+																						);
+																					}}
+																					onPointerEnter={() => {
+																						if (!rowId) return;
+																						handleCellPointerEnter(
+																							{
+																								rowId,
+																								columnId: cell.column.id,
+																							},
+																							isSelectableCell,
+																						);
+																					}}
+																					onDoubleClick={(event) => {
+																						if (!rowId || !isSelectableCell)
+																							return;
+																						event.stopPropagation();
+																						startEditing({
+																							rowId,
+																							columnId: cell.column.id,
+																						});
+																					}}
 																				>
-																					{flexRender(
-																						cell.column.columnDef.cell,
-																						cell.getContext(),
+																					{isGridActive && (
+																						<>
+																							<div className="pointer-events-none absolute inset-[-2px] rounded-xs border-2 border-blue-500" />
+																							<span
+																								data-fill-handle
+																								className="absolute right-0 bottom-0 z-30 size-2 translate-x-1/2 translate-y-1/2 cursor-crosshair border border-blue-600 bg-white shadow-sm"
+																								onPointerDown={(event) => {
+																									if (!rowId) return;
+																									handleFillPointerDown(event, {
+																										rowId,
+																										columnId: cell.column.id,
+																									});
+																								}}
+																							/>
+																						</>
 																					)}
+																					<p className="truncate">
+																						{flexRender(
+																							cell.column.columnDef.cell,
+																							cell.getContext(),
+																						)}
+																					</p>
 																				</td>
 																			);
 																		})
@@ -622,37 +1428,34 @@ export function DataTable({ tableId }: DataTableProps) {
 								{/* Add Row button row */}
 								<tfoot>
 									<tr className="border-gray-200 border-r bg-white">
-										{visibleColumns
-											.map((col, index) => (
-												<td
-													key={col.id}
-													className={cn(
-														"border-gray-200 text-gray-900 text-sm",
-													)}
-												>
-													{index === 0 ? (
-														<TooltipProvider>
-															<Tooltip>
-																<TooltipTrigger asChild>
-																	<button
-																		type="button"
-																		onClick={handleAddRow}
-																		className="flex size-8 w-full cursor-pointer items-center justify-center text-gray-600 text-xl hover:bg-gray-50 hover:text-gray-800"
-																	>
-																		+
-																	</button>
-																</TooltipTrigger>
-																<TooltipContent>
-																	<p>
-																		You can also insert a new record anywhere by
-																		pressing Shift-Enter
-																	</p>
-																</TooltipContent>
-															</Tooltip>
-														</TooltipProvider>
-													) : null}
-												</td>
-											))}
+										{visibleColumns.map((col, index) => (
+											<td
+												key={col.id}
+												className={cn("border-gray-200 text-gray-900 text-sm")}
+											>
+												{index === 0 ? (
+													<TooltipProvider>
+														<Tooltip>
+															<TooltipTrigger asChild>
+																<button
+																	type="button"
+																	onClick={handleAddRow}
+																	className="flex size-8 w-full cursor-pointer items-center justify-center text-gray-600 text-xl hover:bg-gray-50 hover:text-gray-800"
+																>
+																	+
+																</button>
+															</TooltipTrigger>
+															<TooltipContent>
+																<p>
+																	You can also insert a new record anywhere by
+																	pressing Shift-Enter
+																</p>
+															</TooltipContent>
+														</Tooltip>
+													</TooltipProvider>
+												) : null}
+											</td>
+										))}
 										{/* trailing add-column cell */}
 										<td className="w-[100px] border-gray-200" />
 									</tr>

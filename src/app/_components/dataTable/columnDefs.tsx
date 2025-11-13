@@ -49,11 +49,14 @@ type CreateColumnDefsParams = {
 	setSelectedRowIds: React.Dispatch<React.SetStateAction<Set<string>>>;
 	showCheckboxes: boolean;
 	setShowCheckboxes: React.Dispatch<React.SetStateAction<boolean>>;
-	handleCellUpdate: (
+	editingCell: { rowId: string; columnId: string } | null;
+	onCommitEdit: (
 		rowId: string,
 		columnId: string,
-		value: string | number,
+		value: string,
+		previousValue: string | number | null,
 	) => void;
+	onCancelEdit: () => void;
 };
 
 export function createColumnDefs({
@@ -63,7 +66,9 @@ export function createColumnDefs({
 	setSelectedRowIds,
 	showCheckboxes,
 	setShowCheckboxes,
-	handleCellUpdate,
+	editingCell,
+	onCommitEdit,
+	onCancelEdit,
 }: CreateColumnDefsParams): ColumnDef<TableData>[] {
 	return [
 		{
@@ -161,14 +166,29 @@ export function createColumnDefs({
 				),
 				cell: ({ getValue, row }: CellContext<TableData, unknown>) => {
 					const cells = getValue() as Cell | undefined;
-					const value = cells?.value || "";
+					const value = cells?.value ?? null;
+					const cellIdentity = {
+						rowId: row.original.id,
+						columnId: col.id,
+					};
+					const isEditing =
+						editingCell?.rowId === cellIdentity.rowId &&
+						editingCell?.columnId === cellIdentity.columnId;
 					return (
 						<EditableCell
 							value={value}
-							rowId={row.original.id}
-							columnId={col.id}
+							cellKey={`${cellIdentity.rowId}|${cellIdentity.columnId}`}
+							isEditing={isEditing}
 							type={col.type}
-							handleCellUpdate={handleCellUpdate}
+							onCommit={(nextValue: string, previousValue) =>
+								onCommitEdit(
+									cellIdentity.rowId,
+									cellIdentity.columnId,
+									nextValue,
+									previousValue,
+								)
+							}
+							onCancel={onCancelEdit}
 						/>
 					);
 				},

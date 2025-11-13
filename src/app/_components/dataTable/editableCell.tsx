@@ -1,65 +1,80 @@
 import { memo, useEffect, useRef, useState } from "react";
-import type React from "react";
 
 type ColumnType = "TEXT" | "NUMBER";
 
 interface EditableCellProps {
-	handleCellUpdate: (
-		rowId: string,
-		columnId: string,
-		value: string | number,
-	) => void;
-	value: string | number;
-	rowId: string;
-	columnId: string;
+	value: string | number | null;
 	type: ColumnType;
+	cellKey: string;
+	isEditing: boolean;
+	onCommit: (value: string, previousValue: string | number | null) => void;
+	onCancel: () => void;
 }
 
 function EditableCellComponent({
-	handleCellUpdate,
 	value,
-	rowId,
-	columnId,
 	type,
+	cellKey,
+	isEditing,
+	onCommit,
+	onCancel,
 }: EditableCellProps) {
-	const [cellValue, setCellValue] = useState(String(value ?? ""));
+	const stringValue = value === null || value === undefined ? "" : String(value);
+	const [draft, setDraft] = useState(stringValue);
 	const inputRef = useRef<HTMLInputElement>(null);
 	const committedRef = useRef(false);
 
 	useEffect(() => {
-		setCellValue(String(value ?? ""));
-	}, [value]);
+		setDraft(stringValue);
+	}, [stringValue]);
 
-	const commit = (val: string | number) => {
+	useEffect(() => {
+		if (!isEditing) return;
+		const frame = requestAnimationFrame(() => {
+			inputRef.current?.focus();
+			inputRef.current?.select();
+		});
+		return () => cancelAnimationFrame(frame);
+	}, [isEditing]);
+
+	const commit = (nextValue: string) => {
+		if (committedRef.current) return;
 		committedRef.current = true;
-		handleCellUpdate(rowId, columnId, val);
-	};
-
-	const onKeyDown = (e: React.KeyboardEvent) => {
-		if (e.key === "Enter" || e.key === "Escape") {
-			commit(cellValue);
-			inputRef.current?.blur();
-			e.preventDefault();
-		}
+		onCommit(nextValue, value);
 	};
 
 	return (
 		<input
 			ref={inputRef}
 			type={type === "NUMBER" ? "number" : "text"}
-			value={String(cellValue ?? "")}
-			onChange={(e) => {
-				const inputValue = e.target.value.toString();
-				if (cellValue !== inputValue) setCellValue(inputValue);
-			}}
-			onKeyDown={onKeyDown}
+			value={draft}
+			data-cell-input={cellKey}
+			readOnly={!isEditing}
+			tabIndex={isEditing ? 0 : -1}
 			onFocus={() => {
 				committedRef.current = false;
+				if (!isEditing) {
+					inputRef.current?.blur();
+				}
 			}}
 			onBlur={(e) => {
-				if (!committedRef.current) commit(e.target.value.toString());
+				if (!isEditing) return;
+				commit(e.target.value);
 			}}
-			className=" w-full cursor-text overflow-hidden truncate whitespace-nowrap border-gray-200 bg-transparent px-1 hover:bg-gray-50 focus:bg-blue-50 focus:outline-none"
+			onChange={(e) => setDraft(e.target.value)}
+			onKeyDown={(e) => {
+				if (!isEditing) return;
+				if (e.key === "Enter") {
+					e.preventDefault();
+					commit((e.target as HTMLInputElement).value);
+				} else if (e.key === "Escape") {
+					e.preventDefault();
+					committedRef.current = true;
+					setDraft(stringValue);
+					onCancel();
+				}
+			}}
+			className={`relative z-10 w-full truncate border-none px-1 text-gray-900 text-sm outline-none ${isEditing ? "" : "pointer-events-none select-none"}`}
 		/>
 	);
 }
@@ -67,8 +82,7 @@ function EditableCellComponent({
 export const EditableCell = memo(
 	EditableCellComponent,
 	(prevProps, nextProps) =>
-		prevProps.rowId === nextProps.rowId &&
-		prevProps.columnId === nextProps.columnId &&
 		prevProps.type === nextProps.type &&
+		prevProps.isEditing === nextProps.isEditing &&
 		String(prevProps.value ?? "") === String(nextProps.value ?? ""),
 );
