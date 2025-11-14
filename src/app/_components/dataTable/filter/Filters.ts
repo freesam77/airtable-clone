@@ -1,3 +1,5 @@
+import type { ColumnType } from "~/types/column";
+
 export type TextOp =
 	| "is_empty"
 	| "is_not_empty"
@@ -8,7 +10,7 @@ export type NumOp = "is_empty" | "is_not_empty" | ">" | "<" | "=";
 export type FilterCondition = {
 	id: string;
 	columnId: string;
-	type: "TEXT" | "NUMBER";
+	type: ColumnType;
 	op: TextOp | NumOp;
 	value?: string;
 };
@@ -17,7 +19,7 @@ type Row = {
 	cells: Array<{ columnId: string; value: string | null }>;
 };
 
-type Column = { id: string; type: "TEXT" | "NUMBER" };
+type Column = { id: string; type: ColumnType };
 
 export function applyFilters<T extends Row>(
 	rows: T[],

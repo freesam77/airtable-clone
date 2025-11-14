@@ -49,6 +49,7 @@ import {
 	type SelectionRange,
 	useDataTableState,
 } from "./hooks/useDataTableState";
+import type { ColumnType } from "~/types/column";
 
 // Column helpers and definitions extracted to dataTable/columnDefs
 
@@ -57,7 +58,7 @@ declare module "@tanstack/react-table" {
 	interface ColumnMeta<TData, TValue> {
 		className?: string;
 		// Optional: used for editor input typing
-		type?: "TEXT" | "NUMBER";
+		type?: ColumnType;
 	}
 }
 
@@ -69,7 +70,7 @@ type Cell = {
 	column: {
 		id: string;
 		name: string;
-		type: "TEXT" | "NUMBER";
+		type: ColumnType;
 		required: boolean;
 		position: number;
 		tableId: string;
@@ -377,7 +378,7 @@ export function DataTable({ tableId }: DataTableProps) {
 
 	// Create column definitions dynamically based on the table structure
 	const handleAddColumn = useCallback(
-		(name: string, type: "TEXT" | "NUMBER") => {
+		(name: string, type: ColumnType) => {
 			addColumnMutation.mutate({ tableId, name, type });
 		},
 		[addColumnMutation, tableId],

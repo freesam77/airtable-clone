@@ -1,11 +1,12 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { columnTypeSchema } from "~/types/column";
 
 const filterConditionSchema = z.object({
 	id: z.string(),
 	columnId: z.string(),
-	type: z.enum(["TEXT", "NUMBER"]),
+	type: columnTypeSchema,
 	op: z.string(),
 	value: z.string().optional().nullable(),
 });
@@ -13,7 +14,7 @@ const filterConditionSchema = z.object({
 const sortConditionSchema = z.object({
 	id: z.string().optional(),
 	columnId: z.string(),
-	type: z.enum(["TEXT", "NUMBER"]),
+	type: columnTypeSchema,
 	dir: z.enum(["asc", "desc"]),
 });
 

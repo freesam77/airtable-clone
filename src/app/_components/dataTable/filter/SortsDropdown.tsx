@@ -10,9 +10,10 @@ import {
 import { Switch } from "~/components/ui/switch";
 import { cn } from "~/lib/utils";
 import type { SortCondition } from "./Sorts";
+import type { ColumnType } from "~/types/column";
 
 type Props = {
-	columns: Array<{ id: string; name: string; type: "TEXT" | "NUMBER" }>;
+	columns: Array<{ id: string; name: string; type: ColumnType }>;
 	sorts: SortCondition[];
 	onChange: (sorts: SortCondition[]) => void;
 	autoSort: boolean;
@@ -49,7 +50,7 @@ export function SortsDropdown({
 		id: string,
 		patch: Partial<{
 			columnId: string;
-			type: "TEXT" | "NUMBER";
+			type: ColumnType;
 			dir: "asc" | "desc";
 		}>,
 	) => {

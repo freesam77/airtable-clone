@@ -10,7 +10,7 @@ import {
 } from "~/components/ui/tooltip";
 import { EditableCell } from "./editableCell";
 
-export type ColumnType = "TEXT" | "NUMBER";
+import type { ColumnType } from "~/types/column";
 
 export type ColumnMeta = {
 	id: string;

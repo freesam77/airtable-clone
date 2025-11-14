@@ -1,11 +1,12 @@
 import orderBy from "lodash-es/orderBy";
+import type { ColumnType } from "~/types/column";
 
 export type SortDirection = "asc" | "desc";
 
 export type SortCondition = {
 	id: string;
 	columnId: string;
-	type: "TEXT" | "NUMBER";
+	type: ColumnType;
 	dir: SortDirection;
 };
 
@@ -13,7 +14,7 @@ type Row = {
 	cells: Array<{ columnId: string; value: string | null }>;
 };
 
-type Column = { id: string; type: "TEXT" | "NUMBER" };
+type Column = { id: string; type: ColumnType };
 
 export function applySorts<T extends Row>(
 	rows: T[],

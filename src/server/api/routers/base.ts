@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { columnTypeSchema } from "~/types/column";
 import { defaultViewSettings } from "./view";
 
 export const baseRouter = createTRPCRouter({
@@ -218,7 +219,7 @@ export const baseRouter = createTRPCRouter({
 				columns: z.array(
 					z.object({
 						name: z.string().min(1),
-						type: z.enum(["TEXT", "NUMBER"]),
+						type: columnTypeSchema,
 						required: z.boolean().default(false),
 						position: z.number(),
 					}),

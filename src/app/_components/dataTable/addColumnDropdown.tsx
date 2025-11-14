@@ -10,9 +10,10 @@ import {
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { cn } from "~/lib/utils";
+import type { ColumnType } from "~/types/column";
 
 interface AddColumnDropdownProps {
-	onCreate: (name: string, type: "TEXT" | "NUMBER") => void;
+	onCreate: (name: string, type: ColumnType) => void;
 	isLoading: boolean;
 	trigger: React.ReactNode;
 }
@@ -38,7 +39,7 @@ export function AddColumnDropdown({
 	trigger,
 }: AddColumnDropdownProps) {
 	const [columnName, setColumnName] = useState("");
-	const [columnType, setColumnType] = useState<"TEXT" | "NUMBER">("TEXT");
+	const [columnType, setColumnType] = useState<ColumnType>("TEXT");
 	const [open, setOpen] = useState(false);
 
 	const handleCreate = () => {

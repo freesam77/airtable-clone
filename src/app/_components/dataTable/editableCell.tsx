@@ -1,6 +1,5 @@
 import { memo, useEffect, useRef, useState } from "react";
-
-type ColumnType = "TEXT" | "NUMBER";
+import type { ColumnType } from "~/types/column";
 
 interface EditableCellProps {
 	value: string | number | null;

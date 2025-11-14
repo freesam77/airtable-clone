@@ -10,9 +10,10 @@ import {
 import { Input } from "~/components/ui/input";
 import { cn } from "~/lib/utils";
 import type { FilterCondition } from "./Filters";
+import type { ColumnType } from "~/types/column";
 
 type Props = {
-	columns: Array<{ id: string; name: string; type: "TEXT" | "NUMBER" }>;
+	columns: Array<{ id: string; name: string; type: ColumnType }>;
 	filters: FilterCondition[];
 	onChange: (filters: FilterCondition[]) => void;
 };
@@ -48,7 +49,7 @@ export function FiltersDropdown({ columns, filters, onChange }: Props) {
 		id: string,
 		patch: Partial<{
 			columnId: string;
-			type: "TEXT" | "NUMBER";
+			type: ColumnType;
 			op: FilterCondition["op"];
 			value?: string;
 		}>,

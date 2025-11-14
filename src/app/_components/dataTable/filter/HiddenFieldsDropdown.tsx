@@ -11,8 +11,9 @@ import {
 import { Input } from "~/components/ui/input";
 import { Switch } from "~/components/ui/switch";
 import { cn } from "~/lib/utils";
+import type { ColumnType } from "~/types/column";
 
-type Column = { id: string; name: string; type: "TEXT" | "NUMBER" };
+type Column = { id: string; name: string; type: ColumnType };
 
 type Props = {
 	columns: Column[];
@@ -20,8 +21,7 @@ type Props = {
 	onChange: (hiddenIds: string[]) => void;
 };
 
-const columnTypeSymbol = (type: "TEXT" | "NUMBER") =>
-	type === "TEXT" ? "A" : "#";
+const columnTypeSymbol = (type: ColumnType) => (type === "TEXT" ? "A" : "#");
 
 export function HiddenFieldsDropdown({
 	columns,
