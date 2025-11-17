@@ -1,11 +1,10 @@
 import { api } from "~/trpc/react";
 import { useCellUpdateQueue } from "./useCellUpdateQueue";
 
-type InfiniteInput = {
-	id: string;
-	limit: number;
-	direction: "forward" | "backward";
-};
+type InfiniteInput = Extract<
+	Parameters<typeof api.table.getInfiniteRows.useInfiniteQuery>[0],
+	{ id: string }
+>;
 
 type UseTableMutationsParams = {
 	tableId: string;

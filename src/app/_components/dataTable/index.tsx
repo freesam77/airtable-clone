@@ -104,7 +104,9 @@ const toHistoryValue = (
 	return String(value);
 };
 
-const SAMPLE_NAMES = [
+type NonEmptyArray<T> = readonly [T, ...T[]];
+
+const SAMPLE_NAMES: NonEmptyArray<string> = [
 	"Ava",
 	"Ethan",
 	"Isabella",
@@ -115,9 +117,9 @@ const SAMPLE_NAMES = [
 	"Ruby",
 	"Jack",
 	"William",
-] as const;
-const SAMPLE_DOMAINS = ["yahoo.com", "gmail.com", "icloud.com", "outlook.com"] as const;
-const SAMPLE_WORDS = [
+] 
+const SAMPLE_DOMAINS: NonEmptyArray<string> = ["yahoo.com", "gmail.com", "icloud.com", "outlook.com"] 
+const SAMPLE_WORDS: NonEmptyArray<string> = [
 	"consectetur",
 	"adipiscing",
 	"elit",
@@ -125,24 +127,28 @@ const SAMPLE_WORDS = [
 	"amet",
 	"lorem",
 	"ipsum",
-] as const;
-const SAMPLE_COMPANIES = [
+] 
+const SAMPLE_COMPANIES: NonEmptyArray<string> = [
 	"Acme Corp",
 	"Globex",
 	"Innotech",
 	"Umbrella",
 	"Wayne Enterprises",
-] as const;
-const SAMPLE_CITIES = ["Sydney", "Melbourne", "Perth", "Auckland", "Toronto"] as const;
+] 
+const SAMPLE_CITIES: NonEmptyArray<string> = ["Sydney", "Melbourne", "Perth", "Auckland", "Toronto"] 
 const ROW_HEIGHT = 37;
 const MIN_PAGE_SIZE = 60;
 const MAX_PAGE_SIZE = 200;
 
-const randomItem = <T,>(arr: readonly T[]): T =>
-	arr[Math.floor(Math.random() * arr.length)];
+const randomItem = <T,>(arr: readonly T[]): T => {
+	if (arr.length === 0) {
+		throw new Error("randomItem requires a non-empty array");
+	}
+	return arr[Math.floor(Math.random() * arr.length)]!;
+};
 
 const generateOptimisticValue = (
-	column: Column["column"],
+	column: TableData["cells"][number]["column"],
 	index: number,
 ): string => {
 	const lower = column.name.toLowerCase();
@@ -159,11 +165,11 @@ const generateOptimisticValue = (
 
 	if (lower.includes("name")) {
 		return `${randomItem(SAMPLE_NAMES)} ${
-			SAMPLE_NAMES[(index + 3) % SAMPLE_NAMES.length]
+			SAMPLE_NAMES[(index + 3) % SAMPLE_NAMES.length] ?? SAMPLE_NAMES[0]
 		}`;
 	}
 	if (lower.includes("email")) {
-		const name = SAMPLE_NAMES[index % SAMPLE_NAMES.length]
+		const name = (SAMPLE_NAMES[index % SAMPLE_NAMES.length] ?? SAMPLE_NAMES[0])
 			.toLowerCase()
 			.replace(/\s+/g, ".");
 		return `${name}@${randomItem(SAMPLE_DOMAINS)}`;
@@ -304,14 +310,15 @@ export function DataTable({ tableId }: DataTableProps) {
 			},
 		);
 
-	const infiniteQueryInput = useMemo(
-		() => ({
+	const infiniteQueryInput = useMemo(() => {
+		const input: Parameters<
+			typeof api.table.getInfiniteRows.useInfiniteQuery
+		>[0] = {
 			id: tableId,
-			limit: pageSize as const,
-			direction: "forward" as const,
-		}),
-		[tableId, pageSize],
-	);
+			limit: pageSize,
+		};
+		return input;
+	}, [tableId, pageSize]);
 	const utils = api.useUtils();
 	const rowsInfinite = api.table.getInfiniteRows.useInfiniteQuery(
 		infiniteQueryInput,
