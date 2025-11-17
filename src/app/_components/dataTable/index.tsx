@@ -111,8 +111,9 @@ const toHistoryValue = (
 	return String(value);
 };
 const ROW_HEIGHT = 37;
-const MIN_PAGE_SIZE = 60;
-const MAX_PAGE_SIZE = 200;
+const MIN_PAGE_SIZE = 500;
+const MAX_PAGE_SIZE = 500;
+const NEXT_PAGE_FETCH_THRESHOLD = Math.ceil(MIN_PAGE_SIZE * 0.8)
 
 const randomItem = <T,>(arr: readonly T[]): T => {
 	if (arr.length === 0) {
@@ -208,7 +209,7 @@ export function DataTable({ tableId }: DataTableProps) {
 	const [viewSidebarOpen, setViewSidebarOpen] = useState(true);
 	const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(new Set());
 	const [showCheckboxes, setShowCheckboxes] = useState(false);
-	const [pageSize, setPageSize] = useState(200);
+	const [pageSize, setPageSize] = useState(MAX_PAGE_SIZE);
 	const [optimisticRows, setOptimisticRows] = useState<TableData[]>([]);
 	const osName = useMemo(() => detectOS(), []);
 	const {
@@ -283,6 +284,17 @@ export function DataTable({ tableId }: DataTableProps) {
 				},
 			},
 		);
+	const { data: rowCountData } = api.table.getRowCount.useQuery(
+		{ id: tableId },
+		{
+			retry: (failureCount, error) => {
+				if (error?.data?.code === "UNAUTHORIZED") {
+					return false;
+				}
+				return failureCount < 3;
+			},
+		},
+	);
 
 	const infiniteQueryInput = useMemo(() => {
 		const input: Parameters<
@@ -355,6 +367,7 @@ export function DataTable({ tableId }: DataTableProps) {
 			);
 			refetchRows();
 			utils.table.getTableColumnType.invalidate({ id: tableId });
+			utils.table.getRowCount.invalidate({ id: tableId });
 		};
 
 		window.addEventListener(
@@ -376,7 +389,13 @@ export function DataTable({ tableId }: DataTableProps) {
 				handleJobComplete as EventListener,
 			);
 		};
-	}, [orderedColumns, tableId, refetchRows, utils.table.getTableColumnType]);
+	}, [
+		orderedColumns,
+		tableId,
+		refetchRows,
+		utils.table.getTableColumnType,
+		utils.table.getRowCount,
+	]);
 
 	const {
 		views,
@@ -1133,6 +1152,9 @@ export function DataTable({ tableId }: DataTableProps) {
 		const filteredRowsCount = rowsInfinite.hasNextPage
 			? rowsWithOptimistic.length + 1
 			: rowsWithOptimistic.length;
+		const exactRowCount = rowCountData?.count;
+		const footerRowCount = exactRowCount ?? filteredRowsCount;
+		const showApproximate = exactRowCount === undefined && rowsInfinite.hasNextPage;
 
 		const rowVirtualizer = useVirtualizer({
 			count: filteredRowsCount,
@@ -1146,15 +1168,20 @@ export function DataTable({ tableId }: DataTableProps) {
 				if (!vItems.length) return;
 				const last = vItems[vItems.length - 1];
 				if (!last) return;
-				const reachedEnd = last.index >= rowsWithOptimistic.length - 10;
-			if (
-				reachedEnd &&
-				rowsInfinite.hasNextPage &&
-				!rowsInfinite.isFetchingNextPage
-			) {
-				rowsInfinite.fetchNextPage();
-			}
-			utils.table.getInfiniteRows.setInfiniteData(infiniteQueryInput, (old) => {
+				const totalLoadedRows = rowsWithOptimistic.length;
+				if (totalLoadedRows > 0) {
+					const latestIndex = totalLoadedRows - 1;
+					const prefetchThreshold = Math.max(latestIndex - NEXT_PAGE_FETCH_THRESHOLD, 0);
+					const crossedPrefetchThreshold = last.index >= prefetchThreshold;
+					if (
+						crossedPrefetchThreshold &&
+						rowsInfinite.hasNextPage &&
+						!rowsInfinite.isFetchingNextPage
+					) {
+						rowsInfinite.fetchNextPage();
+					}
+				}
+				utils.table.getInfiniteRows.setInfiniteData(infiniteQueryInput, (old) => {
 				if (!old) return old;
 				return { ...old, pages: old.pages.slice(-5) };
 			});
@@ -1799,7 +1826,10 @@ export function DataTable({ tableId }: DataTableProps) {
 						</div>
 						{/* Footer with record count */}
 						<div className="w-full border-t bg-white p-4 text-xs">
-							<span> {filteredRowsCount} records</span>
+							<span>
+								{footerRowCount.toLocaleString()}
+								{showApproximate ? "+" : ""} records
+							</span>
 						</div>
 					</div>
 				</div>

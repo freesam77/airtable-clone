@@ -49,13 +49,13 @@ export const tableRouter = createTRPCRouter({
 		.input(
 			z.object({
 				id: z.string(),
-				limit: z.number().min(1).max(200).nullish(),
+				limit: z.number().nullish(),
 				cursor: z.string().nullish(),
 				direction: z.enum(["forward", "backward"]).default("forward"),
 			}),
 		)
 		.query(async ({ ctx, input }) => {
-			const limit = input.limit ?? 50;
+			const limit = input.limit ?? 100;
 			const forward = input.direction === "forward";
 
 			// Stable deterministic ordering using position then id as tiebreaker

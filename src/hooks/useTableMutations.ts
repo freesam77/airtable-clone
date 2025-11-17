@@ -22,6 +22,7 @@ export function useTableMutations({
 	onOptimisticUpdate,
 }: UseTableMutationsParams) {
 	const utils = api.useUtils();
+	const rowCountInput = { id: tableId };
 
 	const { queueCellUpdate, flushPendingUpdates, remapRowId } =
 		useCellUpdateQueue({
@@ -82,11 +83,17 @@ export function useTableMutations({
 				);
 				return { ...old, pages };
 			});
+			const prevRowCount = utils.table.getRowCount.getData(rowCountInput);
+			utils.table.getRowCount.setData(rowCountInput, (old) => {
+				if (!old) return old;
+				return { ...old, count: old.count + 1 };
+			});
 
 			return {
 				previousInfinite: prevInfiniteRows,
 				previousData: prevColumnData,
 				optimisticRow,
+				previousRowCount: prevRowCount,
 			};
 		},
 		onSuccess: (result, _variables, context) => {
@@ -113,9 +120,13 @@ export function useTableMutations({
 					context.previousInfinite,
 				);
 			}
+			if (context?.previousRowCount) {
+				utils.table.getRowCount.setData(rowCountInput, context.previousRowCount);
+			}
 		},
 		onSettled: () => {
 			utils.table.getInfiniteRows.invalidate(infiniteInput);
+			utils.table.getRowCount.invalidate(rowCountInput);
 		},
 	});
 
@@ -239,7 +250,13 @@ export function useTableMutations({
 				};
 			});
 
-			return { previousInfinite: prevInfiniteRows };
+			const prevRowCount = utils.table.getRowCount.getData(rowCountInput);
+			utils.table.getRowCount.setData(rowCountInput, (old) => {
+				if (!old) return old;
+				return { ...old, count: Math.max(old.count - 1, 0) };
+			});
+
+			return { previousInfinite: prevInfiniteRows, previousRowCount: prevRowCount };
 		},
 		onError: (_err, _variables, context) => {
 			if (context?.previousInfinite) {
@@ -248,9 +265,13 @@ export function useTableMutations({
 					context.previousInfinite,
 				);
 			}
+			if (context?.previousRowCount) {
+				utils.table.getRowCount.setData(rowCountInput, context.previousRowCount);
+			}
 		},
 		onSettled: () => {
 			utils.table.getInfiniteRows.invalidate(infiniteInput);
+			utils.table.getRowCount.invalidate(rowCountInput);
 		},
 	});
 
