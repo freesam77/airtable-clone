@@ -4,33 +4,23 @@ import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { columnTypeSchema } from "~/types/column";
 import { defaultViewSettings } from "./view";
 
+const minimalBaseInclude = {
+	tables: {
+		orderBy: { createdAt: "asc" },
+		select: {
+			id: true,
+			name: true,
+			description: true,
+		},
+	},
+} as const;
+
 export const baseRouter = createTRPCRouter({
 	// Get all bases for the current user
 	getAll: protectedProcedure.query(async ({ ctx }) => {
 		const bases = await ctx.db.base.findMany({
 			where: { createdById: ctx.session.user.id },
-			include: {
-				tables: {
-					include: {
-						columns: {
-							orderBy: { position: "asc" },
-						},
-						rows: {
-							include: {
-								cells: {
-									include: {
-										column: true,
-									},
-								},
-							},
-							orderBy: { position: "asc" },
-						},
-						views: {
-							orderBy: { position: "asc" },
-						},
-					},
-				},
-			},
+			include: minimalBaseInclude,
 			orderBy: { createdAt: "desc" },
 		});
 
@@ -74,28 +64,7 @@ export const baseRouter = createTRPCRouter({
 			// Return the created base
 			return ctx.db.base.findMany({
 				where: { createdById: ctx.session.user.id },
-				include: {
-					tables: {
-						include: {
-							columns: {
-								orderBy: { position: "asc" },
-							},
-							rows: {
-								include: {
-									cells: {
-										include: {
-											column: true,
-										},
-									},
-								},
-								orderBy: { position: "asc" },
-							},
-							views: {
-								orderBy: { position: "asc" },
-							},
-						},
-					},
-				},
+				include: minimalBaseInclude,
 				orderBy: { createdAt: "desc" },
 			});
 		}

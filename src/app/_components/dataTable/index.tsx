@@ -51,6 +51,13 @@ import { applyFilters } from "./filter/Filters";
 import { applySorts } from "./filter/Sorts";
 import { useViewFilter } from "./filter/useViewFilter";
 import {
+	SAMPLE_CITIES,
+	SAMPLE_COMPANIES,
+	SAMPLE_DOMAINS,
+	SAMPLE_NAMES,
+	SAMPLE_WORDS,
+} from "./sampleData";
+import {
 	type FillPreview,
 	type GridCell,
 	type SelectionRange,
@@ -103,39 +110,6 @@ const toHistoryValue = (
 	if (value === null || value === undefined) return null;
 	return String(value);
 };
-
-type NonEmptyArray<T> = readonly [T, ...T[]];
-
-const SAMPLE_NAMES: NonEmptyArray<string> = [
-	"Ava",
-	"Ethan",
-	"Isabella",
-	"Mia",
-	"Liam",
-	"Noah",
-	"Olivia",
-	"Ruby",
-	"Jack",
-	"William",
-] 
-const SAMPLE_DOMAINS: NonEmptyArray<string> = ["yahoo.com", "gmail.com", "icloud.com", "outlook.com"] 
-const SAMPLE_WORDS: NonEmptyArray<string> = [
-	"consectetur",
-	"adipiscing",
-	"elit",
-	"dolor",
-	"amet",
-	"lorem",
-	"ipsum",
-] 
-const SAMPLE_COMPANIES: NonEmptyArray<string> = [
-	"Acme Corp",
-	"Globex",
-	"Innotech",
-	"Umbrella",
-	"Wayne Enterprises",
-] 
-const SAMPLE_CITIES: NonEmptyArray<string> = ["Sydney", "Melbourne", "Perth", "Auckland", "Toronto"] 
 const ROW_HEIGHT = 37;
 const MIN_PAGE_SIZE = 60;
 const MAX_PAGE_SIZE = 200;
