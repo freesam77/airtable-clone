@@ -14,6 +14,8 @@ export const env = createEnv({
 		AUTH_GOOGLE_ID: z.string(),
 		AUTH_GOOGLE_SECRET: z.string(),
 		DATABASE_URL: z.string().url(),
+		SUPABASE_BULK_QUEUE_NAME: z.string().default("bulk_update"),
+		BULK_ROW_QUEUE_THRESHOLD: z.coerce.number().default(10000),
 		NODE_ENV: z
 			.enum(["development", "test", "production"])
 			.default("development"),
@@ -37,6 +39,8 @@ export const env = createEnv({
 		AUTH_GOOGLE_ID: process.env.AUTH_GOOGLE_ID,
 		AUTH_GOOGLE_SECRET: process.env.AUTH_GOOGLE_SECRET,
 		DATABASE_URL: process.env.DATABASE_URL,
+		SUPABASE_BULK_QUEUE_NAME: process.env.SUPABASE_BULK_QUEUE_NAME,
+		BULK_ROW_QUEUE_THRESHOLD: process.env.BULK_ROW_QUEUE_THRESHOLD,
 		NODE_ENV: process.env.NODE_ENV,
 	},
 	/**

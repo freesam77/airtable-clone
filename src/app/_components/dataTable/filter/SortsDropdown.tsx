@@ -9,8 +9,8 @@ import {
 } from "~/components/ui/dropdown-menu";
 import { Switch } from "~/components/ui/switch";
 import { cn } from "~/lib/utils";
-import type { SortCondition } from "./Sorts";
 import type { ColumnType } from "~/types/column";
+import type { SortCondition } from "./Sorts";
 
 type Props = {
 	columns: Array<{ id: string; name: string; type: ColumnType }>;

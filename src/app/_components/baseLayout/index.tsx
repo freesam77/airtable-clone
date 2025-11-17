@@ -1,5 +1,4 @@
 "use client";
-import { Database } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -81,7 +80,7 @@ export function BaseLayout({
 		(table) => table.id === selectedTableId,
 	);
 
-	// generateRows mutation and handlers moved to TopNav
+	// bulkAddRows mutation and handlers moved to TopNav
 
 	// Base selection handled via URL params and sidebar
 

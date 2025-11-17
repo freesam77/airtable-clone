@@ -31,10 +31,17 @@ import {
 import { type CellHistoryChange, useSteps } from "~/hooks/useSteps";
 import { useTableMutations } from "~/hooks/useTableMutations";
 import { useTableSearchNavigation } from "~/hooks/useTableSearchNavigation";
+import {
+	BULK_JOB_COMPLETED_EVENT,
+	BULK_JOB_STARTED_EVENT,
+	type BulkJobCompletedDetail,
+	type BulkJobStartDetail,
+} from "~/lib/bulkJobEvents";
 import { detectOS } from "~/lib/detectOS";
 import { filterRowsByQuery, rowMatchesQuery } from "~/lib/tableFilter";
 import { cn } from "~/lib/utils";
 import { api } from "~/trpc/react";
+import type { ColumnType } from "~/types/column";
 import { ColumnHeaderMenu } from "./ColumnHeaderMenu";
 import { ViewsHeader } from "./ViewsHeader";
 import { ViewsSidebar } from "./ViewsSidebar";
@@ -49,7 +56,6 @@ import {
 	type SelectionRange,
 	useDataTableState,
 } from "./hooks/useDataTableState";
-import type { ColumnType } from "~/types/column";
 
 // Column helpers and definitions extracted to dataTable/columnDefs
 
@@ -84,6 +90,8 @@ type TableData = {
 	updatedAt: Date;
 	tableId: string;
 	cells: Array<Cell>;
+	__optimistic?: boolean;
+	__jobId?: string;
 };
 
 const clamp = (value: number, min: number, max: number) =>
@@ -96,6 +104,120 @@ const toHistoryValue = (
 	return String(value);
 };
 
+const SAMPLE_NAMES = [
+	"Ava",
+	"Ethan",
+	"Isabella",
+	"Mia",
+	"Liam",
+	"Noah",
+	"Olivia",
+	"Ruby",
+	"Jack",
+	"William",
+] as const;
+const SAMPLE_DOMAINS = ["yahoo.com", "gmail.com", "icloud.com", "outlook.com"] as const;
+const SAMPLE_WORDS = [
+	"consectetur",
+	"adipiscing",
+	"elit",
+	"dolor",
+	"amet",
+	"lorem",
+	"ipsum",
+] as const;
+const SAMPLE_COMPANIES = [
+	"Acme Corp",
+	"Globex",
+	"Innotech",
+	"Umbrella",
+	"Wayne Enterprises",
+] as const;
+const SAMPLE_CITIES = ["Sydney", "Melbourne", "Perth", "Auckland", "Toronto"] as const;
+const ROW_HEIGHT = 37;
+const MIN_PAGE_SIZE = 60;
+const MAX_PAGE_SIZE = 200;
+
+const randomItem = <T,>(arr: readonly T[]): T =>
+	arr[Math.floor(Math.random() * arr.length)];
+
+const generateOptimisticValue = (
+	column: Column["column"],
+	index: number,
+): string => {
+	const lower = column.name.toLowerCase();
+	if (column.type === "NUMBER") {
+		const base = 1 + ((index * 13) % 97);
+		if (lower.includes("age")) {
+			return String(18 + (base % 70));
+		}
+		if (lower.includes("price") || lower.includes("amount")) {
+			return String(10 + (base * 7) % 5000);
+		}
+		return String(base);
+	}
+
+	if (lower.includes("name")) {
+		return `${randomItem(SAMPLE_NAMES)} ${
+			SAMPLE_NAMES[(index + 3) % SAMPLE_NAMES.length]
+		}`;
+	}
+	if (lower.includes("email")) {
+		const name = SAMPLE_NAMES[index % SAMPLE_NAMES.length]
+			.toLowerCase()
+			.replace(/\s+/g, ".");
+		return `${name}@${randomItem(SAMPLE_DOMAINS)}`;
+	}
+	if (lower.includes("phone") || lower.includes("tel")) {
+		return `+1-555-${String(1000 + (index * 17) % 9000)}`;
+	}
+	if (lower.includes("company")) {
+		return randomItem(SAMPLE_COMPANIES);
+	}
+	if (lower.includes("city")) {
+		return randomItem(SAMPLE_CITIES);
+	}
+	if (lower.includes("note") || lower.includes("description")) {
+		return `${randomItem(SAMPLE_WORDS)} ${randomItem(SAMPLE_WORDS)}`;
+	}
+
+	return `${randomItem(SAMPLE_WORDS)} ${index + 1}`;
+};
+
+const buildOptimisticRows = ({
+	columns,
+	count,
+	startPosition,
+	tableId,
+	jobId,
+}: {
+	columns: TableData["cells"][number]["column"][];
+	count: number;
+	startPosition: number;
+	tableId: string;
+	jobId: string;
+}): TableData[] => {
+	return Array.from({ length: Math.min(count, MAX_PAGE_SIZE) }, (_, idx) => {
+		const rowId = `optimistic-${jobId}-${startPosition + idx}`;
+		return {
+			id: rowId,
+			position: startPosition + idx,
+			createdAt: new Date(),
+			updatedAt: new Date(),
+			tableId,
+			cells: columns.map((column) => ({
+				id: `${rowId}-${column.id}`,
+				columnId: column.id,
+				rowId,
+				value: generateOptimisticValue(column, idx),
+				column,
+			})),
+			__optimistic: true,
+			__jobId: jobId,
+		};
+	});
+};
+
 interface DataTableProps {
 	tableId: string;
 }
@@ -106,6 +228,8 @@ export function DataTable({ tableId }: DataTableProps) {
 	const [viewSidebarOpen, setViewSidebarOpen] = useState(true);
 	const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(new Set());
 	const [showCheckboxes, setShowCheckboxes] = useState(false);
+	const [pageSize, setPageSize] = useState(200);
+	const [optimisticRows, setOptimisticRows] = useState<TableData[]>([]);
 	const osName = useMemo(() => detectOS(), []);
 	const {
 		state: interactionState,
@@ -152,6 +276,20 @@ export function DataTable({ tableId }: DataTableProps) {
 		}
 	}, [editingCell]);
 
+	const updatePageSize = useCallback(() => {
+		const height = scrollParentRef.current?.clientHeight ?? 0;
+		if (!height) return;
+		const target = clamp(
+			Math.ceil(height / ROW_HEIGHT) * 2,
+			MIN_PAGE_SIZE,
+			MAX_PAGE_SIZE,
+		);
+		setPageSize((prev) => (prev === target ? prev : target));
+	}, []);
+	useEffect(() => {
+		updatePageSize();
+	}, [updatePageSize]);
+
 	// Fetch table metadata for columns
 	const { data: tableColumn, isLoading: tableColumnLoading } =
 		api.table.getTableColumnType.useQuery(
@@ -166,11 +304,15 @@ export function DataTable({ tableId }: DataTableProps) {
 			},
 		);
 
-	const infiniteQueryInput = {
-		id: tableId,
-		limit: 200 as const,
-		direction: "forward" as const,
-	};
+	const infiniteQueryInput = useMemo(
+		() => ({
+			id: tableId,
+			limit: pageSize as const,
+			direction: "forward" as const,
+		}),
+		[tableId, pageSize],
+	);
+	const utils = api.useUtils();
 	const rowsInfinite = api.table.getInfiniteRows.useInfiniteQuery(
 		infiniteQueryInput,
 		{
@@ -178,6 +320,17 @@ export function DataTable({ tableId }: DataTableProps) {
 			getPreviousPageParam: (firstPage) => firstPage.prevCursor,
 		},
 	);
+	useEffect(() => {
+		utils.table.getInfiniteRows.setInfiniteData(infiniteQueryInput, (old) => {
+			if (!old || old.pages.length <= MAX_CACHED_PAGES) return old;
+			const start = old.pages.length - MAX_CACHED_PAGES;
+			return {
+				...old,
+				pages: old.pages.slice(start),
+				pageParams: old.pageParams.slice(start),
+			};
+		});
+	}, [rowsInfinite.dataUpdatedAt, infiniteQueryInput, utils.table.getInfiniteRows]);
 
 	// No global sentinel needed; we observe the last rendered row
 
@@ -193,6 +346,56 @@ export function DataTable({ tableId }: DataTableProps) {
 		() => [...columns].sort((a, b) => a.position - b.position),
 		[columns],
 	);
+	const { refetch: refetchRows } = rowsInfinite;
+
+	useEffect(() => {
+		const handleJobStart = (event: Event) => {
+			const detail = (event as CustomEvent<BulkJobStartDetail>).detail;
+			if (!detail || detail.tableId !== tableId) return;
+			if (!orderedColumns.length) return;
+			const optimistic = buildOptimisticRows({
+				columns: orderedColumns,
+				count: detail.count,
+				startPosition: detail.startRowCount,
+				tableId,
+				jobId: detail.jobId,
+			});
+			setOptimisticRows((prev) => [
+				...prev.filter((row) => row.__jobId !== detail.jobId),
+				...optimistic,
+			]);
+		};
+
+		const handleJobComplete = (event: Event) => {
+			const detail = (event as CustomEvent<BulkJobCompletedDetail>).detail;
+			if (!detail || detail.tableId !== tableId) return;
+			setOptimisticRows((prev) =>
+				prev.filter((row) => row.__jobId !== detail.jobId),
+			);
+			refetchRows();
+			utils.table.getTableColumnType.invalidate({ id: tableId });
+		};
+
+		window.addEventListener(
+			BULK_JOB_STARTED_EVENT,
+			handleJobStart as EventListener,
+		);
+		window.addEventListener(
+			BULK_JOB_COMPLETED_EVENT,
+			handleJobComplete as EventListener,
+		);
+
+		return () => {
+			window.removeEventListener(
+				BULK_JOB_STARTED_EVENT,
+				handleJobStart as EventListener,
+			);
+			window.removeEventListener(
+				BULK_JOB_COMPLETED_EVENT,
+				handleJobComplete as EventListener,
+			);
+		};
+	}, [orderedColumns, tableId, refetchRows, utils.table.getTableColumnType]);
 
 	const {
 		views,
@@ -229,8 +432,6 @@ export function DataTable({ tableId }: DataTableProps) {
 			handleUpdateView({ hiddenColumnIds: filtered });
 		}
 	}, [orderedColumns, hiddenColumnIds, handleUpdateView]);
-
-	const utils = api.useUtils();
 
 	// Optimistic update function for immediate UI feedback
 	const handleOptimisticUpdate = useCallback(
@@ -358,11 +559,11 @@ export function DataTable({ tableId }: DataTableProps) {
 		return applySorts<TableData>(filtered, orderedColumns, sorts, autoSort);
 	}, [data, orderedColumns, filters, sorts, autoSort]);
 
-	const rowNumberMap = useMemo(() => {
-		const map = new Map<string, number>();
-		viewRows.forEach((row, index) => map.set(row.id, index + 1));
-		return map;
-	}, [viewRows]);
+		const rowNumberMap = useMemo(() => {
+			const map = new Map<string, number>();
+			viewRows.forEach((row, index) => map.set(row.id, index + 1));
+			return map;
+		}, [viewRows]);
 
 	const displayData = useMemo<TableData[]>(() => {
 		return filterRowsByQuery(
@@ -372,7 +573,16 @@ export function DataTable({ tableId }: DataTableProps) {
 		) as unknown as TableData[];
 	}, [viewRows, orderedColumns, searchValue]);
 
-	const filteredRows = displayData;
+		const filteredRows = displayData;
+		const optimisticRowLimit = 200;
+		const MAX_CACHED_PAGES = 5;
+		const rowsWithOptimistic = useMemo(
+			() => [
+				...filteredRows,
+				...optimisticRows.slice(0, optimisticRowLimit),
+			],
+			[filteredRows, optimisticRows],
+		);
 
 	// Pre-filter rows using the same logic as the global filter so non-matching rows are hidden at the data level too
 
@@ -418,8 +628,8 @@ export function DataTable({ tableId }: DataTableProps) {
 		onInitialValueConsumed: consumeInitialEditValue,
 	}) as unknown as ColumnDef<TableData>[];
 
-	const table = useReactTable<TableData>({
-		data: displayData,
+		const table = useReactTable<TableData>({
+			data: rowsWithOptimistic,
 		columns: columnDefs,
 		getCoreRowModel: getCoreRowModel(),
 		state: { globalFilter: searchValue },
@@ -435,9 +645,9 @@ export function DataTable({ tableId }: DataTableProps) {
 	});
 	const rowIndexLookup = useMemo(() => {
 		const map = new Map<string, number>();
-		filteredRows.forEach((row, index) => map.set(row.id, index));
+		rowsWithOptimistic.forEach((row, index) => map.set(row.id, index));
 		return map;
-	}, [filteredRows]);
+	}, [rowsWithOptimistic]);
 
 	const columnIndexLookup = useMemo(() => {
 		const map = new Map<string, number>();
@@ -447,12 +657,12 @@ export function DataTable({ tableId }: DataTableProps) {
 
 	const getCellByIndex = useCallback(
 		(rowIndex: number, columnIndex: number): GridCell | null => {
-			const row = filteredRows[rowIndex];
+			const row = rowsWithOptimistic[rowIndex];
 			const column = visibleColumns[columnIndex];
 			if (!row || !column) return null;
 			return { rowId: row.id, columnId: column.id };
 		},
-		[filteredRows, visibleColumns],
+		[rowsWithOptimistic, visibleColumns],
 	);
 
 	const getSelectionBounds = useCallback(
@@ -483,18 +693,18 @@ export function DataTable({ tableId }: DataTableProps) {
 	useEffect(() => {
 		if (
 			activeCell ||
-			filteredRows.length === 0 ||
+			rowsWithOptimistic.length === 0 ||
 			visibleColumns.length === 0
 		) {
 			return;
 		}
-		const firstRow = filteredRows[0];
+		const firstRow = rowsWithOptimistic[0];
 		const firstColumn = visibleColumns[0];
 		if (!firstRow || !firstColumn) return;
 		const first = { rowId: firstRow.id, columnId: firstColumn.id };
 		setActiveCell(first);
 		setSelection({ anchor: first, focus: first });
-	}, [activeCell, filteredRows, visibleColumns]);
+	}, [activeCell, rowsWithOptimistic, visibleColumns]);
 
 	useEffect(() => {
 		if (
@@ -504,12 +714,12 @@ export function DataTable({ tableId }: DataTableProps) {
 		) {
 			return;
 		}
-		if (filteredRows.length === 0 || visibleColumns.length === 0) {
+		if (rowsWithOptimistic.length === 0 || visibleColumns.length === 0) {
 			setActiveCell(null);
 			setSelection(null);
 			return;
 		}
-		const fallbackRow = filteredRows[0];
+		const fallbackRow = rowsWithOptimistic[0];
 		const fallbackColumn = visibleColumns[0];
 		if (!fallbackRow || !fallbackColumn) {
 			setActiveCell(null);
@@ -519,13 +729,13 @@ export function DataTable({ tableId }: DataTableProps) {
 		const fallback = { rowId: fallbackRow.id, columnId: fallbackColumn.id };
 		setActiveCell(fallback);
 		setSelection({ anchor: fallback, focus: fallback });
-	}, [
-		activeCell,
-		rowIndexLookup,
-		columnIndexLookup,
-		filteredRows,
-		visibleColumns,
-	]);
+		}, [
+			activeCell,
+			rowIndexLookup,
+			columnIndexLookup,
+			rowsWithOptimistic,
+			visibleColumns,
+		]);
 
 	useEffect(() => {
 		if (!editingCell) return;
@@ -610,7 +820,7 @@ export function DataTable({ tableId }: DataTableProps) {
 			const anchor = pointerAnchorRef.current;
 			const anchorRowIndex = rowIndexLookup.get(anchor.rowId);
 			if (anchorRowIndex === undefined) return;
-			const anchorRow = filteredRows[anchorRowIndex];
+			const anchorRow = rowsWithOptimistic[anchorRowIndex];
 			if (!anchorRow) return;
 			const sourceValue =
 				anchorRow.cells.find((cell) => cell.columnId === preview.columnId)
@@ -619,7 +829,7 @@ export function DataTable({ tableId }: DataTableProps) {
 			const nextHistoryValue = toHistoryValue(sourceValue);
 
 			for (const rowIndex of preview.rows) {
-				const targetRow = filteredRows[rowIndex];
+				const targetRow = rowsWithOptimistic[rowIndex];
 				if (!targetRow) continue;
 				const previousValue =
 					targetRow.cells.find((cell) => cell.columnId === preview.columnId)
@@ -653,16 +863,16 @@ export function DataTable({ tableId }: DataTableProps) {
 				setActiveCell(anchor);
 			}
 		},
-		[
-			columnIndexLookup,
-			filteredRows,
-			getCellByIndex,
-			handleCellUpdate,
-			recordUndoStep,
-			rowIndexLookup,
-			setActiveCell,
-			setSelection,
-		],
+			[
+				columnIndexLookup,
+				rowsWithOptimistic,
+				getCellByIndex,
+				handleCellUpdate,
+				recordUndoStep,
+				rowIndexLookup,
+				setActiveCell,
+				setSelection,
+			],
 	);
 
 	const finalizePointer = useCallback(() => {
@@ -689,7 +899,7 @@ export function DataTable({ tableId }: DataTableProps) {
 			rowIndex <= bounds.rowEnd;
 			rowIndex++
 		) {
-			const row = filteredRows[rowIndex];
+			const row = rowsWithOptimistic[rowIndex];
 			if (!row) continue;
 			for (
 				let colIndex = bounds.colStart;
@@ -702,18 +912,18 @@ export function DataTable({ tableId }: DataTableProps) {
 			}
 		}
 		return keys;
-	}, [selection, getSelectionBounds, filteredRows, visibleColumns]);
+	}, [selection, getSelectionBounds, rowsWithOptimistic, visibleColumns]);
 
 	const fillPreviewKeys = useMemo(() => {
 		if (!fillPreview) return new Set<string>();
 		const keys = new Set<string>();
 		for (const rowIndex of fillPreview.rows) {
-			const row = filteredRows[rowIndex];
+			const row = rowsWithOptimistic[rowIndex];
 			if (!row) continue;
 			keys.add(`${row.id}|${fillPreview.columnId}`);
 		}
 		return keys;
-	}, [fillPreview, filteredRows]);
+	}, [fillPreview, rowsWithOptimistic]);
 
 	const hasRangeSelection =
 		Boolean(selection) &&
@@ -824,7 +1034,7 @@ export function DataTable({ tableId }: DataTableProps) {
 			rowIndex <= bounds.rowEnd;
 			rowIndex++
 		) {
-			const row = filteredRows[rowIndex];
+			const row = rowsWithOptimistic[rowIndex];
 			if (!row) continue;
 			const values: string[] = [];
 			for (
@@ -845,14 +1055,14 @@ export function DataTable({ tableId }: DataTableProps) {
 		} catch (error) {
 			console.error("Copy failed", error);
 		}
-	}, [
-		activeCell,
-		filteredRows,
-		getCellDisplayValue,
-		getSelectionBounds,
-		selection,
-		visibleColumns,
-	]);
+		}, [
+			activeCell,
+			rowsWithOptimistic,
+			getCellDisplayValue,
+			getSelectionBounds,
+			selection,
+			visibleColumns,
+		]);
 
 	const pasteClipboardData = useCallback(async () => {
 		if (
@@ -867,7 +1077,7 @@ export function DataTable({ tableId }: DataTableProps) {
 		if (
 			startRowIndex === undefined ||
 			startColIndex === undefined ||
-			filteredRows.length === 0 ||
+				rowsWithOptimistic.length === 0 ||
 			visibleColumns.length === 0
 		) {
 			return;
@@ -889,12 +1099,12 @@ export function DataTable({ tableId }: DataTableProps) {
 					const targetRowIndex = startRowIndex + rowOffset;
 					const targetColIndex = startColIndex + colOffset;
 					if (
-						targetRowIndex >= filteredRows.length ||
+							targetRowIndex >= rowsWithOptimistic.length ||
 						targetColIndex >= visibleColumns.length
 					) {
 						return;
 					}
-					const targetRow = filteredRows[targetRowIndex];
+						const targetRow = rowsWithOptimistic[targetRowIndex];
 					const targetCol = visibleColumns[targetColIndex];
 					if (!targetRow || !targetCol) return;
 					const previousValue =
@@ -927,34 +1137,35 @@ export function DataTable({ tableId }: DataTableProps) {
 		} catch (error) {
 			console.error("Paste failed", error);
 		}
-	}, [
-		activeCell,
-		columnIndexLookup,
-		filteredRows,
-		getCellByIndex,
-		handleCellUpdate,
-		normalizeValueForColumn,
-		recordUndoStep,
-		rowIndexLookup,
-		visibleColumns,
-	]);
+		}, [
+			activeCell,
+			columnIndexLookup,
+			rowsWithOptimistic,
+			getCellByIndex,
+			handleCellUpdate,
+			normalizeValueForColumn,
+			recordUndoStep,
+			rowIndexLookup,
+			visibleColumns,
+		]);
 
-	const filteredRowsCount = rowsInfinite.hasNextPage
-		? filteredRows.length + 1
-		: filteredRows.length;
+		const filteredRowsCount = rowsInfinite.hasNextPage
+			? rowsWithOptimistic.length + 1
+			: rowsWithOptimistic.length;
 
-	const rowVirtualizer = useVirtualizer({
-		count: filteredRowsCount,
-		getScrollElement: () => scrollParentRef.current,
-		estimateSize: () => 37,
-		overscan: 10,
-		useAnimationFrameWithResizeObserver: true,
-		onChange: (instance) => {
-			const vItems = instance.getVirtualItems();
-			if (!vItems.length) return;
-			const last = vItems[vItems.length - 1];
-			if (!last) return;
-			const reachedEnd = last.index >= filteredRows.length - 10;
+		const rowVirtualizer = useVirtualizer({
+			count: filteredRowsCount,
+			getScrollElement: () => scrollParentRef.current,
+			estimateSize: () => 37,
+			overscan: 10,
+			useAnimationFrameWithResizeObserver: true,
+			onChange: (instance) => {
+				updatePageSize();
+				const vItems = instance.getVirtualItems();
+				if (!vItems.length) return;
+				const last = vItems[vItems.length - 1];
+				if (!last) return;
+				const reachedEnd = last.index >= rowsWithOptimistic.length - 10;
 			if (
 				reachedEnd &&
 				rowsInfinite.hasNextPage &&
@@ -980,16 +1191,16 @@ export function DataTable({ tableId }: DataTableProps) {
 			if (
 				currentRowIndex === undefined ||
 				currentColIndex === undefined ||
-				filteredRows.length === 0 ||
+				rowsWithOptimistic.length === 0 ||
 				visibleColumns.length === 0
 			) {
 				return;
 			}
-			const nextRowIndex = clamp(
-				currentRowIndex + deltaRow,
-				0,
-				Math.max(filteredRows.length - 1, 0),
-			);
+				const nextRowIndex = clamp(
+					currentRowIndex + deltaRow,
+					0,
+					Math.max(rowsWithOptimistic.length - 1, 0),
+				);
 			const nextColIndex = clamp(
 				currentColIndex + deltaCol,
 				0,
@@ -1000,15 +1211,15 @@ export function DataTable({ tableId }: DataTableProps) {
 			selectCell(nextCell, { extend });
 			rowVirtualizer.scrollToIndex(nextRowIndex, { align: "auto" });
 		},
-		[
-			rowIndexLookup,
-			columnIndexLookup,
-			filteredRows.length,
-			visibleColumns.length,
-			getCellByIndex,
-			selectCell,
-			rowVirtualizer,
-		],
+			[
+				rowIndexLookup,
+				columnIndexLookup,
+				rowsWithOptimistic.length,
+				visibleColumns.length,
+				getCellByIndex,
+				selectCell,
+				rowVirtualizer,
+			],
 	);
 
 	const moveHorizontallyFromCell = useCallback(
@@ -1177,8 +1388,8 @@ export function DataTable({ tableId }: DataTableProps) {
 		activeMatch,
 		gotoNextMatch,
 		gotoPrevMatch,
-	} = useTableSearchNavigation({
-		rows: filteredRows,
+		} = useTableSearchNavigation({
+			rows: rowsWithOptimistic,
 		columns: orderedColumns,
 		searchValue,
 	});

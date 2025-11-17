@@ -13,7 +13,7 @@ import {
 	Star,
 } from "lucide-react";
 import { Check, Search } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -24,6 +24,7 @@ import {
 } from "~/components/ui/dropdown-menu";
 import { Input } from "~/components/ui/input";
 import { showToast } from "~/components/ui/toast";
+import { BULK_JOB_COMPLETED_EVENT, BULK_JOB_STARTED_EVENT, type BulkJobStartDetail } from "~/lib/bulkJobEvents";
 import { cn } from "~/lib/utils";
 import { api } from "~/trpc/react";
 
@@ -55,9 +56,71 @@ export const TopNav = ({
 	createTable,
 }: TopNavProps) => {
 	const utils = api.useUtils();
-	const generateRows = api.table.generateRows.useMutation({
-		onSuccess: async () => {
+	const bulkAddRows = api.table.bulkAddRows.useMutation({
+		onMutate: async (variables) => {
+			if (!variables?.tableId) return undefined;
+			const jobId =
+				typeof crypto !== "undefined" && crypto.randomUUID
+					? crypto.randomUUID()
+					: `job-${Date.now()}`;
+			let startRowCount = 0;
+			try {
+				const result = await utils.table.getRowCount.fetch({
+					id: variables.tableId,
+				});
+				startRowCount = result?.count ?? 0;
+			} catch (error) {
+				console.error("Failed to get current row count", error);
+			}
+			const detail: BulkJobStartDetail = {
+				tableId: variables.tableId,
+				jobId,
+				count: variables.count,
+				startRowCount,
+			};
+			dispatchJobStart(detail);
+			return { jobDetail: detail };
+		},
+		onSuccess: async (result, variables, context) => {
+			const tableName =
+				selectedBase.tables.find(
+					(table) => table.id === (variables?.tableId ?? ""),
+				)?.name ?? "table";
+
+			if (result?.queued) {
+				const rowCount = variables?.count
+					? variables.count.toLocaleString()
+					: "Bulk";
+				const ticket = result.messageId ? ` (job ${result.messageId})` : "";
+				showToast(
+					`${rowCount} rows queued for ${tableName}${ticket}. We'll add them in the background.`,
+					{ variant: "success" },
+				);
+				if (context?.jobDetail) {
+					startJobPolling(context.jobDetail);
+				}
+			} else if (typeof result?.created === "number") {
+				showToast(
+					`Added ${result.created.toLocaleString()} rows to ${tableName}.`,
+					{ variant: "success" },
+				);
+				if (context?.jobDetail) {
+					dispatchJobComplete(
+						context.jobDetail.tableId,
+						context.jobDetail.jobId,
+					);
+				}
+			}
+
 			await utils.base.getAll.invalidate();
+		},
+		onError: (error, _variables, context) => {
+			showToast(error.message ?? "Failed to add new rows.", {
+				variant: "error",
+			});
+			if (context?.jobDetail) {
+				dispatchJobComplete(context.jobDetail.tableId, context.jobDetail.jobId);
+			}
 		},
 	});
 	const updateBase = api.base.update.useMutation({
@@ -134,6 +197,64 @@ export const TopNav = ({
 	// Add or import dropdown state
 	const [importMenuOpen, setImportMenuOpen] = useState(false);
 	const [importInlineOpen, setImportInlineOpen] = useState(false);
+	const bulkJobPolls = useRef<Map<string, number>>(new Map());
+
+	useEffect(() => {
+		return () => {
+			bulkJobPolls.current.forEach((intervalId) => {
+				window.clearInterval(intervalId);
+			});
+			bulkJobPolls.current.clear();
+		};
+	}, []);
+
+	const dispatchJobStart = useCallback((detail: BulkJobStartDetail) => {
+		window.dispatchEvent(
+			new CustomEvent(BULK_JOB_STARTED_EVENT, {
+				detail,
+			}),
+		);
+	}, []);
+
+	const dispatchJobComplete = useCallback(
+		(tableId: string, jobId: string) => {
+			const existing = bulkJobPolls.current.get(jobId);
+			if (existing) {
+				window.clearInterval(existing);
+				bulkJobPolls.current.delete(jobId);
+			}
+			window.dispatchEvent(
+				new CustomEvent(BULK_JOB_COMPLETED_EVENT, {
+					detail: { tableId, jobId },
+				}),
+			);
+		},
+		[],
+	);
+
+	const startJobPolling = useCallback(
+		(detail: BulkJobStartDetail) => {
+			const runCheck = async () => {
+				try {
+					const result = await utils.table.getRowCount.fetch({
+						id: detail.tableId,
+					});
+					if (result?.count === undefined) return;
+					if (result.count >= detail.startRowCount + detail.count) {
+						dispatchJobComplete(detail.tableId, detail.jobId);
+					}
+				} catch (error) {
+					console.error("Bulk job polling failed", error);
+				}
+			};
+
+			runCheck();
+
+			const intervalId = window.setInterval(runCheck, 4000);
+			bulkJobPolls.current.set(detail.jobId, intervalId);
+		},
+		[dispatchJobComplete, utils.table.getRowCount],
+	);
 
 	useEffect(() => {
 		setNameDraft(selectedBase.name);
@@ -358,26 +479,26 @@ export const TopNav = ({
 								onClick={() => {
 									const id = selectedTableId ?? selectedBase.tables[0]?.id;
 									if (!id) return;
-									generateRows.mutate({ tableId: id, count: 100_000 });
+									bulkAddRows.mutate({ tableId: id, count: 100_000 });
 								}}
-								disabled={generateRows.isPending}
+								disabled={bulkAddRows.isPending}
 								className="btn-share"
 							>
 								<Plus size={16} />
-								{generateRows.isPending ? "Adding rows..." : "Add 100K Rows"}
+								{bulkAddRows.isPending ? "Adding rows..." : "Add 100K Rows"}
 							</button>
 							<button
 								type="button"
 								onClick={() => {
 									const id = selectedTableId ?? selectedBase.tables[0]?.id;
 									if (!id) return;
-									generateRows.mutate({ tableId: id, count: 100 });
+									bulkAddRows.mutate({ tableId: id, count: 100 });
 								}}
-								disabled={generateRows.isPending}
+								disabled={bulkAddRows.isPending}
 								className="btn-share"
 							>
 								<Plus size={16} />
-								{generateRows.isPending ? "Adding rows..." : "Add 100 Rows"}
+								{bulkAddRows.isPending ? "Adding rows..." : "Add 100 Rows"}
 							</button>
 							<button
 								type="button"

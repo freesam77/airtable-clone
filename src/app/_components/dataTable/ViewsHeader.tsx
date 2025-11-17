@@ -16,6 +16,7 @@ import {
 	DropdownMenuContent,
 	DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
+import type { ColumnType } from "~/types/column";
 import { SearchMenu } from "./SearchMenu";
 import type { FilterCondition } from "./filter/Filters";
 import { FiltersDropdown } from "./filter/FiltersDropdown";
@@ -23,7 +24,6 @@ import { HiddenFieldsDropdown } from "./filter/HiddenFieldsDropdown";
 import type { SortCondition } from "./filter/Sorts";
 import { SortsDropdown } from "./filter/SortsDropdown";
 import type { ViewUpdatePatch } from "./filter/useViewFilter";
-import type { ColumnType } from "~/types/column";
 
 type ViewsHeaderProps = {
 	viewName: string;

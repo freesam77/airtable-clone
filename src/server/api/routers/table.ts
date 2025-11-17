@@ -1,8 +1,15 @@
+import { faker } from "@faker-js/faker";
 import type { Prisma } from "@prisma/client";
 import { z } from "zod";
-import { columnTypeSchema } from "~/types/column";
+import { env } from "~/env";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { columnTypeSchema } from "~/types/column";
 import { defaultViewSettings } from "./view";
+
+const BULK_QUEUE_NAME = env.SUPABASE_BULK_QUEUE_NAME ?? "bulk_update";
+const BULK_QUEUE_CHUNK_SIZE = 10000;
+const BULK_ROW_QUEUE_THRESHOLD = env.BULK_ROW_QUEUE_THRESHOLD ?? BULK_QUEUE_CHUNK_SIZE;
+const BULK_QUEUE_EVENT_TYPE = "BULK_RANDOM_ROW_GENERATION";
 
 export const tableRouter = createTRPCRouter({
 	// Get table columns (for headers/typing)
@@ -20,8 +27,22 @@ export const tableRouter = createTRPCRouter({
 					columns: {
 						orderBy: { position: "asc" },
 					},
+					_count: {
+						select: { rows: true },
+					},
 				},
 			});
+		}),
+	getRowCount: protectedProcedure
+		.input(z.object({ id: z.string() }))
+		.query(async ({ ctx, input }) => {
+			const count = await ctx.db.row.count({
+				where: {
+					tableId: input.id,
+					table: { base: { createdById: ctx.session.user.id } },
+				},
+			});
+			return { count };
 		}),
 	// Get infinite rows
 	getInfiniteRows: protectedProcedure
@@ -170,7 +191,11 @@ export const tableRouter = createTRPCRouter({
 					},
 				},
 				include: {
-					rows: true,
+					_count: {
+						select: {
+							rows: true,
+						},
+					},
 				},
 			});
 
@@ -179,7 +204,7 @@ export const tableRouter = createTRPCRouter({
 			}
 
 			// Get the next position for the new row
-			const nextPosition = table.rows.length;
+			const nextPosition = table._count?.rows ?? 0;
 
 			// Create the row
 			const row = await ctx.db.row.create({
@@ -553,12 +578,12 @@ export const tableRouter = createTRPCRouter({
 			return newCol;
 		}),
 
-	// Generate random rows
-	generateRows: protectedProcedure
+	// Bulk add random rows (and optionally enqueue massive jobs)
+	bulkAddRows: protectedProcedure
 		.input(
 			z.object({
 				tableId: z.string(),
-				count: z.number().min(1).max(100000),
+				count: z.number(),
 			}),
 		)
 		.mutation(async ({ ctx, input }) => {
@@ -572,7 +597,11 @@ export const tableRouter = createTRPCRouter({
 				},
 				include: {
 					columns: true,
-					rows: true,
+					_count: {
+						select: {
+							rows: true,
+						},
+					},
 				},
 			});
 
@@ -580,81 +609,70 @@ export const tableRouter = createTRPCRouter({
 				throw new Error("Table not found or access denied");
 			}
 
-			// Helper functions for random data generation
-			const randomNames = [
-				"Alice",
-				"Bob",
-				"Charlie",
-				"Diana",
-				"Eve",
-				"Frank",
-				"Grace",
-				"Henry",
-				"Ivy",
-				"Jack",
-				"Kate",
-				"Liam",
-				"Mia",
-				"Noah",
-				"Olivia",
-				"Paul",
-				"Quinn",
-				"Ruby",
-				"Sam",
-				"Tina",
-			];
-			const randomEmails = [
-				"gmail.com",
-				"yahoo.com",
-				"outlook.com",
-				"hotmail.com",
-				"icloud.com",
-			];
+			const existingRowCount = table._count?.rows ?? 0;
+			const shouldQueue = input.count >= BULK_ROW_QUEUE_THRESHOLD;
+
+			if (shouldQueue) {
+				const totalJobs = Math.ceil(input.count / BULK_QUEUE_CHUNK_SIZE);
+				const messageIds: number[] = [];
+				for (let jobIndex = 0; jobIndex < totalJobs; jobIndex += 1) {
+					const rowsRemaining = input.count - jobIndex * BULK_QUEUE_CHUNK_SIZE;
+					const chunkCount = Math.min(rowsRemaining, BULK_QUEUE_CHUNK_SIZE);
+
+					const payload = {
+						type: BULK_QUEUE_EVENT_TYPE,
+						requestedAt: new Date().toISOString(),
+						tableId: table.id,
+						tableName: table.name,
+						baseId: table.baseId,
+						count: chunkCount,
+						totalRequested: input.count,
+						requestedBy: ctx.session.user.id,
+					};
+
+					const [messageRow] = await ctx.db.$queryRaw<
+						Array<{ msg_id: bigint }>
+					>`SELECT pgmq.send(${BULK_QUEUE_NAME}, ${JSON.stringify(payload)}::jsonb, 0) AS msg_id;`;
+					if (messageRow?.msg_id) {
+						messageIds.push(Number(messageRow.msg_id));
+					}
+				}
+
+				return {
+					created: 0,
+					queued: true,
+					queueName: BULK_QUEUE_NAME,
+					messageId: messageIds[0] ?? null,
+				};
+			}
 
 			const generateRandomValue = (column: { type: string; name: string }):
 				| string
 				| number => {
 				if (column.type === "NUMBER") {
 					if (column.name.toLowerCase().includes("age")) {
-						return Math.floor(Math.random() * 80) + 18; // Age between 18-98
+						return faker.number.int({ min: 18, max: 98 });
 					}
-					return Math.floor(Math.random() * 1000) + 1; // Random number 1-1000
+					return faker.number.int({ min: 1, max: 1000 });
 				}
 
 				// TEXT type
 				if (column.name.toLowerCase().includes("name")) {
-					return (
-						randomNames[Math.floor(Math.random() * randomNames.length)] ||
-						"User"
-					);
+					return faker.person.fullName();
 				}
 				if (column.name.toLowerCase().includes("email")) {
-					const name =
-						randomNames[
-							Math.floor(Math.random() * randomNames.length)
-						]?.toLowerCase() || "user";
-					const domain =
-						randomEmails[Math.floor(Math.random() * randomEmails.length)] ||
-						"example.com";
-					return `${name}@${domain}`;
+					return faker.internet.email({
+						firstName: faker.person.firstName(),
+						lastName: faker.person.lastName(),
+					});
 				}
 				// Generic text
-				const words = [
-					"Lorem",
-					"ipsum",
-					"dolor",
-					"sit",
-					"amet",
-					"consectetur",
-					"adipiscing",
-					"elit",
-				];
-				return words[Math.floor(Math.random() * words.length)] || "Lorem";
+				return faker.lorem.word();
 			};
 
 			// Create rows with random data
 			const rowsToCreate = Array.from({ length: input.count }, (_, index) => {
-				const position = table.rows.length + index;
+				const position = existingRowCount + index;
 				return {
 					tableId: input.tableId,
 					position,
@@ -671,7 +689,7 @@ export const tableRouter = createTRPCRouter({
 			});
 
 			// Create rows in chunks to avoid oversized transactions/responses
-			const chunkSize = 1000;
+			const chunkSize = 5000;
 			for (let i = 0; i < rowsToCreate.length; i += chunkSize) {
 				const chunk = rowsToCreate.slice(i, i + chunkSize);
 				await ctx.db.$transaction(
@@ -684,6 +702,11 @@ export const tableRouter = createTRPCRouter({
 			}
 
 			// Return a lightweight result; clients should re-fetch table
-			return { created: rowsToCreate.length };
+			return {
+				created: rowsToCreate.length,
+				queued: false,
+				queueName: null,
+				messageId: null,
+			};
 		}),
 });

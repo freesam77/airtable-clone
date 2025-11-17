@@ -4,7 +4,7 @@ import {
 	ArrowUpRight,
 	Bell,
 	ChevronDown,
-    Folder,
+	Folder,
 	Hammer,
 	HelpCircle,
 	Home,
@@ -290,7 +290,7 @@ export function DashboardLayout({ user }: DashboardLayoutProps) {
 							onClick={() => setIsSidebarCollapsed((prev) => !prev)}
 							aria-label="Toggle sidebar"
 							aria-pressed={isSidebarCollapsed}
-							className="flex items-center justify-center text-gray-600 transition hover:bg-gray-50 mr-3"
+							className="mr-3 flex items-center justify-center text-gray-600 transition hover:bg-gray-50"
 						>
 							<Menu className="size-5" />
 						</button>
@@ -462,9 +462,7 @@ export function DashboardLayout({ user }: DashboardLayoutProps) {
 										onClick={() => setViewMode("list")}
 										aria-pressed={viewMode === "list"}
 										className={`flex items-center gap-2 rounded-full p-1 font-medium text-sm transition ${
-											viewMode === "list"
-												? "bg-gray-200"
-												: "text-gray-400"
+											viewMode === "list" ? "bg-gray-200" : "text-gray-400"
 										}`}
 									>
 										<MenuIcon className="size-4" />
@@ -474,9 +472,7 @@ export function DashboardLayout({ user }: DashboardLayoutProps) {
 										onClick={() => setViewMode("grid")}
 										aria-pressed={viewMode === "grid"}
 										className={`flex items-center gap-2 rounded-full p-1 font-medium text-sm transition ${
-											viewMode === "grid"
-												? "bg-gray-200"
-												: "text-gray-400"
+											viewMode === "grid" ? "bg-gray-200" : "text-gray-400"
 										}`}
 									>
 										<LayoutGrid className="size-4" />
