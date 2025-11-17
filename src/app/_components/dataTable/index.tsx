@@ -7,6 +7,7 @@ import {
 	useReactTable,
 } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { Plus, Sparkles } from "lucide-react";
 import {
 	type KeyboardEvent as ReactKeyboardEvent,
 	type PointerEvent as ReactPointerEvent,
@@ -111,9 +112,9 @@ const toHistoryValue = (
 	return String(value);
 };
 const ROW_HEIGHT = 37;
-const MIN_PAGE_SIZE = 500;
+const MIN_PAGE_SIZE = 200;
 const MAX_PAGE_SIZE = 500;
-const NEXT_PAGE_FETCH_THRESHOLD = Math.ceil(MIN_PAGE_SIZE * 0.8)
+const NEXT_PAGE_FETCH_THRESHOLD = Math.ceil(MIN_PAGE_SIZE * 0.8);
 
 const randomItem = <T,>(arr: readonly T[]): T => {
 	if (arr.length === 0) {
@@ -211,6 +212,7 @@ export function DataTable({ tableId }: DataTableProps) {
 	const [showCheckboxes, setShowCheckboxes] = useState(false);
 	const [pageSize, setPageSize] = useState(MAX_PAGE_SIZE);
 	const [optimisticRows, setOptimisticRows] = useState<TableData[]>([]);
+	const [isAtBottom, setIsAtBottom] = useState(false);
 	const osName = useMemo(() => detectOS(), []);
 	const {
 		state: interactionState,
@@ -1152,8 +1154,12 @@ export function DataTable({ tableId }: DataTableProps) {
 		const filteredRowsCount = rowsInfinite.hasNextPage
 			? rowsWithOptimistic.length + 1
 			: rowsWithOptimistic.length;
+		const optimisticVisibleCount = rowsWithOptimistic.filter(
+			(row) => row.__jobId,
+		).length;
 		const exactRowCount = rowCountData?.count;
-		const footerRowCount = exactRowCount ?? filteredRowsCount;
+		const footerRowCount =
+			(exactRowCount ?? rowsWithOptimistic.length) + optimisticVisibleCount;
 		const showApproximate = exactRowCount === undefined && rowsInfinite.hasNextPage;
 
 		const rowVirtualizer = useVirtualizer({
@@ -1169,12 +1175,22 @@ export function DataTable({ tableId }: DataTableProps) {
 				const last = vItems[vItems.length - 1];
 				if (!last) return;
 				const totalLoadedRows = rowsWithOptimistic.length;
+				const viewport = scrollParentRef.current?.clientHeight ?? 0;
+				const noScrollableContent =
+					totalLoadedRows === 0 ||
+					totalLoadedRows * ROW_HEIGHT <= viewport + ROW_HEIGHT;
 				if (totalLoadedRows > 0) {
 					const latestIndex = totalLoadedRows - 1;
-					const prefetchThreshold = Math.max(latestIndex - NEXT_PAGE_FETCH_THRESHOLD, 0);
+					const prefetchThreshold = Math.max(
+						latestIndex - NEXT_PAGE_FETCH_THRESHOLD,
+						0,
+					);
 					const crossedPrefetchThreshold = last.index >= prefetchThreshold;
+					const loaderIndex = totalLoadedRows;
+					const loaderVisible = last.index >= loaderIndex;
 					if (
 						crossedPrefetchThreshold &&
+						loaderVisible &&
 						rowsInfinite.hasNextPage &&
 						!rowsInfinite.isFetchingNextPage
 					) {
@@ -1182,9 +1198,16 @@ export function DataTable({ tableId }: DataTableProps) {
 					}
 				}
 				utils.table.getInfiniteRows.setInfiniteData(infiniteQueryInput, (old) => {
-				if (!old) return old;
-				return { ...old, pages: old.pages.slice(-5) };
-			});
+					if (!old) return old;
+					return { ...old, pages: old.pages.slice(-5) };
+				});
+				const bottomIndex = filteredRowsCount - 1;
+				const reachedBottom =
+					noScrollableContent ||
+					(!rowsInfinite.hasNextPage &&
+						filteredRowsCount > 0 &&
+						last.index >= bottomIndex);
+				setIsAtBottom(reachedBottom);
 		},
 	});
 
@@ -1424,10 +1447,28 @@ export function DataTable({ tableId }: DataTableProps) {
 		return () => window.removeEventListener("keydown", handler);
 	}, [osName]);
 
-	const handleAddRow = () => {
+	const handleAddRow = useCallback(() => {
 		const cells = columns.map((col) => ({ columnId: col.id, value: "" }));
 		addRowMutation.mutate({ tableId, cells });
-	};
+	}, [addRowMutation, columns, tableId]);
+
+	const scrollToTableBottom = useCallback(() => {
+		if (filteredRowsCount <= 0) return;
+		rowVirtualizer.scrollToIndex(Math.max(filteredRowsCount - 1, 0), {
+			align: "end",
+		});
+	}, [filteredRowsCount, rowVirtualizer]);
+
+	const handleFloatingAddRow = useCallback(() => {
+		scrollToTableBottom();
+		handleAddRow();
+	}, [handleAddRow, scrollToTableBottom]);
+
+	const addRowButtonDisabled = addRowMutation.isPending || columns.length === 0;
+	const viewportHeight = scrollParentRef.current?.clientHeight ?? 0;
+	const estimatedContentHeight = rowsWithOptimistic.length * ROW_HEIGHT;
+	const hasScrollableRows = estimatedContentHeight > viewportHeight + ROW_HEIGHT;
+	const showFloatingAddButton = hasScrollableRows && !isAtBottom;
 
 	const handleDeleteRows = async (clickedRowId: string) => {
 		const ids =
@@ -1462,7 +1503,28 @@ export function DataTable({ tableId }: DataTableProps) {
 	}
 
 	return (
-		<div className="flex h-full">
+		<div className="relative flex h-full">
+			{showFloatingAddButton && (
+				<div className="pointer-events-none absolute bottom-6 left-6 z-50 flex flex-col gap-2">
+					<button
+						type="button"
+						onClick={handleFloatingAddRow}
+						disabled={addRowButtonDisabled}
+						className="pointer-events-auto flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-lg transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+					>
+						<Plus className="size-4" />
+						Add row
+					</button>
+					<button
+						type="button"
+						disabled
+						className="pointer-events-auto flex items-center gap-2 rounded-full border border-dashed border-gray-200 bg-white px-4 py-2 text-sm text-gray-400 shadow"
+					>
+						<Sparkles className="size-4" />
+						Magic fill
+					</button>
+				</div>
+			)}
 			<div className="min-w-0 flex-1">
 				<ViewsHeader
 					viewName={activeView?.name ?? "View"}
