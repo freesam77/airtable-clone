@@ -1,6 +1,7 @@
 "use client";
 
 import {
+	type Cell as TableCell,
 	type ColumnDef,
 	flexRender,
 	getCoreRowModel,
@@ -11,6 +12,7 @@ import { Plus, Sparkles } from "lucide-react";
 import {
 	type KeyboardEvent as ReactKeyboardEvent,
 	type PointerEvent as ReactPointerEvent,
+	memo,
 	useCallback,
 	useEffect,
 	useMemo,
@@ -111,6 +113,28 @@ const toHistoryValue = (
 	if (value === null || value === undefined) return null;
 	return String(value);
 };
+
+const MemoCellValue = memo(
+	function MemoCellValue({
+		cell,
+	}: {
+		cell: TableCell<TableData, unknown>;
+	}) {
+		return (
+			<div className="truncate">
+				{flexRender(cell.column.columnDef.cell, cell.getContext())}
+			</div>
+		);
+	},
+	(prevProps, nextProps) => {
+		const prev = prevProps.cell;
+		const next = nextProps.cell;
+		// Only re-render when the logical cell value changes
+		return prev.row.id === next.row.id &&
+			prev.column.id === next.column.id &&
+			prev.getValue() === next.getValue();
+	},
+);
 const ROW_HEIGHT = 37;
 const MIN_PAGE_SIZE = 200;
 const MAX_PAGE_SIZE = 500;
@@ -1593,14 +1617,14 @@ export function DataTable({ tableId }: DataTableProps) {
 										/>
 									))}
 								</colgroup>
-								<thead className="border-gray-300 border-b bg-white">
+								<thead className="border-gray-300 border-b bg-white sticky top-0">
 									{table.getHeaderGroups().map((headerGroup) => (
 										<tr key={headerGroup.id}>
 											{headerGroup.headers.map((header) => (
 												<th
 													key={header.id}
 													className={cn(
-														"sticky top-0 z-40 border-gray-200 border-r border-b bg-white p-2 text-left text-gray-700 text-sm",
+														"sticky top-0 z-50 border-gray-200 border-r border-b bg-white p-2 text-left text-gray-700 text-sm",
 														header.column.columnDef.meta?.className,
 													)}
 												>
@@ -1795,12 +1819,7 @@ export function DataTable({ tableId }: DataTableProps) {
 																							/>
 																						</>
 																					)}
-																					<div className="truncate">
-																						{flexRender(
-																							cell.column.columnDef.cell,
-																							cell.getContext(),
-																						)}
-																					</div>
+																					<MemoCellValue cell={cell} />
 																				</td>
 																			);
 																		})

@@ -49,24 +49,10 @@ export function useCellUpdateQueue({
 							typeof update.value === "number"
 								? String(update.value)
 								: update.value;
-						// If this update targets an optimistic row, wait briefly
-						// for the real rowId mapping to appear before sending.
 						const resolveRowId = async (rowId: string) => {
-							// Fast path: already mapped
 							const existing = rowIdMapRef.current.get(rowId);
 							if (existing) return existing;
 
-							// If not a temp id, just use it
-							if (!rowId.startsWith("temp-")) return rowId;
-
-							// Poll for mapping up to ~5s
-							const start = Date.now();
-							while (Date.now() - start < 5000) {
-								const mapped = rowIdMapRef.current.get(rowId);
-								if (mapped) return mapped;
-								await new Promise((r) => setTimeout(r, 150));
-							}
-							// Give up; send with temp id (may fail, but won't block queue)
 							return rowId;
 						};
 
@@ -131,16 +117,7 @@ export function useCellUpdateQueue({
 			// Only increment pending count for new cell updates
 			if (isNewCellUpdate) {
 				pendingCountRef.current++;
-				console.log(
-					"New cell update queued - pending count:",
-					pendingCountRef.current,
-				);
 				setHasPendingChanges(true);
-			} else {
-				console.log(
-					"Existing cell update replaced - pending count unchanged:",
-					pendingCountRef.current,
-				);
 			}
 		},
 		[onOptimisticUpdate, queuer],
@@ -151,18 +128,12 @@ export function useCellUpdateQueue({
 		// Reset pending count after manual flush
 		pendingCountRef.current = 0;
 		setHasPendingChanges(false);
-		console.log("Manual flush completed - pending count reset to 0");
 	}, [queuer]);
 
 	// Prevent page refresh when there are unsaved changes
 	useEffect(() => {
 		const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-			console.log(
-				"beforeunload triggered, hasPendingChanges:",
-				hasPendingChanges,
-			);
 			if (hasPendingChanges) {
-				console.log("Preventing page unload due to pending changes");
 				// Attempt to flush pending updates before leaving
 				flushPendingUpdates();
 
@@ -175,13 +146,8 @@ export function useCellUpdateQueue({
 			}
 		};
 
-		console.log(
-			"Setting up beforeunload listener, hasPendingChanges:",
-			hasPendingChanges,
-		);
 		window.addEventListener("beforeunload", handleBeforeUnload);
 		return () => {
-			console.log("Removing beforeunload listener");
 			window.removeEventListener("beforeunload", handleBeforeUnload);
 		};
 	}, [hasPendingChanges, flushPendingUpdates]);
