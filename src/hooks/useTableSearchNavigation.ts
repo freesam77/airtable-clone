@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 type RowLike = {
 	id: string;
 	cells: Array<{
-		column: { id: string };
+		column?: { id: string };
+		columnId?: string;
 		value?: string | null;
 	}>;
 };
@@ -47,7 +48,10 @@ export function useTableSearchNavigation({
 			// Iterate columns in the provided order to respect visual left→right
 			for (const col of columns) {
 				if (!columnIdSet.has(col.id)) continue;
-				const cv = row.cells.find((c) => c.column.id === col.id);
+				const cv = row.cells.find((c) => {
+					const cid = c.column?.id ?? c.columnId;
+					return cid === col.id;
+				});
 				if (!cv) continue;
 				const t = (cv.value ?? "").toLowerCase();
 				if (t.includes(query)) {

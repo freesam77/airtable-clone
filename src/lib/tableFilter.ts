@@ -3,7 +3,9 @@
 export type RowLike = {
 	id: string;
 	cells: Array<{
-		column: { id: string };
+		// Support either embedded column metadata or a raw columnId
+		column?: { id: string };
+		columnId?: string;
 		value?: string | null;
 	}>;
 };
@@ -39,7 +41,10 @@ export function rowMatchesQuery(
 
 	// Look for any cell in the provided column order that includes the query
 	return columns.some((col) => {
-		const cell = row.cells.find((c) => c.column.id === col.id);
+		const cell = row.cells.find((c) => {
+			const cid = c.column?.id ?? c.columnId;
+			return cid === col.id;
+		});
 		return cellText(cell?.value).includes(q);
 	});
 }

@@ -8,7 +8,8 @@ import { defaultViewSettings } from "./view";
 
 const BULK_QUEUE_NAME = env.SUPABASE_BULK_QUEUE_NAME ?? "bulk_update";
 const BULK_QUEUE_CHUNK_SIZE = 10000;
-const BULK_ROW_QUEUE_THRESHOLD = env.BULK_ROW_QUEUE_THRESHOLD ?? BULK_QUEUE_CHUNK_SIZE;
+const BULK_ROW_QUEUE_THRESHOLD =
+	env.BULK_ROW_QUEUE_THRESHOLD ?? BULK_QUEUE_CHUNK_SIZE;
 const BULK_QUEUE_EVENT_TYPE = "BULK_RANDOM_ROW_GENERATION";
 
 export const tableRouter = createTRPCRouter({

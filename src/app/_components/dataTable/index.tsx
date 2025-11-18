@@ -1,8 +1,8 @@
 "use client";
 
 import {
-	type Cell as TableCell,
 	type ColumnDef,
+	type Cell as TableCell,
 	type Header as TableHeader,
 	flexRender,
 	getCoreRowModel,
@@ -50,10 +50,20 @@ import { ColumnHeaderMenu } from "./ColumnHeaderMenu";
 import { ViewsHeader } from "./ViewsHeader";
 import { ViewsSidebar } from "./ViewsSidebar";
 import { AddColumnDropdown } from "./addColumnDropdown";
-import { type TableData as TableRowData, createColumnDefs } from "./columnDefs";
+import {
+	type ColumnMeta,
+	type TableData as TableRowData,
+	createColumnDefs,
+} from "./columnDefs";
 import { applyFilters } from "./filter/Filters";
 import { applySorts } from "./filter/Sorts";
 import { useViewFilter } from "./filter/useViewFilter";
+import {
+	type FillPreview,
+	type GridCell,
+	type SelectionRange,
+	useDataTableState,
+} from "./hooks/useDataTableState";
 import {
 	SAMPLE_CITIES,
 	SAMPLE_COMPANIES,
@@ -61,12 +71,6 @@ import {
 	SAMPLE_NAMES,
 	SAMPLE_WORDS,
 } from "./sampleData";
-import {
-	type FillPreview,
-	type GridCell,
-	type SelectionRange,
-	useDataTableState,
-} from "./hooks/useDataTableState";
 
 // Column helpers and definitions extracted to dataTable/columnDefs
 
@@ -84,7 +88,7 @@ type Cell = {
 	columnId: string;
 	value: string | null;
 	rowId: string;
-	column: {
+	column?: {
 		id: string;
 		name: string;
 		type: ColumnType;
@@ -135,7 +139,7 @@ const MemoHeaderContent = memo(
 			<th
 				key={header.id}
 				className={cn(
-					"sticky top-0 z-40 border-gray-200 border-r border-b bg-white p-2 text-left text-gray-700 text-sm"
+					"sticky top-0 z-40 border-gray-200 border-r border-b bg-white p-2 text-left text-gray-700 text-sm",
 				)}
 			>
 				<div
@@ -196,9 +200,11 @@ const MemoCellValue = memo(
 		const prev = prevProps.cell;
 		const next = nextProps.cell;
 		// Only re-render when the logical cell value changes
-		return prev.row.id === next.row.id &&
+		return (
+			prev.row.id === next.row.id &&
 			prev.column.id === next.column.id &&
-			prev.getValue() === next.getValue();
+			prev.getValue() === next.getValue()
+		);
 	},
 );
 const ROW_HEIGHT = 37;
@@ -213,10 +219,7 @@ const randomItem = <T,>(arr: readonly T[]): T => {
 	return arr[Math.floor(Math.random() * arr.length)]!;
 };
 
-const generateOptimisticValue = (
-	column: TableData["cells"][number]["column"],
-	index: number,
-): string => {
+const generateOptimisticValue = (column: ColumnMeta, index: number): string => {
 	const lower = column.name.toLowerCase();
 	if (column.type === "NUMBER") {
 		const base = 1 + ((index * 13) % 97);
@@ -224,7 +227,7 @@ const generateOptimisticValue = (
 			return String(18 + (base % 70));
 		}
 		if (lower.includes("price") || lower.includes("amount")) {
-			return String(10 + (base * 7) % 5000);
+			return String(10 + ((base * 7) % 5000));
 		}
 		return String(base);
 	}
@@ -241,7 +244,7 @@ const generateOptimisticValue = (
 		return `${name}@${randomItem(SAMPLE_DOMAINS)}`;
 	}
 	if (lower.includes("phone") || lower.includes("tel")) {
-		return `+1-555-${String(1000 + (index * 17) % 9000)}`;
+		return `+1-555-${String(1000 + ((index * 17) % 9000))}`;
 	}
 	if (lower.includes("company")) {
 		return randomItem(SAMPLE_COMPANIES);
@@ -263,7 +266,7 @@ const buildOptimisticRows = ({
 	tableId,
 	jobId,
 }: {
-	columns: TableData["cells"][number]["column"][];
+	columns: ColumnMeta[];
 	count: number;
 	startPosition: number;
 	tableId: string;
@@ -415,7 +418,11 @@ export function DataTable({ tableId }: DataTableProps) {
 				pageParams: old.pageParams.slice(start),
 			};
 		});
-	}, [rowsInfinite.dataUpdatedAt, infiniteQueryInput, utils.table.getInfiniteRows]);
+	}, [
+		rowsInfinite.dataUpdatedAt,
+		infiniteQueryInput,
+		utils.table.getInfiniteRows,
+	]);
 
 	// No global sentinel needed; we observe the last rendered row
 
@@ -679,11 +686,11 @@ export function DataTable({ tableId }: DataTableProps) {
 		return applySorts<TableData>(filtered, orderedColumns, sorts, autoSort);
 	}, [data, orderedColumns, filters, sorts, autoSort]);
 
-		const rowNumberMap = useMemo(() => {
-			const map = new Map<string, number>();
-			viewRows.forEach((row, index) => map.set(row.id, index + 1));
-			return map;
-		}, [viewRows]);
+	const rowNumberMap = useMemo(() => {
+		const map = new Map<string, number>();
+		viewRows.forEach((row, index) => map.set(row.id, index + 1));
+		return map;
+	}, [viewRows]);
 
 	const displayData = useMemo<TableData[]>(() => {
 		return filterRowsByQuery(
@@ -693,16 +700,13 @@ export function DataTable({ tableId }: DataTableProps) {
 		) as unknown as TableData[];
 	}, [viewRows, orderedColumns, searchValue]);
 
-		const filteredRows = displayData;
-		const optimisticRowLimit = 200;
-		const MAX_CACHED_PAGES = 5;
-		const rowsWithOptimistic = useMemo(
-			() => [
-				...filteredRows,
-				...optimisticRows.slice(0, optimisticRowLimit),
-			],
-			[filteredRows, optimisticRows],
-		);
+	const filteredRows = displayData;
+	const optimisticRowLimit = 200;
+	const MAX_CACHED_PAGES = 5;
+	const rowsWithOptimistic = useMemo(
+		() => [...filteredRows, ...optimisticRows.slice(0, optimisticRowLimit)],
+		[filteredRows, optimisticRows],
+	);
 
 	// Pre-filter rows using the same logic as the global filter so non-matching rows are hidden at the data level too
 
@@ -748,8 +752,8 @@ export function DataTable({ tableId }: DataTableProps) {
 		onInitialValueConsumed: consumeInitialEditValue,
 	}) as unknown as ColumnDef<TableData>[];
 
-		const table = useReactTable<TableData>({
-			data: rowsWithOptimistic,
+	const table = useReactTable<TableData>({
+		data: rowsWithOptimistic,
 		columns: columnDefs,
 		getCoreRowModel: getCoreRowModel(),
 		state: { globalFilter: searchValue },
@@ -849,13 +853,13 @@ export function DataTable({ tableId }: DataTableProps) {
 		const fallback = { rowId: fallbackRow.id, columnId: fallbackColumn.id };
 		setActiveCell(fallback);
 		setSelection({ anchor: fallback, focus: fallback });
-		}, [
-			activeCell,
-			rowIndexLookup,
-			columnIndexLookup,
-			rowsWithOptimistic,
-			visibleColumns,
-		]);
+	}, [
+		activeCell,
+		rowIndexLookup,
+		columnIndexLookup,
+		rowsWithOptimistic,
+		visibleColumns,
+	]);
 
 	useEffect(() => {
 		if (!editingCell) return;
@@ -983,16 +987,16 @@ export function DataTable({ tableId }: DataTableProps) {
 				setActiveCell(anchor);
 			}
 		},
-			[
-				columnIndexLookup,
-				rowsWithOptimistic,
-				getCellByIndex,
-				handleCellUpdate,
-				recordUndoStep,
-				rowIndexLookup,
-				setActiveCell,
-				setSelection,
-			],
+		[
+			columnIndexLookup,
+			rowsWithOptimistic,
+			getCellByIndex,
+			handleCellUpdate,
+			recordUndoStep,
+			rowIndexLookup,
+			setActiveCell,
+			setSelection,
+		],
 	);
 
 	const finalizePointer = useCallback(() => {
@@ -1175,14 +1179,14 @@ export function DataTable({ tableId }: DataTableProps) {
 		} catch (error) {
 			console.error("Copy failed", error);
 		}
-		}, [
-			activeCell,
-			rowsWithOptimistic,
-			getCellDisplayValue,
-			getSelectionBounds,
-			selection,
-			visibleColumns,
-		]);
+	}, [
+		activeCell,
+		rowsWithOptimistic,
+		getCellDisplayValue,
+		getSelectionBounds,
+		selection,
+		visibleColumns,
+	]);
 
 	const pasteClipboardData = useCallback(async () => {
 		if (
@@ -1197,7 +1201,7 @@ export function DataTable({ tableId }: DataTableProps) {
 		if (
 			startRowIndex === undefined ||
 			startColIndex === undefined ||
-				rowsWithOptimistic.length === 0 ||
+			rowsWithOptimistic.length === 0 ||
 			visibleColumns.length === 0
 		) {
 			return;
@@ -1219,12 +1223,12 @@ export function DataTable({ tableId }: DataTableProps) {
 					const targetRowIndex = startRowIndex + rowOffset;
 					const targetColIndex = startColIndex + colOffset;
 					if (
-							targetRowIndex >= rowsWithOptimistic.length ||
+						targetRowIndex >= rowsWithOptimistic.length ||
 						targetColIndex >= visibleColumns.length
 					) {
 						return;
 					}
-						const targetRow = rowsWithOptimistic[targetRowIndex];
+					const targetRow = rowsWithOptimistic[targetRowIndex];
 					const targetCol = visibleColumns[targetColIndex];
 					if (!targetRow || !targetCol) return;
 					const previousValue =
@@ -1257,73 +1261,74 @@ export function DataTable({ tableId }: DataTableProps) {
 		} catch (error) {
 			console.error("Paste failed", error);
 		}
-		}, [
-			activeCell,
-			columnIndexLookup,
-			rowsWithOptimistic,
-			getCellByIndex,
-			handleCellUpdate,
-			normalizeValueForColumn,
-			recordUndoStep,
-			rowIndexLookup,
-			visibleColumns,
-		]);
+	}, [
+		activeCell,
+		columnIndexLookup,
+		rowsWithOptimistic,
+		getCellByIndex,
+		handleCellUpdate,
+		normalizeValueForColumn,
+		recordUndoStep,
+		rowIndexLookup,
+		visibleColumns,
+	]);
 
-		const filteredRowsCount = rowsInfinite.hasNextPage
-			? rowsWithOptimistic.length + 1
-			: rowsWithOptimistic.length;
-		const optimisticVisibleCount = rowsWithOptimistic.filter(
-			(row) => row.__jobId,
-		).length;
-		const exactRowCount = rowCountData?.count;
-		const footerRowCount =
-			(exactRowCount ?? rowsWithOptimistic.length) + optimisticVisibleCount;
-		const showApproximate = exactRowCount === undefined && rowsInfinite.hasNextPage;
+	const filteredRowsCount = rowsInfinite.hasNextPage
+		? rowsWithOptimistic.length + 1
+		: rowsWithOptimistic.length;
+	const optimisticVisibleCount = rowsWithOptimistic.filter(
+		(row) => row.__jobId,
+	).length;
+	const exactRowCount = rowCountData?.count;
+	const footerRowCount =
+		(exactRowCount ?? rowsWithOptimistic.length) + optimisticVisibleCount;
+	const showApproximate =
+		exactRowCount === undefined && rowsInfinite.hasNextPage;
 
-		const rowVirtualizer = useVirtualizer({
-			count: filteredRowsCount,
-			getScrollElement: () => scrollParentRef.current,
-			estimateSize: () => 37,
-			overscan: 10,
-			useAnimationFrameWithResizeObserver: true,
-			onChange: (instance) => {
-				updatePageSize();
-				const vItems = instance.getVirtualItems();
-				if (!vItems.length) return;
-				const last = vItems[vItems.length - 1];
-				if (!last) return;
-				const totalLoadedRows = rowsWithOptimistic.length;
-				const viewport = scrollParentRef.current?.clientHeight ?? 0;
-				const noScrollableContent =
-					totalLoadedRows === 0 ||
-					totalLoadedRows * ROW_HEIGHT <= viewport + ROW_HEIGHT;
-				if (totalLoadedRows > 0) {
-					const latestIndex = totalLoadedRows - 1;
-					const prefetchThreshold = Math.max(
-						latestIndex - NEXT_PAGE_FETCH_THRESHOLD,
-						0,
-					);
-					const crossedPrefetchThreshold = last.index >= prefetchThreshold;
-					const loaderIndex = totalLoadedRows;
-					const loaderVisible = last.index >= loaderIndex;
-					if (
-						crossedPrefetchThreshold &&
-						loaderVisible &&
-						rowsInfinite.hasNextPage &&
-						!rowsInfinite.isFetchingNextPage
-					) {
-						rowsInfinite.fetchNextPage();
-					}
+	const rowVirtualizer = useVirtualizer({
+		count: filteredRowsCount,
+		getScrollElement: () => scrollParentRef.current,
+		estimateSize: () => 37,
+		overscan: 10,
+		useAnimationFrameWithResizeObserver: true,
+		onChange: (instance) => {
+			updatePageSize();
+			const vItems = instance.getVirtualItems();
+			if (!vItems.length) return;
+			const last = vItems[vItems.length - 1];
+			if (!last) return;
+			const totalLoadedRows = rowsWithOptimistic.length;
+			const viewport = scrollParentRef.current?.clientHeight ?? 0;
+			const noScrollableContent =
+				totalLoadedRows === 0 ||
+				totalLoadedRows * ROW_HEIGHT <= viewport + ROW_HEIGHT;
+			if (totalLoadedRows > 0) {
+				const latestIndex = totalLoadedRows - 1;
+				const prefetchThreshold = Math.max(
+					latestIndex - NEXT_PAGE_FETCH_THRESHOLD,
+					0,
+				);
+				const crossedPrefetchThreshold = last.index >= prefetchThreshold;
+				const loaderIndex = totalLoadedRows;
+				const loaderVisible = last.index >= loaderIndex;
+				if (
+					crossedPrefetchThreshold &&
+					loaderVisible &&
+					rowsInfinite.hasNextPage &&
+					!rowsInfinite.isFetchingNextPage
+				) {
+					rowsInfinite.fetchNextPage();
 				}
-				const bottomIndex = filteredRowsCount - 1;
-				const reachedBottom =
-					noScrollableContent ||
-					(!rowsInfinite.hasNextPage &&
-						filteredRowsCount > 0 &&
-						last.index >= bottomIndex);
-				setIsAtBottom(reachedBottom);
-			},
-		});
+			}
+			const bottomIndex = filteredRowsCount - 1;
+			const reachedBottom =
+				noScrollableContent ||
+				(!rowsInfinite.hasNextPage &&
+					filteredRowsCount > 0 &&
+					last.index >= bottomIndex);
+			setIsAtBottom(reachedBottom);
+		},
+	});
 
 	const moveSelection = useCallback(
 		(deltaRow: number, deltaCol: number, extend: boolean) => {
@@ -1341,11 +1346,11 @@ export function DataTable({ tableId }: DataTableProps) {
 			) {
 				return;
 			}
-				const nextRowIndex = clamp(
-					currentRowIndex + deltaRow,
-					0,
-					Math.max(rowsWithOptimistic.length - 1, 0),
-				);
+			const nextRowIndex = clamp(
+				currentRowIndex + deltaRow,
+				0,
+				Math.max(rowsWithOptimistic.length - 1, 0),
+			);
 			const nextColIndex = clamp(
 				currentColIndex + deltaCol,
 				0,
@@ -1356,15 +1361,15 @@ export function DataTable({ tableId }: DataTableProps) {
 			selectCell(nextCell, { extend });
 			rowVirtualizer.scrollToIndex(nextRowIndex, { align: "auto" });
 		},
-			[
-				rowIndexLookup,
-				columnIndexLookup,
-				rowsWithOptimistic.length,
-				visibleColumns.length,
-				getCellByIndex,
-				selectCell,
-				rowVirtualizer,
-			],
+		[
+			rowIndexLookup,
+			columnIndexLookup,
+			rowsWithOptimistic.length,
+			visibleColumns.length,
+			getCellByIndex,
+			selectCell,
+			rowVirtualizer,
+		],
 	);
 
 	const moveHorizontallyFromCell = useCallback(
@@ -1533,8 +1538,8 @@ export function DataTable({ tableId }: DataTableProps) {
 		activeMatch,
 		gotoNextMatch,
 		gotoPrevMatch,
-		} = useTableSearchNavigation({
-			rows: rowsWithOptimistic,
+	} = useTableSearchNavigation({
+		rows: rowsWithOptimistic,
 		columns: orderedColumns,
 		searchValue,
 	});
@@ -1581,7 +1586,8 @@ export function DataTable({ tableId }: DataTableProps) {
 	const addRowButtonDisabled = addRowMutation.isPending || columns.length === 0;
 	const viewportHeight = scrollParentRef.current?.clientHeight ?? 0;
 	const estimatedContentHeight = rowsWithOptimistic.length * ROW_HEIGHT;
-	const hasScrollableRows = estimatedContentHeight > viewportHeight + ROW_HEIGHT;
+	const hasScrollableRows =
+		estimatedContentHeight > viewportHeight + ROW_HEIGHT;
 	const showFloatingAddButton = hasScrollableRows && !isAtBottom;
 
 	const handleDeleteRows = async (clickedRowId: string) => {
@@ -1624,7 +1630,7 @@ export function DataTable({ tableId }: DataTableProps) {
 						type="button"
 						onClick={handleFloatingAddRow}
 						disabled={addRowButtonDisabled}
-						className="pointer-events-auto flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-lg transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+						className="pointer-events-auto flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 font-medium text-gray-700 text-sm shadow-lg transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
 					>
 						<Plus className="size-4" />
 						Add row
@@ -1632,7 +1638,7 @@ export function DataTable({ tableId }: DataTableProps) {
 					<button
 						type="button"
 						disabled
-						className="pointer-events-auto flex items-center gap-2 rounded-full border border-dashed border-gray-200 bg-white px-4 py-2 text-sm text-gray-400 shadow"
+						className="pointer-events-auto flex items-center gap-2 rounded-full border border-gray-200 border-dashed bg-white px-4 py-2 text-gray-400 text-sm shadow"
 					>
 						<Sparkles className="size-4" />
 						Magic fill
@@ -1692,7 +1698,7 @@ export function DataTable({ tableId }: DataTableProps) {
 
 					<div className="flex h-[88vh] w-full flex-col justify-between">
 						<div
-							className="relative flex min-h-0 overflow-x-auto overflow-y-auto border-gray-200 outline-none bg-white"
+							className="relative flex min-h-0 overflow-x-auto overflow-y-auto border-gray-200 bg-white outline-none"
 							ref={scrollParentRef}
 							onKeyDown={handleGridKeyDown}
 							onMouseDown={() => scrollParentRef.current?.focus()}

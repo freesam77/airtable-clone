@@ -1,6 +1,13 @@
 import { api } from "~/trpc/react";
 import { useCellUpdateQueue } from "./useCellUpdateQueue";
 
+type RowCell = {
+	columnId: string;
+	column?: ({ id: string } & Record<string, unknown>) | null;
+};
+
+const resolveCellColumnId = (cell: RowCell) => cell.column?.id ?? cell.columnId;
+
 type InfiniteInput = Extract<
 	Parameters<typeof api.table.getInfiniteRows.useInfiniteQuery>[0],
 	{ id: string }
@@ -121,7 +128,10 @@ export function useTableMutations({
 				);
 			}
 			if (context?.previousRowCount) {
-				utils.table.getRowCount.setData(rowCountInput, context.previousRowCount);
+				utils.table.getRowCount.setData(
+					rowCountInput,
+					context.previousRowCount,
+				);
 			}
 		},
 		onSettled: () => {
@@ -204,7 +214,7 @@ export function useTableMutations({
 						items: page.items.map((row) => ({
 							...row,
 							cells: row.cells.map((cell) =>
-								cell.column.id === context?.optimisticColumn.id
+								resolveCellColumnId(cell) === context?.optimisticColumn.id
 									? { ...cell, column: result }
 									: cell,
 							),
@@ -256,7 +266,10 @@ export function useTableMutations({
 				return { ...old, count: Math.max(old.count - 1, 0) };
 			});
 
-			return { previousInfinite: prevInfiniteRows, previousRowCount: prevRowCount };
+			return {
+				previousInfinite: prevInfiniteRows,
+				previousRowCount: prevRowCount,
+			};
 		},
 		onError: (_err, _variables, context) => {
 			if (context?.previousInfinite) {
@@ -266,7 +279,10 @@ export function useTableMutations({
 				);
 			}
 			if (context?.previousRowCount) {
-				utils.table.getRowCount.setData(rowCountInput, context.previousRowCount);
+				utils.table.getRowCount.setData(
+					rowCountInput,
+					context.previousRowCount,
+				);
 			}
 		},
 		onSettled: () => {
@@ -370,7 +386,17 @@ export function useTableMutations({
 								cell.columnId === variables.colId
 									? {
 											...cell,
-											column: { ...cell.column, name: variables.name },
+											column: {
+												...((cell as RowCell).column ?? {
+													id: variables.colId,
+													name: variables.name,
+													type: "TEXT" as const,
+													required: false,
+													position: 0,
+													tableId,
+												}),
+												name: variables.name,
+											} as RowCell["column"],
 										}
 									: cell,
 							),

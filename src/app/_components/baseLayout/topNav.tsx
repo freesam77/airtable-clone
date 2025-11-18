@@ -24,7 +24,11 @@ import {
 } from "~/components/ui/dropdown-menu";
 import { Input } from "~/components/ui/input";
 import { showToast } from "~/components/ui/toast";
-import { BULK_JOB_COMPLETED_EVENT, BULK_JOB_STARTED_EVENT, type BulkJobStartDetail } from "~/lib/bulkJobEvents";
+import {
+	BULK_JOB_COMPLETED_EVENT,
+	BULK_JOB_STARTED_EVENT,
+	type BulkJobStartDetail,
+} from "~/lib/bulkJobEvents";
 import { cn } from "~/lib/utils";
 import { api } from "~/trpc/react";
 
@@ -216,21 +220,18 @@ export const TopNav = ({
 		);
 	}, []);
 
-	const dispatchJobComplete = useCallback(
-		(tableId: string, jobId: string) => {
-			const existing = bulkJobPolls.current.get(jobId);
-			if (existing) {
-				window.clearInterval(existing);
-				bulkJobPolls.current.delete(jobId);
-			}
-			window.dispatchEvent(
-				new CustomEvent(BULK_JOB_COMPLETED_EVENT, {
-					detail: { tableId, jobId },
-				}),
-			);
-		},
-		[],
-	);
+	const dispatchJobComplete = useCallback((tableId: string, jobId: string) => {
+		const existing = bulkJobPolls.current.get(jobId);
+		if (existing) {
+			window.clearInterval(existing);
+			bulkJobPolls.current.delete(jobId);
+		}
+		window.dispatchEvent(
+			new CustomEvent(BULK_JOB_COMPLETED_EVENT, {
+				detail: { tableId, jobId },
+			}),
+		);
+	}, []);
 
 	const startJobPolling = useCallback(
 		(detail: BulkJobStartDetail) => {

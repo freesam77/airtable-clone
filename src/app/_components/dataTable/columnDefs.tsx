@@ -26,7 +26,7 @@ export type Cell = {
 	columnId: string;
 	value: string | null;
 	rowId: string;
-	column: ColumnMeta;
+	column?: ColumnMeta;
 };
 
 export type TableData = {
