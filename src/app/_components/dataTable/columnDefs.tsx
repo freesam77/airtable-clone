@@ -1,7 +1,7 @@
 "use client";
 
 import type { CellContext, ColumnDef } from "@tanstack/react-table";
-import { useEffect, useRef } from "react";
+import { memo, useEffect, useRef } from "react";
 import {
 	Tooltip,
 	TooltipContent,
@@ -37,6 +37,84 @@ export type TableData = {
 	tableId: string;
 	cells: Array<Cell>;
 };
+
+type RowNumberHeaderProps = {
+	displayDataIds: string[];
+	selectedRowIds: Set<string>;
+	setSelectedRowIds: React.Dispatch<React.SetStateAction<Set<string>>>;
+	showCheckboxes: boolean;
+	setShowCheckboxes: React.Dispatch<React.SetStateAction<boolean>>;
+};
+
+const RowNumberHeader = memo(function RowNumberHeader({
+	displayDataIds,
+	selectedRowIds,
+	setSelectedRowIds,
+	showCheckboxes,
+	setShowCheckboxes,
+}: RowNumberHeaderProps) {
+	const visibleIds = displayDataIds;
+	const someSelected = visibleIds.some((id) => selectedRowIds.has(id));
+
+	const ref = useRef<HTMLInputElement | null>(null);
+	useEffect(() => {
+		if (ref.current)
+			ref.current.indeterminate = !showCheckboxes && someSelected;
+	}, [someSelected, showCheckboxes]);
+
+	const toggleAll = (checked: boolean) => {
+		setSelectedRowIds((prev) => {
+			const next = new Set(prev);
+			if (checked) {
+				for (const id of visibleIds) next.add(id);
+			} else {
+				for (const id of visibleIds) next.delete(id);
+			}
+			return next;
+		});
+	};
+
+	return (
+		<input
+			ref={ref}
+			type="checkbox"
+			aria-label="Select all"
+			className="flex size-4 w-full items-center"
+			checked={showCheckboxes}
+			onChange={(e) => {
+				const checked = e.target.checked;
+				setShowCheckboxes(checked);
+				toggleAll(checked);
+			}}
+		/>
+	);
+});
+
+const ColumnHeaderLabel = memo(function ColumnHeaderLabel({
+	col,
+}: {
+	col: ColumnMeta;
+}) {
+	return (
+		<div className="flex min-w-0 items-center">
+			<TooltipProvider>
+				<Tooltip>
+					<TooltipTrigger asChild>
+						<span className="flex size-6 flex-none items-center justify-center text-md text-muted-foreground">
+							{getColumnTypeIcon(col.type)}
+						</span>
+					</TooltipTrigger>
+					<TooltipContent>
+						<p>{getColumnTypeLabel(col.type)}</p>
+					</TooltipContent>
+				</Tooltip>
+			</TooltipProvider>
+			<span className="flex-1 truncate whitespace-nowrap font-medium">
+				{col.name}
+			</span>
+		</div>
+	);
+});
 
 const getColumnTypeIcon = (type: ColumnType) => (type === "TEXT" ? "A" : "#");
 const getColumnTypeLabel = (type: ColumnType) =>
@@ -86,43 +164,15 @@ export function createColumnDefs({
 	return [
 		{
 			id: "row-number",
-			header: () => {
-				const visibleIds = displayData.map((r) => r.id);
-				const someSelected = visibleIds.some((id) => selectedRowIds.has(id));
-
-				const ref = useRef<HTMLInputElement | null>(null);
-				useEffect(() => {
-					if (ref.current)
-						ref.current.indeterminate = !showCheckboxes && someSelected;
-				}, [someSelected, showCheckboxes]);
-
-				const toggleAll = (checked: boolean) => {
-					setSelectedRowIds((prev) => {
-						const next = new Set(prev);
-						if (checked) {
-							for (const id of visibleIds) next.add(id);
-						} else {
-							for (const id of visibleIds) next.delete(id);
-						}
-						return next;
-					});
-				};
-
-				return (
-					<input
-						ref={ref}
-						type="checkbox"
-						aria-label="Select all"
-						className="size-4"
-						checked={showCheckboxes}
-						onChange={(e) => {
-							const checked = e.target.checked;
-							setShowCheckboxes(checked);
-							toggleAll(checked);
-						}}
-					/>
-				);
-			},
+			header: () => (
+				<RowNumberHeader
+					displayDataIds={displayData.map((r) => r.id)}
+					selectedRowIds={selectedRowIds}
+					setSelectedRowIds={setSelectedRowIds}
+					showCheckboxes={showCheckboxes}
+					setShowCheckboxes={setShowCheckboxes}
+				/>
+			),
 			cell: ({ row }) => {
 				const checked = selectedRowIds.has(row.original.id);
 				const rowNumber = rowNumberMap.get(row.original.id) ?? row.index + 1;
@@ -159,25 +209,7 @@ export function createColumnDefs({
 			.sort((a, b) => a.position - b.position)
 			.map((col) => ({
 				id: col.id,
-				header: () => (
-					<div className="flex min-w-0 items-center">
-						<TooltipProvider>
-							<Tooltip>
-								<TooltipTrigger asChild>
-									<span className="flex size-6 flex-none items-center justify-center text-md text-muted-foreground">
-										{getColumnTypeIcon(col.type)}
-									</span>
-								</TooltipTrigger>
-								<TooltipContent>
-									<p>{getColumnTypeLabel(col.type)}</p>
-								</TooltipContent>
-							</Tooltip>
-						</TooltipProvider>
-						<span className="flex-1 truncate whitespace-nowrap font-medium">
-							{col.name}
-						</span>
-					</div>
-				),
+				header: () => <ColumnHeaderLabel col={col} />,
 				cell: ({ getValue, row }: CellContext<TableData, unknown>) => {
 					const cells = getValue() as Cell | undefined;
 					const value = cells?.value ?? null;
@@ -213,9 +245,10 @@ export function createColumnDefs({
 					);
 				},
 				accessorFn: (row: TableData) =>
-					row.cells.find(
-						(cv: { column: { id: string } }) => cv.column.id === col.id,
-					),
+					row.cells.find((cv: any) => {
+						const columnId = cv?.column?.id ?? cv?.columnId;
+						return columnId === col.id;
+					}),
 			})),
 	];
 }

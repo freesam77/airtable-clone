@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronDown } from "lucide-react";
+import { memo } from "react";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -16,7 +17,7 @@ type Props = {
 	disabledDuplicate?: boolean;
 };
 
-export function ColumnHeaderMenu({
+function ColumnHeaderMenuComponent({
 	columnId,
 	onRename,
 	onDuplicate,
@@ -65,3 +66,14 @@ export function ColumnHeaderMenu({
 		</DropdownMenu>
 	);
 }
+
+export const ColumnHeaderMenu = memo(
+	ColumnHeaderMenuComponent,
+	(prev, next) =>
+		prev.columnId === next.columnId &&
+		prev.disabledRename === next.disabledRename &&
+		prev.disabledDuplicate === next.disabledDuplicate &&
+		prev.onRename === next.onRename &&
+		prev.onDuplicate === next.onDuplicate &&
+		prev.onDelete === next.onDelete,
+);

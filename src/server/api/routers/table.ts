@@ -70,9 +70,19 @@ export const tableRouter = createTRPCRouter({
 						base: { createdById: ctx.session.user.id },
 					},
 				},
-				include: {
+				select: {
+					id: true,
+					position: true,
+					createdAt: true,
+					updatedAt: true,
+					tableId: true,
 					cells: {
-						include: { column: true },
+						select: {
+							id: true,
+							rowId: true,
+							columnId: true,
+							value: true,
+						},
 					},
 				},
 				orderBy,

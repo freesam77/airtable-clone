@@ -3,6 +3,7 @@
 import {
 	type Cell as TableCell,
 	type ColumnDef,
+	type Header as TableHeader,
 	flexRender,
 	getCoreRowModel,
 	useReactTable,
@@ -113,6 +114,71 @@ const toHistoryValue = (
 	if (value === null || value === undefined) return null;
 	return String(value);
 };
+
+const MemoHeaderContent = memo(
+	function MemoHeaderContent({
+		header,
+		onRename,
+		onDuplicate,
+		onDelete,
+		disabledRename,
+		disabledDuplicate,
+	}: {
+		header: TableHeader<TableData, unknown>;
+		onRename: (id: string) => void;
+		onDuplicate: (id: string) => void;
+		onDelete: (id: string) => void;
+		disabledRename?: boolean;
+		disabledDuplicate?: boolean;
+	}) {
+		return (
+			<th
+				key={header.id}
+				className={cn(
+					"sticky top-0 z-40 border-gray-200 border-r border-b bg-white p-2 text-left text-gray-700 text-sm"
+				)}
+			>
+				<div
+					className={cn(
+						"flex items-center gap-2",
+						header.column.id === "row-number" && "inline",
+					)}
+				>
+					{header.isPlaceholder
+						? null
+						: flexRender(header.column.columnDef.header, header.getContext())}
+
+					{header.column.id !== "row-number" && (
+						<ColumnHeaderMenu
+							columnId={header.column.id}
+							onRename={onRename}
+							onDuplicate={onDuplicate}
+							onDelete={onDelete}
+							disabledRename={disabledRename}
+							disabledDuplicate={disabledDuplicate}
+						/>
+					)}
+				</div>
+			</th>
+		);
+	},
+	(prevProps, nextProps) => {
+		const prev = prevProps.header;
+		const next = nextProps.header;
+		return (
+			prev.id === next.id &&
+			prev.isPlaceholder === next.isPlaceholder &&
+			prev.column.id === next.column.id &&
+			prev.column.columnDef.meta?.className ===
+				next.column.columnDef.meta?.className &&
+			prevProps.disabledRename === nextProps.disabledRename &&
+			prevProps.disabledDuplicate === nextProps.disabledDuplicate &&
+			prevProps.onRename === nextProps.onRename &&
+			prevProps.onDuplicate === nextProps.onDuplicate &&
+			prevProps.onDelete === nextProps.onDelete
+		);
+	},
+);
 
 const MemoCellValue = memo(
 	function MemoCellValue({
@@ -475,7 +541,7 @@ export function DataTable({ tableId }: DataTableProps) {
 								? {
 										...row,
 										cells: row.cells.map((cell) =>
-											cell.column.id === columnId
+											cell.columnId === columnId
 												? { ...cell, value: normalized ?? null }
 												: cell,
 										),
@@ -503,6 +569,34 @@ export function DataTable({ tableId }: DataTableProps) {
 		infiniteInput: infiniteQueryInput,
 		onOptimisticUpdate: handleOptimisticUpdate,
 	});
+
+	const handleRenameColumn = useCallback(
+		(id: string) => {
+			const currentName = columns.find((c) => c.id === id)?.name ?? id;
+			const name = prompt("Rename column", currentName);
+			if (name?.trim()) {
+				renameColumnMutation.mutate({
+					colId: id,
+					name: name.trim(),
+				});
+			}
+		},
+		[columns, renameColumnMutation],
+	);
+
+	const handleDuplicateColumn = useCallback(
+		(id: string) => {
+			duplicateColumnMutation.mutate({ colId: id });
+		},
+		[duplicateColumnMutation],
+	);
+
+	const handleDeleteColumn = useCallback(
+		(id: string) => {
+			deleteColumnMutation.mutate({ colId: id });
+		},
+		[deleteColumnMutation],
+	);
 
 	// Handle cell value updates using the queue
 	const normalizeValueForColumn = useCallback(
@@ -1221,10 +1315,6 @@ export function DataTable({ tableId }: DataTableProps) {
 						rowsInfinite.fetchNextPage();
 					}
 				}
-				utils.table.getInfiniteRows.setInfiniteData(infiniteQueryInput, (old) => {
-					if (!old) return old;
-					return { ...old, pages: old.pages.slice(-5) };
-				});
 				const bottomIndex = filteredRowsCount - 1;
 				const reachedBottom =
 					noScrollableContent ||
@@ -1232,8 +1322,8 @@ export function DataTable({ tableId }: DataTableProps) {
 						filteredRowsCount > 0 &&
 						last.index >= bottomIndex);
 				setIsAtBottom(reachedBottom);
-		},
-	});
+			},
+		});
 
 	const moveSelection = useCallback(
 		(deltaRow: number, deltaCol: number, extend: boolean) => {
@@ -1550,37 +1640,39 @@ export function DataTable({ tableId }: DataTableProps) {
 				</div>
 			)}
 			<div className="min-w-0 flex-1">
-				<ViewsHeader
-					viewName={activeView?.name ?? "View"}
-					onRenameView={(name) => {
-						if (!activeView) return;
-						handleRenameView(activeView.id, name);
-					}}
-					onDuplicateView={() => {
-						if (!activeView) return;
-						handleDuplicateView(activeView.id);
-					}}
-					onDeleteView={() => {
-						if (!activeView) return;
-						handleDeleteView(activeView.id);
-					}}
-					canDeleteView={canDeleteView}
-					onToggleSidebar={() => setViewSidebarOpen((v) => !v)}
-					searchOpen={searchOpen}
-					setSearchOpen={setSearchOpen}
-					searchValue={searchValue}
-					onSearchValueChange={setSearchValue}
-					matchesCount={matches.length}
-					activeMatchIndex={activeMatchIndex}
-					gotoPrevMatch={gotoPrevMatch}
-					gotoNextMatch={gotoNextMatch}
-					columns={orderedColumns}
-					filters={filters}
-					sorts={sorts}
-					autoSort={autoSort}
-					hiddenColumnIds={hiddenColumnIds}
-					onUpdateView={handleUpdateView}
-				/>
+				<div className="sticky top-0 z-50 bg-white">
+					<ViewsHeader
+						viewName={activeView?.name ?? "View"}
+						onRenameView={(name) => {
+							if (!activeView) return;
+							handleRenameView(activeView.id, name);
+						}}
+						onDuplicateView={() => {
+							if (!activeView) return;
+							handleDuplicateView(activeView.id);
+						}}
+						onDeleteView={() => {
+							if (!activeView) return;
+							handleDeleteView(activeView.id);
+						}}
+						canDeleteView={canDeleteView}
+						onToggleSidebar={() => setViewSidebarOpen((v) => !v)}
+						searchOpen={searchOpen}
+						setSearchOpen={setSearchOpen}
+						searchValue={searchValue}
+						onSearchValueChange={setSearchValue}
+						matchesCount={matches.length}
+						activeMatchIndex={activeMatchIndex}
+						gotoPrevMatch={gotoPrevMatch}
+						gotoNextMatch={gotoNextMatch}
+						columns={orderedColumns}
+						filters={filters}
+						sorts={sorts}
+						autoSort={autoSort}
+						hiddenColumnIds={hiddenColumnIds}
+						onUpdateView={handleUpdateView}
+					/>
+				</div>
 
 				<div className="flex">
 					{/* Left views sidebar inside table area */}
@@ -1600,7 +1692,7 @@ export function DataTable({ tableId }: DataTableProps) {
 
 					<div className="flex h-[88vh] w-full flex-col justify-between">
 						<div
-							className="relative flex min-h-0 overflow-x-auto overflow-y-auto border-gray-200 outline-none"
+							className="relative flex min-h-0 overflow-x-auto overflow-y-auto border-gray-200 outline-none bg-white"
 							ref={scrollParentRef}
 							onKeyDown={handleGridKeyDown}
 							onMouseDown={() => scrollParentRef.current?.focus()}
@@ -1617,65 +1709,19 @@ export function DataTable({ tableId }: DataTableProps) {
 										/>
 									))}
 								</colgroup>
-								<thead className="border-gray-300 border-b bg-white sticky top-0">
+								<thead className="border-gray-300 border-b bg-white">
 									{table.getHeaderGroups().map((headerGroup) => (
 										<tr key={headerGroup.id}>
 											{headerGroup.headers.map((header) => (
-												<th
+												<MemoHeaderContent
 													key={header.id}
-													className={cn(
-														"sticky top-0 z-50 border-gray-200 border-r border-b bg-white p-2 text-left text-gray-700 text-sm",
-														header.column.columnDef.meta?.className,
-													)}
-												>
-													<div
-														className={cn(
-															"flex items-center gap-2",
-															header.column.id === "row-number" && "inline",
-														)}
-													>
-														{header.isPlaceholder
-															? null
-															: flexRender(
-																	header.column.columnDef.header,
-																	header.getContext(),
-																)}
-
-														{header.column.id !== "row-number" && (
-															<ColumnHeaderMenu
-																columnId={header.column.id}
-																onRename={(id) => {
-																	const current =
-																		header.column.columnDef.header;
-																	const name = prompt(
-																		"Rename column",
-																		String(
-																			current instanceof Function
-																				? id
-																				: current,
-																		) || id,
-																	);
-																	if (name?.trim()) {
-																		renameColumnMutation.mutate({
-																			colId: id,
-																			name: name.trim(),
-																		});
-																	}
-																}}
-																onDuplicate={(id) =>
-																	duplicateColumnMutation.mutate({ colId: id })
-																}
-																onDelete={(id) =>
-																	deleteColumnMutation.mutate({ colId: id })
-																}
-																disabledRename={renameColumnMutation.isPending}
-																disabledDuplicate={
-																	duplicateColumnMutation.isPending
-																}
-															/>
-														)}
-													</div>
-												</th>
+													header={header}
+													onRename={handleRenameColumn}
+													onDuplicate={handleDuplicateColumn}
+													onDelete={handleDeleteColumn}
+													disabledRename={renameColumnMutation.isPending}
+													disabledDuplicate={duplicateColumnMutation.isPending}
+												/>
 											))}
 										</tr>
 									))}

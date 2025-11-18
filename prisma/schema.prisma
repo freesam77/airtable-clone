@@ -69,7 +69,7 @@ model Row {
     cells     Cell[]
     table     Table    @relation(fields: [tableId], references: [id], onDelete: Cascade)
 
-    @@index([tableId, position])
+    @@index([tableId, position, id], name: "idx_row_table_position_id")
 }
 
 model View {
