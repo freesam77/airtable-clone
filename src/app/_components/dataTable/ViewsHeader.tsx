@@ -72,7 +72,7 @@ export function ViewsHeader({
 }: ViewsHeaderProps) {
 	// filter UI moved to FiltersDropdown
 	return (
-		<div className="flex items-center justify-between border-b bg-white px-3">
+		<div className="flex items-center justify-between bg-white px-3">
 			<div className="flex gap-1">
 				<button
 					type="button"

@@ -205,9 +205,10 @@ export const TopNav = ({
 
 	useEffect(() => {
 		return () => {
-			bulkJobPolls.current.forEach((intervalId) => {
+			for (const poll of bulkJobPolls.current) {
+				const intervalId = poll[1];
 				window.clearInterval(intervalId);
-			});
+			}
 			bulkJobPolls.current.clear();
 		};
 	}, []);
@@ -514,7 +515,7 @@ export const TopNav = ({
 			</div>
 
 			{/* Table tabs + switcher */}
-			<div className="flex items-center justify-between border-gray-200 border-b-2 bg-blue-50">
+			<div className="flex h-[36px] items-center justify-between bg-blue-50">
 				<div className="flex items-center">
 					{selectedBase.tables.map((table, tableIndex) => {
 						const isActive = selectedTableId === table.id;
@@ -523,11 +524,12 @@ export const TopNav = ({
 							<div
 								key={table.id}
 								className={cn(
-									"flex border-separate border-spacing-0 items-center justify-between gap-2 rounded-tr-sm border-x border-t px-3 py-2 font-medium text-sm",
+									"flex items-center justify-between gap-2 rounded-tr-sm border-x px-3 py-2 font-medium text-sm",
 									isActive
-										? "-mb-0.5 z-10 border-gray-300 bg-white text-gray-900"
+										? "-mb-0.5 -mt-px z-10 border-gray-300 bg-white text-gray-900"
 										: "border-transparent bg-transparent text-gray-600 hover:bg-slate-200 hover:text-gray-900",
 									tableIndex !== 0 && "rounded-t-sm",
+									tableIndex === 0 && "border-l-0",
 								)}
 							>
 								<button

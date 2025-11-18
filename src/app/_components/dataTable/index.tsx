@@ -1,15 +1,13 @@
 "use client";
 
 import {
-	type ColumnDef,
-	type Cell as TableCell,
 	type Header as TableHeader,
 	flexRender,
 	getCoreRowModel,
 	useReactTable,
 } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { Plus, Sparkles } from "lucide-react";
+import { Plus, WandSparkles } from "lucide-react";
 import {
 	type KeyboardEvent as ReactKeyboardEvent,
 	type PointerEvent as ReactPointerEvent,
@@ -50,11 +48,7 @@ import { ColumnHeaderMenu } from "./ColumnHeaderMenu";
 import { ViewsHeader } from "./ViewsHeader";
 import { ViewsSidebar } from "./ViewsSidebar";
 import { AddColumnDropdown } from "./addColumnDropdown";
-import {
-	type ColumnMeta,
-	type TableData as TableRowData,
-	createColumnDefs,
-} from "./columnDefs";
+import { type ColumnMeta, createColumnDefs } from "./columnDefs";
 import { applyFilters } from "./filter/Filters";
 import { applySorts } from "./filter/Sorts";
 import { useViewFilter } from "./filter/useViewFilter";
@@ -76,7 +70,7 @@ import {
 
 // Extend the column meta type to include className
 declare module "@tanstack/react-table" {
-	interface ColumnMeta<TData, TValue> {
+	interface ColumnMeta {
 		className?: string;
 		// Optional: used for editor input typing
 		type?: ColumnType;
@@ -186,29 +180,6 @@ const MemoHeaderContent = memo(
 	},
 );
 
-const MemoCellValue = memo(
-	function MemoCellValue({
-		cell,
-	}: {
-		cell: TableCell<TableData, unknown>;
-	}) {
-		return (
-			<div className="truncate">
-				{flexRender(cell.column.columnDef.cell, cell.getContext())}
-			</div>
-		);
-	},
-	(prevProps, nextProps) => {
-		const prev = prevProps.cell;
-		const next = nextProps.cell;
-		// Only re-render when the logical cell value changes
-		return (
-			prev.row.id === next.row.id &&
-			prev.column.id === next.column.id &&
-			prev.getValue() === next.getValue()
-		);
-	},
-);
 const ROW_HEIGHT = 37;
 const MIN_PAGE_SIZE = 200;
 const MAX_PAGE_SIZE = 500;
@@ -307,7 +278,6 @@ export function DataTable({ tableId }: DataTableProps) {
 	const [showCheckboxes, setShowCheckboxes] = useState(false);
 	const [pageSize, setPageSize] = useState(MAX_PAGE_SIZE);
 	const [optimisticRows, setOptimisticRows] = useState<TableData[]>([]);
-	const [isAtBottom, setIsAtBottom] = useState(false);
 	const osName = useMemo(() => detectOS(), []);
 	const {
 		state: interactionState,
@@ -1300,29 +1270,26 @@ export function DataTable({ tableId }: DataTableProps) {
 	const showApproximate =
 		exactRowCount === undefined && rowsInfinite.hasNextPage;
 
-		const rowVirtualizer = useVirtualizer({
-			count: filteredRowsCount,
-			getScrollElement: () => scrollParentRef.current,
-			estimateSize: () => 37,
-			overscan: 10,
-			getItemKey: (index) => {
-				const row = rowsWithOptimistic[index];
-				return `${row?.id ?? `loader-${index}`}-${
-					showCheckboxes ? "checkbox" : "row-number"
-				}`;
-			},
-			useAnimationFrameWithResizeObserver: true,
-			onChange: (instance) => {
+	const rowVirtualizer = useVirtualizer({
+		count: filteredRowsCount,
+		getScrollElement: () => scrollParentRef.current,
+		estimateSize: () => ROW_HEIGHT,
+		overscan: 10,
+		getItemKey: (index) => {
+			const row = rowsWithOptimistic[index];
+			return `${row?.id ?? `loader-${index}`}-${
+				showCheckboxes ? "checkbox" : "row-number"
+			}`;
+		},
+		onChange: (instance) => {
 			updatePageSize();
 			const vItems = instance.getVirtualItems();
 			if (!vItems.length) return;
 			const last = vItems[vItems.length - 1];
 			if (!last) return;
+
 			const totalLoadedRows = rowsWithOptimistic.length;
-			const viewport = scrollParentRef.current?.clientHeight ?? 0;
-			const noScrollableContent =
-				totalLoadedRows === 0 ||
-				totalLoadedRows * ROW_HEIGHT <= viewport + ROW_HEIGHT;
+
 			if (totalLoadedRows > 0) {
 				const latestIndex = totalLoadedRows - 1;
 				const prefetchThreshold = Math.max(
@@ -1341,13 +1308,8 @@ export function DataTable({ tableId }: DataTableProps) {
 					rowsInfinite.fetchNextPage();
 				}
 			}
-			const bottomIndex = filteredRowsCount - 1;
-			const reachedBottom =
-				noScrollableContent ||
-				(!rowsInfinite.hasNextPage &&
-					filteredRowsCount > 0 &&
-					last.index >= bottomIndex);
-			setIsAtBottom(reachedBottom);
+
+
 		},
 	});
 
@@ -1605,11 +1567,6 @@ export function DataTable({ tableId }: DataTableProps) {
 	}, [handleAddRow, scrollToTableBottom]);
 
 	const addRowButtonDisabled = addRowMutation.isPending || columns.length === 0;
-	const viewportHeight = scrollParentRef.current?.clientHeight ?? 0;
-	const estimatedContentHeight = rowsWithOptimistic.length * ROW_HEIGHT;
-	const hasScrollableRows =
-		estimatedContentHeight > viewportHeight + ROW_HEIGHT;
-	const showFloatingAddButton = hasScrollableRows && !isAtBottom;
 
 	const handleDeleteRows = async (clickedRowId: string) => {
 		const ids =
@@ -1629,45 +1586,24 @@ export function DataTable({ tableId }: DataTableProps) {
 		!activeView
 	) {
 		return (
-			<div className="flex h-64 items-center justify-center">
-				<div className="text-gray-500">Loading view…</div>
+			<div className="flex h-full w-full items-center justify-center text-gray-500">
+				<p>Loading view…</p>
 			</div>
 		);
 	}
 
 	if (!tableColumn) {
 		return (
-			<div className="flex h-64 items-center justify-center">
-				<div className="text-gray-500">Table not found.</div>
+			<div className="flex h-full w-full items-center justify-center text-gray-500">
+				<p>Table not found.</p>
 			</div>
 		);
 	}
 
 	return (
-		<div className="relative flex h-full">
-			{showFloatingAddButton && (
-				<div className="pointer-events-none absolute bottom-6 left-6 z-50 flex flex-col gap-2">
-					<button
-						type="button"
-						onClick={handleFloatingAddRow}
-						disabled={addRowButtonDisabled}
-						className="pointer-events-auto flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 font-medium text-gray-700 text-sm shadow-lg transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
-					>
-						<Plus className="size-4" />
-						Add row
-					</button>
-					<button
-						type="button"
-						disabled
-						className="pointer-events-auto flex items-center gap-2 rounded-full border border-gray-200 border-dashed bg-white px-4 py-2 text-gray-400 text-sm shadow"
-					>
-						<Sparkles className="size-4" />
-						Magic fill
-					</button>
-				</div>
-			)}
-			<div className="min-w-0 flex-1">
-				<div className="sticky top-0 z-50 bg-white">
+		<div className="relative flex h-full w-full flex-col overflow-hidden">
+			<div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+				<div className="shrink-0 border-b bg-white">
 					<ViewsHeader
 						viewName={activeView?.name ?? "View"}
 						onRenameView={(name) => {
@@ -1701,31 +1637,33 @@ export function DataTable({ tableId }: DataTableProps) {
 					/>
 				</div>
 
-				<div className="flex">
+				<div className="flex flex-1 overflow-hidden">
 					{/* Left views sidebar inside table area */}
 					{viewSidebarOpen && (
-						<ViewsSidebar
-							views={views}
-							activeViewId={activeView?.id ?? null}
-							onSelectView={handleSelectView}
-							onCreateView={handleCreateView}
-							onRenameView={handleRenameView}
-							onDuplicateView={handleDuplicateView}
-							onDeleteView={handleDeleteView}
-							onReorderView={handleReorderView}
-							canDeleteView={canDeleteView}
-						/>
+						<div className="flex h-full w-[263px] flex-col border-r bg-white">
+							<ViewsSidebar
+								views={views}
+								activeViewId={activeView?.id ?? null}
+								onSelectView={handleSelectView}
+								onCreateView={handleCreateView}
+								onRenameView={handleRenameView}
+								onDuplicateView={handleDuplicateView}
+								onDeleteView={handleDeleteView}
+								onReorderView={handleReorderView}
+								canDeleteView={canDeleteView}
+							/>
+						</div>
 					)}
 
-					<div className="flex h-[88vh] w-full flex-col justify-between">
+					<div className="flex h-full w-full flex-1 flex-col overflow-hidden">
 						<div
-							className="relative flex min-h-0 overflow-x-auto overflow-y-auto border-gray-200 bg-white outline-none"
+							className="relative flex min-h-0 flex-1 overflow-x-auto overflow-y-auto border-gray-200 bg-white outline-none"
 							ref={scrollParentRef}
 							onKeyDown={handleGridKeyDown}
 							onMouseDown={() => scrollParentRef.current?.focus()}
 						>
 							<table
-								className="border-separate border-spacing-0 border bg-white"
+								className="table-fixed border-collapse self-start"
 								key={`table-${columns.length}-${columns.map((c) => c.id).join("-")}`}
 							>
 								<colgroup>
@@ -1736,7 +1674,7 @@ export function DataTable({ tableId }: DataTableProps) {
 										/>
 									))}
 								</colgroup>
-								<thead className="border-gray-300 border-b bg-white">
+								<thead className="bg-white">
 									{table.getHeaderGroups().map((headerGroup) => (
 										<tr key={headerGroup.id}>
 											{headerGroup.headers.map((header) => (
@@ -1787,13 +1725,13 @@ export function DataTable({ tableId }: DataTableProps) {
 																<tr
 																	data-index={vItem.index}
 																	className="cursor-default"
-																	style={{ height: `${vItem.size}px` }}
+																	style={{ height: ROW_HEIGHT }}
 																>
 																	{isLoader ? (
 																		// Loader row spans all columns
 																		<td
 																			colSpan={visibleColCount}
-																			className="h-8 text-center text-gray-500 text-sm"
+																			className=" text-center text-gray-500 text-sm leading-none"
 																			// biome-ignore lint/a11y/noNoninteractiveTabindex: <explanation>
 																			tabIndex={0}
 																		>
@@ -1839,7 +1777,7 @@ export function DataTable({ tableId }: DataTableProps) {
 																				<td
 																					key={cell.id}
 																					className={cn(
-																						"relative h-8 w-[150px] overflow-visible whitespace-nowrap border-gray-200 border-r border-b px-2 text-gray-900 text-sm",
+																						"relative w-[150px] border-gray-200 border-r border-b px-2 text-gray-900 text-sm leading-none",
 																						cell.column.columnDef.meta
 																							?.className,
 																						backgroundClass,
@@ -1892,7 +1830,10 @@ export function DataTable({ tableId }: DataTableProps) {
 																							/>
 																						</>
 																					)}
-																					<MemoCellValue cell={cell} />
+																					{flexRender(
+																						cell.column.columnDef.cell,
+																						cell.getContext(),
+																					)}
 																				</td>
 																			);
 																		})
@@ -1930,11 +1871,14 @@ export function DataTable({ tableId }: DataTableProps) {
 								</tbody>
 								{/* Add Row button row */}
 								<tfoot>
-									<tr className="border-gray-200 border-r bg-white">
+									<tr className="border-gray-200 border-r border-b bg-white">
 										{visibleColumns.map((col, index) => (
 											<td
 												key={col.id}
-												className={cn("border-gray-200 text-gray-900 text-sm")}
+												className={cn(
+													"w-full border-gray-200 text-gray-900 text-sm",
+												)}
+												colSpan={visibleColumns.length + 1}
 											>
 												{index === 0 ? (
 													<TooltipProvider>
@@ -1943,7 +1887,7 @@ export function DataTable({ tableId }: DataTableProps) {
 																<button
 																	type="button"
 																	onClick={handleAddRow}
-																	className="flex size-8 w-full cursor-pointer items-center justify-center text-gray-600 text-xl hover:bg-gray-50 hover:text-gray-800"
+																	className="flex size-8 w-full cursor-pointer items-center pl-8 text-gray-600 text-xl hover:bg-gray-50 hover:text-gray-800"
 																>
 																	+
 																</button>
@@ -1964,13 +1908,41 @@ export function DataTable({ tableId }: DataTableProps) {
 									</tr>
 								</tfoot>
 							</table>
+
+							<div className="fixed bottom-10 z-20 ml-3 flex items-center text-xs">
+								<TooltipProvider>
+									<Tooltip>
+										<TooltipTrigger asChild>
+											<button
+												type="button"
+												onClick={handleFloatingAddRow}
+												disabled={addRowButtonDisabled}
+												className="h-8 rounded-l-full border border-gray-200 bg-white p-2 px-3 text-gray-700 text-xs transition hover:bg-gray-100"
+											>
+												<Plus className="size-3.5" />
+											</button>
+										</TooltipTrigger>
+										<TooltipContent>
+											<p>Add record</p>
+										</TooltipContent>
+									</Tooltip>
+								</TooltipProvider>
+								<button
+									type="button"
+									className="flex h-8 items-center gap-1 rounded-r-full border border-gray-200 border-l-0 bg-white p-2 px-3 text-gray-700 text-xs transition disabled:text-gray-400"
+									disabled
+								>
+									<WandSparkles className="size-3.5" />
+									<span>Add...</span>
+								</button>
+							</div>
 							<AddColumnDropdown
 								onCreate={handleAddColumn}
 								isLoading={addColumnMutation.isPending}
 								trigger={
 									<button
 										type="button"
-										className="sticky top-0 h-[41.5px] w-[200px] border-separate border-spacing-0 cursor-pointer border-t border-r border-b border-l-0 bg-white text-gray-900 text-lg hover:bg-gray-100"
+										className="sticky top-0 h-[40.5px] w-30 border-separate border-spacing-0 cursor-pointer border-r border-b bg-white text-gray-900 text-lg hover:bg-gray-100"
 										aria-label="Add column"
 									>
 										+
@@ -1979,7 +1951,7 @@ export function DataTable({ tableId }: DataTableProps) {
 							/>
 						</div>
 						{/* Footer with record count */}
-						<div className="w-full border-t bg-white p-4 text-xs">
+						<div className="w-full border-t bg-white p-4 pl-3 text-xs">
 							<span>
 								{footerRowCount.toLocaleString()}
 								{showApproximate ? "+" : ""} records

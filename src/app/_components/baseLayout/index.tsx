@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -113,32 +113,35 @@ export function BaseLayout({
 	};
 
 	return (
-		<div className="flex">
-			<div className="relative z-50 flex w-16 shrink-0 items-start justify-center border-r bg-white pt-5">
+		<div className="flex h-screen bg-gray-50">
+			<div className="relative z-50 flex w-16 shrink-0 flex-col items-center border-r bg-white pt-5">
 				<Image
 					src="/airtable-logo.svg"
 					className="h-6 cursor-pointer"
 					width={30}
 					height={10}
 					onClick={() => router.push("/dashboard")}
-					alt={"Home"}
+					alt="Home"
 				/>
 			</div>
-			<div className="w-full">
-				{/* Inline conditional content */}
-				<div className="flex h-screen flex-1 flex-col bg-gray-50">
-					{basesLoading ? (
-						<div className="text-gray-500">Loading...</div>
-					) : !selectedBase ? (
-						<div className="text-gray-500">No bases found.</div>
-					) : !currentTable ? (
-						<div className="text-gray-500">
-							{initialTableId
-								? "Preparing your table…"
-								: "No table selected. Please select a table from the sidebar."}
-						</div>
-					) : (
-						<>
+			<div className="flex h-full w-full flex-col overflow-hidden">
+				{basesLoading ? (
+					<div className="flex flex-1 items-center justify-center text-gray-500">
+						Loading...
+					</div>
+				) : !selectedBase ? (
+					<div className="flex flex-1 items-center justify-center text-gray-500">
+						No bases found.
+					</div>
+				) : !currentTable ? (
+					<div className="flex flex-1 items-center justify-center text-gray-500">
+						{initialTableId
+							? "Preparing your table..."
+							: "No table selected. Please select a table from the sidebar."}
+					</div>
+				) : (
+					<>
+						<div className="shrink-0 border-b bg-white">
 							<TopNav
 								selectedBase={selectedBase}
 								selectedTableId={selectedTableId}
@@ -148,12 +151,15 @@ export function BaseLayout({
 								handleCreateTable={handleCreateTable}
 								createTable={createTable}
 							/>
-
+						</div>
+						<div className="flex flex-1 overflow-hidden">
 							<DataTable tableId={currentTable.id} />
-						</>
-					)}
-				</div>
+						</div>
+					</>
+				)}
 			</div>
 		</div>
 	);
 }
+
+
