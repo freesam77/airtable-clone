@@ -276,6 +276,15 @@ export function DataTable({ tableId }: DataTableProps) {
 	const [viewSidebarOpen, setViewSidebarOpen] = useState(true);
 	const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(new Set());
 	const [showCheckboxes, setShowCheckboxes] = useState(false);
+	const [hoveredRowId, setHoveredRowId] = useState<string | null>(null);
+	
+	const handleRowMouseEnter = useCallback((rowId: string) => {
+		setHoveredRowId(rowId);
+	}, []);
+	
+	const handleRowMouseLeave = useCallback(() => {
+		setHoveredRowId(null);
+	}, []);
 	const [pageSize, setPageSize] = useState(MAX_PAGE_SIZE);
 	const [optimisticRows, setOptimisticRows] = useState<TableData[]>([]);
 	const osName = useMemo(() => detectOS(), []);
@@ -716,6 +725,7 @@ export function DataTable({ tableId }: DataTableProps) {
 			setSelectedRowIds,
 			showCheckboxes,
 			setShowCheckboxes,
+			hoveredRowId,
 			editingCell,
 			onCommitEdit: handleCommitEdit,
 			onCancelEdit: handleCancelEdit,
@@ -730,6 +740,7 @@ export function DataTable({ tableId }: DataTableProps) {
 		rowNumberMap,
 		selectedRowIds,
 		showCheckboxes,
+		hoveredRowId,
 		editingCell,
 		consumeInitialEditValue,
 		getInitialEditValue,
@@ -1760,8 +1771,17 @@ export function DataTable({ tableId }: DataTableProps) {
 															<ContextMenuTrigger asChild>
 																<tr
 																	data-index={vItem.index}
-																	className="cursor-default"
+																	className={cn(
+																		"cursor-default transition-colors",
+																		hoveredRowId === row?.original.id && "bg-gray-50"
+																	)}
 																	style={{ height: ROW_HEIGHT }}
+																	onMouseEnter={() => {
+																		if (row?.original.id) {
+																			handleRowMouseEnter(row.original.id);
+																		}
+																	}}
+																	onMouseLeave={handleRowMouseLeave}
 																>
 																	{isLoader ? (
 																		// Loader row spans all columns

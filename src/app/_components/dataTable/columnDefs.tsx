@@ -1,6 +1,7 @@
 "use client";
 
 import type { CellContext, ColumnDef } from "@tanstack/react-table";
+import { GripVertical } from "lucide-react";
 import { memo, useEffect, useRef } from "react";
 import {
 	Tooltip,
@@ -90,6 +91,53 @@ const RowNumberHeader = memo(function RowNumberHeader({
 	);
 });
 
+const RowNumberCell = memo(function RowNumberCell({
+	rowId,
+	rowNumber,
+	checked,
+	isHovered,
+	showCheckboxes,
+	onToggle,
+}: {
+	rowId: string;
+	rowNumber: number;
+	checked: boolean;
+	isHovered: boolean;
+	showCheckboxes: boolean;
+	onToggle: () => void;
+}) {
+	const isSelected = checked;
+	const showRowCheckbox = showCheckboxes || isHovered || isSelected;
+	const showGrip = isHovered && showRowCheckbox;
+
+	return (
+		<div className="relative flex items-center justify-center gap-1">
+			{showGrip && (
+				<button
+					type="button"
+					disabled
+					className="absolute left-0 flex cursor-not-allowed items-center justify-center opacity-60"
+					aria-label="Drag row (disabled)"
+				>
+					<GripVertical className="size-3 text-gray-400" />
+				</button>
+			)}
+			{showRowCheckbox && (
+				<input
+					type="checkbox"
+					aria-label="Select row"
+					className="size-4"
+					checked={checked}
+					onChange={onToggle}
+				/>
+			)}
+			{!showRowCheckbox && (
+				<span className="text-gray-500 text-xs">{rowNumber}</span>
+			)}
+		</div>
+	);
+});
+
 const ColumnHeaderLabel = memo(function ColumnHeaderLabel({
 	col,
 }: {
@@ -128,6 +176,7 @@ type CreateColumnDefsParams = {
 	setSelectedRowIds: React.Dispatch<React.SetStateAction<Set<string>>>;
 	showCheckboxes: boolean;
 	setShowCheckboxes: React.Dispatch<React.SetStateAction<boolean>>;
+	hoveredRowId: string | null;
 	editingCell: { rowId: string; columnId: string } | null;
 	onCommitEdit: (
 		rowId: string,
@@ -154,6 +203,7 @@ export function createColumnDefs({
 	setSelectedRowIds,
 	showCheckboxes,
 	setShowCheckboxes,
+	hoveredRowId,
 	editingCell,
 	onCommitEdit,
 	onCancelEdit,
@@ -175,6 +225,7 @@ export function createColumnDefs({
 			),
 			cell: ({ row }) => {
 				const checked = selectedRowIds.has(row.original.id);
+				const isHovered = hoveredRowId === row.original.id;
 				const rowNumber = rowNumberMap.get(row.original.id) ?? row.index + 1;
 				const onToggle = () =>
 					setSelectedRowIds((prev) => {
@@ -184,20 +235,14 @@ export function createColumnDefs({
 						return next;
 					});
 				return (
-					<div className="relative flex items-center justify-center">
-						{showCheckboxes && (
-							<input
-								type="checkbox"
-								aria-label="Select row"
-								className="size-4"
-								checked={checked}
-								onChange={onToggle}
-							/>
-						)}
-						{!showCheckboxes && (
-							<span className="text-gray-500 text-xs">{rowNumber}</span>
-						)}
-					</div>
+					<RowNumberCell
+						rowId={row.original.id}
+						rowNumber={rowNumber}
+						checked={checked}
+						isHovered={isHovered}
+						showCheckboxes={showCheckboxes}
+						onToggle={onToggle}
+					/>
 				);
 			},
 			enableSorting: false,
