@@ -135,6 +135,8 @@ const MemoHeaderContent = memo(
 		disabledRename?: boolean;
 		disabledDuplicate?: boolean;
 	}) {
+		const headerContext = useMemo(() => header.getContext(), [header]);
+
 		return (
 			<th
 				key={header.id}
@@ -150,7 +152,7 @@ const MemoHeaderContent = memo(
 				>
 					{header.isPlaceholder
 						? null
-						: flexRender(header.column.columnDef.header, header.getContext())}
+						: flexRender(header.column.columnDef.header, headerContext)}
 
 					{header.column.id !== "row-number" && (
 						<ColumnHeaderMenu
@@ -735,22 +737,35 @@ export function DataTable({ tableId }: DataTableProps) {
 		initialEditValueRef.current = null;
 	}, []);
 
-	const columnDefs: ColumnDef<TableRowData>[] = createColumnDefs({
-		columns: visibleColumns,
-		displayData: displayData,
+	const columnDefs = useMemo(() => {
+		return createColumnDefs({
+			columns: visibleColumns,
+			displayData,
+			rowNumberMap,
+			selectedRowIds,
+			setSelectedRowIds,
+			showCheckboxes,
+			setShowCheckboxes,
+			editingCell,
+			onCommitEdit: handleCommitEdit,
+			onCancelEdit: handleCancelEdit,
+			onNavigate: (cell, direction) =>
+				handleNavigateFromCellRef.current?.(cell, direction),
+			getInitialEditValue,
+			onInitialValueConsumed: consumeInitialEditValue,
+		});
+	}, [
+		visibleColumns,
+		displayData,
 		rowNumberMap,
 		selectedRowIds,
-		setSelectedRowIds,
 		showCheckboxes,
-		setShowCheckboxes,
 		editingCell,
-		onCommitEdit: handleCommitEdit,
-		onCancelEdit: handleCancelEdit,
-		onNavigate: (cell, direction) =>
-			handleNavigateFromCellRef.current?.(cell, direction),
+		consumeInitialEditValue,
 		getInitialEditValue,
-		onInitialValueConsumed: consumeInitialEditValue,
-	}) as unknown as ColumnDef<TableData>[];
+		handleCancelEdit,
+		handleCommitEdit,
+	]);
 
 	const table = useReactTable<TableData>({
 		data: rowsWithOptimistic,
