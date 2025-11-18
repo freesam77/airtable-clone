@@ -1300,13 +1300,19 @@ export function DataTable({ tableId }: DataTableProps) {
 	const showApproximate =
 		exactRowCount === undefined && rowsInfinite.hasNextPage;
 
-	const rowVirtualizer = useVirtualizer({
-		count: filteredRowsCount,
-		getScrollElement: () => scrollParentRef.current,
-		estimateSize: () => 37,
-		overscan: 10,
-		useAnimationFrameWithResizeObserver: true,
-		onChange: (instance) => {
+		const rowVirtualizer = useVirtualizer({
+			count: filteredRowsCount,
+			getScrollElement: () => scrollParentRef.current,
+			estimateSize: () => 37,
+			overscan: 10,
+			getItemKey: (index) => {
+				const row = rowsWithOptimistic[index];
+				return `${row?.id ?? `loader-${index}`}-${
+					showCheckboxes ? "checkbox" : "row-number"
+				}`;
+			},
+			useAnimationFrameWithResizeObserver: true,
+			onChange: (instance) => {
 			updatePageSize();
 			const vItems = instance.getVirtualItems();
 			if (!vItems.length) return;
