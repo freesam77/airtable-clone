@@ -134,16 +134,8 @@ const MemoHeaderContent = memo(
 		return (
 			<th
 				key={header.id}
-				onContextMenu={(event) => {
-					event.preventDefault();
-					if (header.isPlaceholder || header.column.id === "row-number") return;
-					const trigger = document.querySelector<HTMLButtonElement>(
-						`[data-column-menu-trigger="${header.column.id}"]`,
-					);
-					trigger?.click();
-				}}
 				className={cn(
-					"sticky top-0 z-40 border-gray-200 border-r bg-white p-2 text-left text-gray-700 text-sm relative after:pointer-events-none after:absolute after:left-0 after:right-0 after:bottom-0 after:border-b after:border-gray-200 after:content-['']",
+					"group sticky top-0 z-40 border-gray-200 border-r bg-white p-2 text-left text-gray-700 text-sm transition-colors hover:bg-gray-50 relative after:pointer-events-none after:absolute after:left-0 after:right-0 after:bottom-0 after:border-b after:border-gray-200 after:content-['']",
 				)}
 			>
 				<div
@@ -1316,8 +1308,6 @@ export function DataTable({ tableId }: DataTableProps) {
 					rowsInfinite.fetchNextPage();
 				}
 			}
-
-
 		},
 	});
 
@@ -1671,7 +1661,7 @@ export function DataTable({ tableId }: DataTableProps) {
 							onMouseDown={() => scrollParentRef.current?.focus()}
 						>
 							<table
-								className="table-fixed border-collapse self-start"
+								className="table-fixed border-separate border-spacing-0 self-start"
 								key={`table-${columns.length}-${columns.map((c) => c.id).join("-")}`}
 							>
 								<colgroup>
@@ -1682,22 +1672,58 @@ export function DataTable({ tableId }: DataTableProps) {
 										/>
 									))}
 								</colgroup>
-								<thead className="border-gray-300 border-b bg-white">
+								<thead className="sticky top-0 z-30 border-gray-300 border-b bg-white">
 									{table.getHeaderGroups().map((headerGroup) => (
 										<tr key={headerGroup.id}>
-											{headerGroup.headers.map((header) => (
-												<MemoHeaderContent
-													key={header.id}
-													header={header}
-													onRename={handleRenameColumn}
-													onDuplicate={handleDuplicateColumn}
-													onDelete={handleDeleteColumn}
-													disabledRename={renameColumnMutation.isPending}
-													disabledDuplicate={
-														duplicateColumnMutation.isPending
-													}
-												/>
-											))}
+											{headerGroup.headers.map((header) => {
+												const isRowNumber = header.column.id === "row-number";
+												return (
+													<ContextMenu key={header.id}>
+														<ContextMenuTrigger asChild>
+															<MemoHeaderContent
+																header={header}
+																onRename={handleRenameColumn}
+																onDuplicate={handleDuplicateColumn}
+																onDelete={handleDeleteColumn}
+																disabledRename={renameColumnMutation.isPending}
+																disabledDuplicate={
+																	duplicateColumnMutation.isPending
+																}
+															/>
+														</ContextMenuTrigger>
+														{!header.isPlaceholder && !isRowNumber && (
+															<ContextMenuContent className="w-64 bg-white p-0">
+																<div className="p-2">
+																	<ContextMenuItem
+																		onClick={() =>
+																			handleRenameColumn(header.column.id)
+																		}
+																		className="w-full rounded px-2 py-2 text-left hover:bg-gray-50"
+																	>
+																		Rename column
+																	</ContextMenuItem>
+																	<ContextMenuItem
+																		onClick={() =>
+																			handleDuplicateColumn(header.column.id)
+																		}
+																		className="w-full rounded px-2 py-2 text-left hover:bg-gray-50"
+																	>
+																		Duplicate column
+																	</ContextMenuItem>
+																	<ContextMenuItem
+																		onClick={() =>
+																			handleDeleteColumn(header.column.id)
+																		}
+																		className="w-full rounded px-2 py-2 text-left text-red-600 hover:bg-red-50"
+																	>
+																		Delete column
+																	</ContextMenuItem>
+																</div>
+															</ContextMenuContent>
+														)}
+													</ContextMenu>
+												);
+											})}
 										</tr>
 									))}
 								</thead>
