@@ -70,7 +70,7 @@ import {
 
 // Extend the column meta type to include className
 declare module "@tanstack/react-table" {
-	interface ColumnMeta {
+	interface ColumnMeta<TData, TValue> {
 		className?: string;
 		// Optional: used for editor input typing
 		type?: ColumnType;
@@ -134,8 +134,16 @@ const MemoHeaderContent = memo(
 		return (
 			<th
 				key={header.id}
+				onContextMenu={(event) => {
+					event.preventDefault();
+					if (header.isPlaceholder || header.column.id === "row-number") return;
+					const trigger = document.querySelector<HTMLButtonElement>(
+						`[data-column-menu-trigger="${header.column.id}"]`,
+					);
+					trigger?.click();
+				}}
 				className={cn(
-					"sticky top-0 z-40 border-gray-200 border-r border-b bg-white p-2 text-left text-gray-700 text-sm",
+					"sticky top-0 z-40 border-gray-200 border-r bg-white p-2 text-left text-gray-700 text-sm relative after:pointer-events-none after:absolute after:left-0 after:right-0 after:bottom-0 after:border-b after:border-gray-200 after:content-['']",
 				)}
 			>
 				<div
@@ -1674,7 +1682,7 @@ export function DataTable({ tableId }: DataTableProps) {
 										/>
 									))}
 								</colgroup>
-								<thead className="bg-white">
+								<thead className="border-gray-300 border-b bg-white">
 									{table.getHeaderGroups().map((headerGroup) => (
 										<tr key={headerGroup.id}>
 											{headerGroup.headers.map((header) => (
@@ -1685,7 +1693,9 @@ export function DataTable({ tableId }: DataTableProps) {
 													onDuplicate={handleDuplicateColumn}
 													onDelete={handleDeleteColumn}
 													disabledRename={renameColumnMutation.isPending}
-													disabledDuplicate={duplicateColumnMutation.isPending}
+													disabledDuplicate={
+														duplicateColumnMutation.isPending
+													}
 												/>
 											))}
 										</tr>

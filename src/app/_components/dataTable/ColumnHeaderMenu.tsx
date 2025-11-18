@@ -30,6 +30,7 @@ function ColumnHeaderMenuComponent({
 			<DropdownMenuTrigger asChild>
 				<button
 					type="button"
+					data-column-menu-trigger={columnId}
 					className="ml-auto opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100"
 					aria-label="Column menu"
 				>
