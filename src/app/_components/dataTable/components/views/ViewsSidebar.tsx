@@ -8,7 +8,6 @@ import {
 	Sheet,
 } from "lucide-react";
 import { useMemo, useState } from "react";
-import { Button } from "~/components/ui/button";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -116,7 +115,9 @@ export function ViewsSidebar({
 									onClick={() => onSelectView(view.id)}
 								>
 									<Sheet className="size-4 text-blue-600" />
-									<span className="flex-1 truncate text-xs font-semibold">{view.name}</span>
+									<span className="flex-1 truncate font-semibold text-xs">
+										{view.name}
+									</span>
 								</button>
 								<div className="flex items-center gap-1">
 									<DropdownMenu>

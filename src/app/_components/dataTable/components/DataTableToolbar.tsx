@@ -1,9 +1,9 @@
 import { memo } from "react";
-import { ViewsHeader } from "./views/ViewsHeader";
 import type { ColumnType } from "~/types/column";
-import type { FilterCondition } from "../filter/Filters";
-import type { SortCondition } from "../filter/Sorts";
-import type { ViewUpdatePatch } from "../filter/useViewFilter";
+import type { FilterCondition } from "./filters/Filters";
+import type { SortCondition } from "./filters/Sorts";
+import type { ViewUpdatePatch } from "../hooks/useViewFilter";
+import { ViewsHeader } from "./views/ViewsHeader";
 
 interface DataTableToolbarProps {
 	viewName: string;
@@ -28,6 +28,8 @@ interface DataTableToolbarProps {
 	onUpdateView: (patch: ViewUpdatePatch) => void;
 }
 
-export const DataTableToolbar = memo(function DataTableToolbar(props: DataTableToolbarProps) {
+export const DataTableToolbar = memo(function DataTableToolbar(
+	props: DataTableToolbarProps,
+) {
 	return <ViewsHeader {...props} />;
 });

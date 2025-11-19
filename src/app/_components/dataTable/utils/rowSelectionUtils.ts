@@ -7,7 +7,7 @@
 export const toggleAllRowsSelection = (
 	checked: boolean,
 	visibleIds: string[],
-	setSelectedRowIds: React.Dispatch<React.SetStateAction<Set<string>>>
+	setSelectedRowIds: React.Dispatch<React.SetStateAction<Set<string>>>,
 ): void => {
 	setSelectedRowIds((prev) => {
 		const next = new Set(prev);
@@ -27,7 +27,7 @@ export const toggleAllRowsSelection = (
  */
 export const toggleSingleRowSelection = (
 	rowId: string,
-	setSelectedRowIds: React.Dispatch<React.SetStateAction<Set<string>>>
+	setSelectedRowIds: React.Dispatch<React.SetStateAction<Set<string>>>,
 ): void => {
 	setSelectedRowIds((prev) => {
 		const next = new Set(prev);
@@ -48,7 +48,7 @@ export const toggleSingleRowSelection = (
  */
 export const hasPartialSelection = (
 	visibleIds: string[],
-	selectedRowIds: Set<string>
+	selectedRowIds: Set<string>,
 ): boolean => {
 	return visibleIds.some((id) => selectedRowIds.has(id));
 };

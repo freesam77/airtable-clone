@@ -3,10 +3,10 @@
 import {
 	ArrowDownUp,
 	ChevronDown,
+	HelpCircle,
 	Plus,
 	Search,
 	X,
-	HelpCircle,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Button } from "~/components/ui/button";
@@ -19,7 +19,7 @@ import { Input } from "~/components/ui/input";
 import { Switch } from "~/components/ui/switch";
 import { cn } from "~/lib/utils";
 import type { ColumnType } from "~/types/column";
-import type { SortCondition } from "../../filter/Sorts";
+import type { SortCondition } from "./Sorts";
 
 type Props = {
 	columns: Array<{ id: string; name: string; type: ColumnType }>;
@@ -32,14 +32,13 @@ type Props = {
 // Field icon component that matches the HiddenFieldsDropdown style
 function FieldIcon({ type }: { type: ColumnType }) {
 	const symbol = type === "TEXT" ? "A" : "#";
-	
+
 	return (
 		<span className="flex size-4 items-center justify-center rounded-full border border-gray-200 bg-gray-50 font-semibold text-gray-600">
 			{symbol}
 		</span>
 	);
 }
-
 
 // Reusable header component - just shows "Sort by" title
 function SortHeader() {
@@ -226,9 +225,7 @@ export function SortsDropdown({
 							: "hover:bg-gray-100",
 					)}
 				>
-					<ArrowDownUp
-						className={cn("size-4", isActive && "text-gray-700")}
-					/>
+					<ArrowDownUp className={cn("size-4", isActive && "text-gray-700")} />
 					<span className="max-w-[320px] truncate text-xs">{label}</span>
 				</Button>
 			</DropdownMenuTrigger>
@@ -285,7 +282,7 @@ export function SortsDropdown({
 								<div className="space-y-3">
 									<div className="flex items-center gap-2">
 										<FieldIcon type={selectedSort.type} />
-										<span className="text-xs font-medium">
+										<span className="font-medium text-xs">
 											{
 												columns.find((c) => c.id === selectedSort.columnId)
 													?.name
@@ -327,7 +324,7 @@ export function SortsDropdown({
 									</div>
 
 									<div className="flex items-center justify-between pt-1">
-										<span className="text-gray-700 text-xs font-medium">
+										<span className="font-medium text-gray-700 text-xs">
 											Automatically sort records
 										</span>
 										<Switch
@@ -347,7 +344,7 @@ export function SortsDropdown({
 				{sorts.length > 0 && !showSortConfig && !showAddFieldList && (
 					<div>
 						<SortHeader />
-						<div className="p-3 space-y-3">
+						<div className="space-y-3 p-3">
 							{sorts.map((sort) => {
 								const column = columns.find((c) => c.id === sort.columnId);
 								if (!column) return null;
@@ -358,7 +355,7 @@ export function SortsDropdown({
 											<DropdownMenuTrigger asChild>
 												<Button
 													variant="outline"
-													className="h-8 flex-1 justify-between px-2 text-xs font-normal"
+													className="h-8 flex-1 justify-between px-2 font-normal text-xs"
 												>
 													<div className="flex items-center gap-2">
 														<FieldIcon type={column.type} />
@@ -390,7 +387,7 @@ export function SortsDropdown({
 											<DropdownMenuTrigger asChild>
 												<Button
 													variant="outline"
-													className="h-8 flex-1 justify-between px-2 text-xs font-normal"
+													className="h-8 flex-1 justify-between px-2 font-normal text-xs"
 												>
 													<span>{getDirectionLabel(sort.dir, sort.type)}</span>
 													<ChevronDown className="h-3 w-3 text-gray-500" />
@@ -425,7 +422,7 @@ export function SortsDropdown({
 
 							<button
 								type="button"
-								className="flex w-full items-center gap-2 py-2 text-blue-600 hover:text-blue-700 text-xs"
+								className="flex w-full items-center gap-2 py-2 text-blue-600 text-xs hover:text-blue-700"
 								onClick={() => setShowAddSortList(true)}
 							>
 								<Plus className="h-4 w-4" />
@@ -433,7 +430,7 @@ export function SortsDropdown({
 							</button>
 
 							<div className="flex items-center justify-between pt-2">
-								<span className="text-gray-700 text-xs font-medium">
+								<span className="font-medium text-gray-700 text-xs">
 									Automatically sort records
 								</span>
 								<Switch

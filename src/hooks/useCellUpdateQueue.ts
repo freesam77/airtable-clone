@@ -177,23 +177,26 @@ export function useCellUpdateQueue({
 			const filteredItems = existingItems.filter(
 				(item) => `${item.rowId}-${item.columnId}` !== cellKey,
 			);
-			
+
 			// Count how many updates we're canceling for this cell
 			const canceledCount = existingItems.filter(
 				(item) => `${item.rowId}-${item.columnId}` === cellKey,
 			).length;
-			
+
 			if (canceledCount > 0) {
 				// Clear and re-add all items except the canceled ones
 				queuer.clear();
 				for (const item of filteredItems) {
 					queuer.addItem(item);
 				}
-				
+
 				// Update pending count
-				pendingCountRef.current = Math.max(0, pendingCountRef.current - canceledCount);
+				pendingCountRef.current = Math.max(
+					0,
+					pendingCountRef.current - canceledCount,
+				);
 				setHasPendingChanges(pendingCountRef.current > 0);
-				
+
 				console.log(
 					`Canceled ${canceledCount} pending update(s) for cell ${cellKey}`,
 					"Remaining pending count:",

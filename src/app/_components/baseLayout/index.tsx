@@ -1,10 +1,10 @@
 ﻿"use client";
 import { Bell, Box, HelpCircle, LoaderCircle } from "lucide-react";
+import { useSession } from "next-auth/react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { auth } from "~/server/auth";
-import { useSession } from "next-auth/react";
 import { api } from "~/trpc/react";
 import { DataTable } from "../dataTable";
 import { TopNav } from "./topNav";
@@ -176,5 +176,3 @@ export function BaseLayout({
 		</div>
 	);
 }
-
-

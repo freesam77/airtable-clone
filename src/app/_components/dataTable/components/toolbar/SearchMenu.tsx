@@ -47,7 +47,10 @@ export function SearchMenu({
 					<Search />
 				</Button>
 			</DropdownMenuTrigger>
-			<DropdownMenuContent align="end" className="w-full rounded-t-none bg-white shadow-xs">
+			<DropdownMenuContent
+				align="end"
+				className="w-full rounded-t-none bg-white shadow-xs"
+			>
 				<div className="flex items-center gap-3">
 					<Input
 						id="table-search"
@@ -63,7 +66,7 @@ export function SearchMenu({
 							}
 						}}
 						placeholder="Find in view"
-                        className="text-xs! shadow-none outline-none"
+						className="text-xs! shadow-none outline-none"
 						autoFocus
 					/>
 					<div className="min-w-20 text-center text-gray-500 text-xs">
@@ -73,7 +76,7 @@ export function SearchMenu({
 						<Button
 							variant="ghost"
 							size="icon"
-                            className="w-6 cursor-pointer"
+							className="w-6 cursor-pointer"
 							onClick={gotoPrevMatch}
 							disabled={matchesCount === 0}
 							aria-label="Previous match"
@@ -83,7 +86,7 @@ export function SearchMenu({
 						<Button
 							variant="ghost"
 							size="icon"
-                            className="w-6 cursor-pointer"
+							className="w-6 cursor-pointer"
 							onClick={gotoNextMatch}
 							disabled={matchesCount === 0}
 							aria-label="Next match"

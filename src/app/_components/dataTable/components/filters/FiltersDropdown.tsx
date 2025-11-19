@@ -10,7 +10,7 @@ import {
 import { Input } from "~/components/ui/input";
 import { cn } from "~/lib/utils";
 import type { ColumnType } from "~/types/column";
-import type { FilterCondition } from "../../filter/Filters";
+import type { FilterCondition } from "../../components/filters/Filters";
 
 type Props = {
 	columns: Array<{ id: string; name: string; type: ColumnType }>;

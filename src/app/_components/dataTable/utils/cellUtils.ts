@@ -6,7 +6,10 @@ import type { Cell, TableData } from "~/types/dataTable";
  * @param columnId - The column ID to find
  * @returns The cell data or undefined if not found
  */
-export const findCellInRow = (row: TableData, columnId: string): Cell | undefined => {
+export const findCellInRow = (
+	row: TableData,
+	columnId: string,
+): Cell | undefined => {
 	return row.cells.find((cv: any) => {
 		const cellColumnId = cv?.column?.id ?? cv?.columnId;
 		return cellColumnId === columnId;
@@ -30,14 +33,4 @@ export const resolveCellValue = (cell: Cell | undefined): string | null => {
  */
 export const createCellKey = (rowId: string, columnId: string): string => {
 	return `${rowId}|${columnId}`;
-};
-
-/**
- * Parse a cell key back into row and column IDs
- * @param cellKey - The cell key string
- * @returns Object with rowId and columnId
- */
-export const parseCellKey = (cellKey: string): { rowId: string; columnId: string } => {
-	const [rowId, columnId] = cellKey.split('|');
-	return { rowId: rowId || '', columnId: columnId || '' };
 };

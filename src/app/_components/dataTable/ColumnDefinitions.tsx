@@ -1,6 +1,6 @@
 "use client";
 
-import type { CellContext, ColumnDef } from "@tanstack/react-table";
+import type { CellContext, ColumnDef, RowData } from "@tanstack/react-table";
 import { GripVertical } from "lucide-react";
 import { memo, useEffect, useRef } from "react";
 import {
@@ -11,11 +11,30 @@ import {
 } from "~/components/ui/tooltip";
 import { EditableCell } from "./components/cells/EditableCell";
 
-import type { ColumnType } from "~/types/column";
-import type { ColumnMeta, Cell, TableData } from "~/types/dataTable";
+import type { Cell, TableData } from "~/types/dataTable";
+import {
+	createCellKey,
+	findCellInRow,
+	resolveCellValue,
+} from "./utils/cellUtils";
 import { getColumnTypeIcon, getColumnTypeLabel } from "./utils/columnUtils";
-import { createCellKey, findCellInRow, resolveCellValue } from "./utils/cellUtils";
-import { toggleAllRowsSelection, toggleSingleRowSelection, hasPartialSelection } from "./utils/rowSelectionUtils";
+import {
+	hasPartialSelection,
+	toggleAllRowsSelection,
+	toggleSingleRowSelection,
+} from "./utils/rowSelectionUtils";
+
+declare module "@tanstack/react-table" {
+  interface ColumnMeta<TData extends RowData, TValue> {
+    table?: string;
+    className?: string;
+    type?: string;
+    name?: string;
+    position?: number;
+  }
+}
+
+
 
 type RowNumberHeaderProps = {
 	displayDataIds: string[];
@@ -111,7 +130,8 @@ const RowNumberCell = memo(function RowNumberCell({
 const ColumnHeaderLabel = memo(function ColumnHeaderLabel({
 	col,
 }: {
-	col: ColumnMeta;
+	col: any
+
 }) {
 	return (
 		<div className="flex min-w-0 items-center">
@@ -135,7 +155,7 @@ const ColumnHeaderLabel = memo(function ColumnHeaderLabel({
 });
 
 type CreateColumnDefsParams = {
-	columns: ColumnMeta[];
+	columns: any[];
 	displayData: TableData[];
 	rowNumberMap: Map<string, number>;
 	selectedRowIds: Set<string>;
@@ -193,7 +213,8 @@ export function createColumnDefs({
 				const checked = selectedRowIds.has(row.original.id);
 				const isHovered = hoveredRowId === row.original.id;
 				const rowNumber = rowNumberMap.get(row.original.id) ?? row.index + 1;
-				const onToggle = () => toggleSingleRowSelection(row.original.id, setSelectedRowIds);
+				const onToggle = () =>
+					toggleSingleRowSelection(row.original.id, setSelectedRowIds);
 				return (
 					<RowNumberCell
 						rowId={row.original.id}

@@ -101,12 +101,11 @@ export function HiddenFieldsDropdown({
 										key={col.id}
 										className="flex items-center gap-2 rounded py-1 text-xs hover:bg-gray-50"
 									>
-
 										<Switch
 											checked={!isHidden}
 											onCheckedChange={() => toggleColumn(col.id)}
 											aria-label={isHidden ? "Show field" : "Hide field"}
-											className="data-[state=checked]:bg-green-600 data-[state=unchecked]:bg-gray-300 scale-50"
+											className="scale-50 data-[state=checked]:bg-green-600 data-[state=unchecked]:bg-gray-300"
 										/>
 										<span className="flex size-4 items-center justify-center rounded-full border border-gray-200 bg-gray-50 font-semibold text-gray-600">
 											{columnTypeSymbol(col.type)}

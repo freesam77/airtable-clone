@@ -2,10 +2,10 @@
 
 import {
 	ChevronDown,
+	ExternalLink,
 	List,
 	Menu,
 	PaintBucket,
-	ExternalLink,
 	Sheet,
 } from "lucide-react";
 import { Button } from "~/components/ui/button";
@@ -15,13 +15,13 @@ import {
 	DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
 import type { ColumnType } from "~/types/column";
-import { SearchMenu } from "../toolbar/SearchMenu";
-import type { FilterCondition } from "../../filter/Filters";
+import type { FilterCondition } from "../../components/filters/Filters";
+import type { SortCondition } from "../../components/filters/Sorts";
+import type { ViewUpdatePatch } from "../../hooks/useViewFilter";
 import { FiltersDropdown } from "../filters/FiltersDropdown";
 import { HiddenFieldsDropdown } from "../filters/HiddenFieldsDropdown";
-import type { SortCondition } from "../../filter/Sorts";
 import { SortsDropdown } from "../filters/SortsDropdown";
-import type { ViewUpdatePatch } from "../../filter/useViewFilter";
+import { SearchMenu } from "../toolbar/SearchMenu";
 
 type ViewsHeaderProps = {
 	viewName: string;
