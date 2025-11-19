@@ -18,7 +18,6 @@ import {
 	useRef,
 	useState,
 } from "react";
-import { flushSync } from "react-dom";
 import {
 	ContextMenu,
 	ContextMenuContent,
@@ -46,10 +45,9 @@ import { cn } from "~/lib/utils";
 import { api } from "~/trpc/react";
 import type { ColumnType } from "~/types/column";
 import { ColumnHeaderMenu } from "./ColumnHeaderMenu";
-import { ViewsSidebar } from "./components/views/ViewsSidebar";
-import { AddColumnDropdown } from "./components/toolbar/AddColumnDropdown";
-import { DataTableStatusBar } from "./components/DataTableStatusBar";
-import { DataTableToolbar } from "./components/DataTableToolbar";
+import { ViewsHeader } from "./ViewsHeader";
+import { ViewsSidebar } from "./ViewsSidebar";
+import { AddColumnDropdown } from "./AddColumnDropdown";
 import { createColumnDefs } from "./ColumnDefinitions";
 import type { ColumnMeta } from "~/types/dataTable";
 import { applyFilters } from "./filter/Filters";
@@ -543,7 +541,7 @@ export function DataTable({ tableId }: DataTableProps) {
 				};
 			});
 		},
-		[utils.table.getInfiniteRows, infiniteQueryInput],
+		[utils.table.getInfiniteRows, tableId],
 	);
 
 	const {
@@ -649,9 +647,7 @@ export function DataTable({ tableId }: DataTableProps) {
 					nextValue: nextHistoryValue,
 				});
 			}
-			flushSync(() => {
-				handleCellUpdate(rowId, columnId, normalizedNext);
-			});
+			handleCellUpdate(rowId, columnId, normalizedNext);
 			setEditingCell(null);
 			scrollParentRef.current?.focus();
 		},
@@ -1071,16 +1067,11 @@ export function DataTable({ tableId }: DataTableProps) {
 			}
 			// Cancel any pending updates for this cell to prevent conflicts
 			cancelCellUpdate(cell.rowId, cell.columnId);
-			
-			// Don't apply optimistic update here for typed characters
-			// Let the EditableCell handle the initial display correctly
-			// The optimistic update will happen in handleCommitEdit when editing finishes
-			
 			initialEditValueRef.current =
 				initialValue !== undefined ? initialValue : null;
 			setEditingCell(cell);
 		},
-		[columnIndexLookup, rowIndexLookup, setEditingCell, cancelCellUpdate, handleOptimisticUpdate],
+		[columnIndexLookup, rowIndexLookup, setEditingCell, cancelCellUpdate],
 	);
 
 	const handleCellPointerDown = useCallback(
@@ -1512,11 +1503,6 @@ export function DataTable({ tableId }: DataTableProps) {
 					event.preventDefault();
 					moveSelection(0, 1, event.shiftKey);
 					return;
-				case "Delete":
-				case "Backspace":
-					event.preventDefault();
-					handleCellUpdate(activeCell.rowId, activeCell.columnId, "");
-					return;
 				default:
 					if (isPrintableKey(event)) {
 						event.preventDefault();
@@ -1530,7 +1516,6 @@ export function DataTable({ tableId }: DataTableProps) {
 			activeCell,
 			copySelectionToClipboard,
 			editingCell,
-			handleCellUpdate,
 			moveSelection,
 			moveHorizontallyFromCell,
 			osName,
@@ -1632,7 +1617,7 @@ export function DataTable({ tableId }: DataTableProps) {
 		<div className="relative flex h-full w-full flex-col overflow-hidden">
 			<div className="flex min-w-0 flex-1 flex-col overflow-hidden">
 				<div className="shrink-0 border-b bg-white">
-					<DataTableToolbar
+					<ViewsHeader
 						viewName={activeView?.name ?? "View"}
 						onRenameView={(name) => {
 							if (!activeView) return;
@@ -2026,10 +2011,12 @@ export function DataTable({ tableId }: DataTableProps) {
 							/>
 						</div>
 						{/* Footer with record count */}
-						<DataTableStatusBar 
-							footerRowCount={footerRowCount}
-							showApproximate={showApproximate}
-						/>
+						<div className="w-full border-t bg-white p-4 pl-3 text-xs">
+							<span>
+								{footerRowCount.toLocaleString()}
+								{showApproximate ? "+" : ""} records
+							</span>
+						</div>
 					</div>
 				</div>
 			</div>

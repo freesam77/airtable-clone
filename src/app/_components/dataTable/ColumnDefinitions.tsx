@@ -9,35 +9,13 @@ import {
 	TooltipProvider,
 	TooltipTrigger,
 } from "~/components/ui/tooltip";
-import { EditableCell } from "./editableCell";
+import { EditableCell } from "./components/cells/EditableCell";
 
 import type { ColumnType } from "~/types/column";
-
-export type ColumnMeta = {
-	id: string;
-	name: string;
-	type: ColumnType;
-	required: boolean;
-	position: number;
-	tableId: string;
-};
-
-export type Cell = {
-	id: string;
-	columnId: string;
-	value: string | null;
-	rowId: string;
-	column?: ColumnMeta;
-};
-
-export type TableData = {
-	id: string;
-	position: number;
-	createdAt: Date;
-	updatedAt: Date;
-	tableId: string;
-	cells: Array<Cell>;
-};
+import type { ColumnMeta, Cell, TableData } from "~/types/dataTable";
+import { getColumnTypeIcon, getColumnTypeLabel } from "./utils/columnUtils";
+import { createCellKey, findCellInRow, resolveCellValue } from "./utils/cellUtils";
+import { toggleAllRowsSelection, toggleSingleRowSelection, hasPartialSelection } from "./utils/rowSelectionUtils";
 
 type RowNumberHeaderProps = {
 	displayDataIds: string[];
@@ -55,7 +33,7 @@ const RowNumberHeader = memo(function RowNumberHeader({
 	setShowCheckboxes,
 }: RowNumberHeaderProps) {
 	const visibleIds = displayDataIds;
-	const someSelected = visibleIds.some((id) => selectedRowIds.has(id));
+	const someSelected = hasPartialSelection(visibleIds, selectedRowIds);
 
 	const ref = useRef<HTMLInputElement | null>(null);
 	useEffect(() => {
@@ -64,15 +42,7 @@ const RowNumberHeader = memo(function RowNumberHeader({
 	}, [someSelected, showCheckboxes]);
 
 	const toggleAll = (checked: boolean) => {
-		setSelectedRowIds((prev) => {
-			const next = new Set(prev);
-			if (checked) {
-				for (const id of visibleIds) next.add(id);
-			} else {
-				for (const id of visibleIds) next.delete(id);
-			}
-			return next;
-		});
+		toggleAllRowsSelection(checked, visibleIds, setSelectedRowIds);
 	};
 
 	return (
@@ -164,10 +134,6 @@ const ColumnHeaderLabel = memo(function ColumnHeaderLabel({
 	);
 });
 
-const getColumnTypeIcon = (type: ColumnType) => (type === "TEXT" ? "A" : "#");
-const getColumnTypeLabel = (type: ColumnType) =>
-	type === "TEXT" ? "Single line text" : "Number";
-
 type CreateColumnDefsParams = {
 	columns: ColumnMeta[];
 	displayData: TableData[];
@@ -227,13 +193,7 @@ export function createColumnDefs({
 				const checked = selectedRowIds.has(row.original.id);
 				const isHovered = hoveredRowId === row.original.id;
 				const rowNumber = rowNumberMap.get(row.original.id) ?? row.index + 1;
-				const onToggle = () =>
-					setSelectedRowIds((prev) => {
-						const next = new Set(prev);
-						if (next.has(row.original.id)) next.delete(row.original.id);
-						else next.add(row.original.id);
-						return next;
-					});
+				const onToggle = () => toggleSingleRowSelection(row.original.id, setSelectedRowIds);
 				return (
 					<RowNumberCell
 						rowId={row.original.id}
@@ -257,7 +217,7 @@ export function createColumnDefs({
 				header: () => <ColumnHeaderLabel col={col} />,
 				cell: ({ getValue, row }: CellContext<TableData, unknown>) => {
 					const cells = getValue() as Cell | undefined;
-					const value = cells?.value ?? null;
+					const value = resolveCellValue(cells);
 					const cellIdentity = {
 						rowId: row.original.id,
 						columnId: col.id,
@@ -271,7 +231,7 @@ export function createColumnDefs({
 					return (
 						<EditableCell
 							value={value}
-							cellKey={`${cellIdentity.rowId}|${cellIdentity.columnId}`}
+							cellKey={createCellKey(cellIdentity.rowId, cellIdentity.columnId)}
 							isEditing={isEditing}
 							type={col.type}
 							onCommit={(nextValue: string, previousValue) =>
@@ -289,11 +249,7 @@ export function createColumnDefs({
 						/>
 					);
 				},
-				accessorFn: (row: TableData) =>
-					row.cells.find((cv: any) => {
-						const columnId = cv?.column?.id ?? cv?.columnId;
-						return columnId === col.id;
-					}),
+				accessorFn: (row: TableData) => findCellInRow(row, col.id),
 			})),
 	];
 }

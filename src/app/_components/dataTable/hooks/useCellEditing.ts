@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import type { CellHistoryChange } from "~/hooks/useSteps";
-import type { ColumnMeta, TableData } from "../columnDefs";
+import type { ColumnMeta, TableData } from "~/types/dataTable";
 import type {
 	FillPreview,
 	GridCell,

@@ -19,7 +19,7 @@ import { Input } from "~/components/ui/input";
 import { Switch } from "~/components/ui/switch";
 import { cn } from "~/lib/utils";
 import type { ColumnType } from "~/types/column";
-import type { SortCondition } from "./Sorts";
+import type { SortCondition } from "../../filter/Sorts";
 
 type Props = {
 	columns: Array<{ id: string; name: string; type: ColumnType }>;

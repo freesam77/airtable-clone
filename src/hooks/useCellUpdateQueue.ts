@@ -95,23 +95,15 @@ export function useCellUpdateQueue({
 			// Apply optimistic update immediately
 			onOptimisticUpdate(rowId, columnId, value);
 
-			// Deduplicate: remove existing update for same cell
+			// Safer approach: just add the item and let the queuer handle deduplication
+			// The AsyncQueuer should handle duplicate keys properly
 			const cellKey = `${rowId}-${columnId}`;
 			const existingItems = queuer.peekPendingItems();
-			const filteredItems = existingItems.filter(
-				(item) => `${item.rowId}-${item.columnId}` !== cellKey,
-			);
-
-			// Check if this is a new cell update (not a duplicate)
 			const isNewCellUpdate = !existingItems.some(
 				(item) => `${item.rowId}-${item.columnId}` === cellKey,
 			);
 
-			// Update queue with latest value only
-			queuer.clear();
-			for (const item of filteredItems) {
-				queuer.addItem(item);
-			}
+			// Simply add the new item - AsyncQueuer will process them in order
 			queuer.addItem({ rowId, columnId, value: value });
 
 			// Only increment pending count for new cell updates

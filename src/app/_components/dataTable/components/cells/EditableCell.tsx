@@ -26,37 +26,56 @@ function EditableCellComponent({
 }: EditableCellProps) {
 	const stringValue =
 		value === null || value === undefined ? "" : String(value);
+	
 	const [draft, setDraft] = useState(stringValue);
 	const inputRef = useRef<HTMLInputElement>(null);
 	const committedRef = useRef(false);
+	const hasFocusedRef = useRef(false);
+	const pendingKeystrokesRef = useRef<string>("");
 
 	// Update draft when value changes (for optimistic updates)
 	useEffect(() => {
 		if (!isEditing) {
 			setDraft(stringValue);
+			hasFocusedRef.current = false; // Reset for next edit session
 		}
 	}, [stringValue, isEditing]);
 
 	useEffect(() => {
 		if (!isEditing) return;
-		const nextValue =
-			initialValue !== undefined && initialValue !== null
-				? initialValue
-				: stringValue;
-		setDraft(nextValue);
-		const frame = requestAnimationFrame(() => {
-			if (!inputRef.current) return;
-			inputRef.current.focus();
-			if (initialValue !== undefined && initialValue !== null) {
-				const pos = nextValue.length;
-				inputRef.current.setSelectionRange(pos, pos);
-				onInitialValueConsumed?.();
-			} else {
-				inputRef.current.select();
+		
+		// Focus and handle initial value immediately
+		if (!hasFocusedRef.current) {
+			hasFocusedRef.current = true;
+			
+			if (inputRef.current) {
+				inputRef.current.focus();
+				
+				// If we have an initial value (user typed a character), 
+				// immediately overwrite with just that character
+				if (initialValue !== undefined && initialValue !== null) {
+					// Directly set the value and update draft immediately
+					inputRef.current.value = initialValue;
+					setDraft(initialValue);
+					
+					// Position cursor at end to prevent selection
+					if (type !== "NUMBER") {
+						inputRef.current.setSelectionRange(initialValue.length, initialValue.length);
+					}
+					
+					onInitialValueConsumed?.();
+				} else {
+					// For Enter key editing, use the existing cell value
+					setDraft(stringValue);
+					// Position cursor at end for Enter editing
+					if (type !== "NUMBER") {
+						const len = stringValue.length;
+						inputRef.current.setSelectionRange(len, len);
+					}
+				}
 			}
-		});
-		return () => cancelAnimationFrame(frame);
-	}, [initialValue, isEditing, onInitialValueConsumed, stringValue]);
+		}
+	}, [initialValue, isEditing, onInitialValueConsumed, stringValue, type]);
 
 	const commit = (nextValue: string) => {
 		if (committedRef.current) return;
