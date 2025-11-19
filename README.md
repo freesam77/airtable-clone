@@ -1,29 +1,75 @@
-# Create T3 App
+# Airtable Clone
 
-This is a [T3 Stack](https://create.t3.gg/) project bootstrapped with `create-t3-app`.
+An [Airtable](https://www.airtable.com) clone built with [create-t3-app](https://create.t3.gg/).
 
-## What's next? How do I make an app with this?
+## Quick Start
 
-We try to keep this project as simple as possible, so you can start with just the scaffolding we set up for you, and add additional things later when they become necessary.
+```bash
+# Install dependencies
+npm install
 
-If you are not familiar with the different technologies used in this project, please refer to the respective docs. If you still are in the wind, please join our [Discord](https://t3.gg/discord) and ask for help.
+# Set up environment variables
+cp .env.example .env.local
+# Fill in your database and auth credentials
 
-- [Next.js](https://nextjs.org)
-- [NextAuth.js](https://next-auth.js.org)
-- [Prisma](https://prisma.io)
-- [Drizzle](https://orm.drizzle.team)
-- [Tailwind CSS](https://tailwindcss.com)
-- [tRPC](https://trpc.io)
+# Set up database
+npm run db:push
+npm run db:generate
 
-## Learn More
+# Start development server
+npm run dev
+```
 
-To learn more about the [T3 Stack](https://create.t3.gg/), take a look at the following resources:
+## Development Commands
 
-- [Documentation](https://create.t3.gg/)
-- [Learn the T3 Stack](https://create.t3.gg/en/faq#what-learning-resources-are-currently-available) — Check out these awesome tutorials
+```bash
+# Development
+npm run dev          # Start development server with Turbo
+npm run build        # Build for production
+npm run start        # Start production server
+npm run preview      # Build and start production server
+npm run typecheck    # Run TypeScript type checking
 
-You can check out the [create-t3-app GitHub repository](https://github.com/t3-oss/create-t3-app) — your feedback and contributions are welcome!
+# Code Quality
+npm run check        # Run Biome linter
+npm run check:write  # Fix linting issues
+npm run check:unsafe # Fix with unsafe rules
 
-## How do I deploy this?
+# Database
+npm run db:generate  # Create and apply migrations
+npm run db:migrate   # Deploy migrations to production
+npm run db:push      # Push schema changes (development)
+npm run db:studio    # Open Prisma Studio GUI
+```
 
-Follow our deployment guides for [Vercel](https://create.t3.gg/en/deployment/vercel), [Netlify](https://create.t3.gg/en/deployment/netlify) and [Docker](https://create.t3.gg/en/deployment/docker) for more information.
+## Core Architecture
+
+**IndexedDB serves as the primary data source** for UI rendering, with PostgreSQL as the durable backend. All mutations go through a local write queue for offline support and optimistic updates.
+
+### Technology Stack
+
+- **Frontend**: Next.js + React + TypeScript
+- **Styling**: TailwindCSS + PostCSS with Biome for linting
+- **Data**: TRPC + TanStack Query + Prisma 6.5
+- **UI**: Radix UI components + TanStack Table + TanStack Virtual
+- **Auth**: NextAuth (Google auth)
+
+## Key Features
+
+- **Real-time Sync**: Background synchronization with conflict resolution
+- **Large Dataset Support**: Handles large amount of records with virtualization and pagination
+- **Optimistic Updates**: Instant UI feedback for all operations
+- **Type Safety**: End-to-end TypeScript from database to UI
+- **Spreadsheet-like Editing**: Cell editing with keyboard shortcuts support
+
+## Environment Configuration
+
+Required environment variables (see `.env.example`):
+- **Database**: `DATABASE_URL` - PostgreSQL connection string
+- **Auth**: `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`
+- **Optional**: `SUPABASE_BULK_QUEUE_NAME` (default: "bulk_update"), `BULK_ROW_QUEUE_THRESHOLD` (default: 10000)
+
+
+## Built With T3 Stack
+
+This project is built on the [T3 Stack](https://create.t3.gg/) foundation with significant enhancements for local-first functionality.
