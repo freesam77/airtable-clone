@@ -81,7 +81,7 @@ export function useCellUpdateQueue({
 					key: `cellUpdateQueue${tableId}`,
 					concurrency: 1,
 					started: true,
-					wait: 500,
+					wait: 0, // Changed from 500ms to 0ms for immediate processing
 					onError: (error, item) =>
 						console.error("Cell update failed:", error, item),
 				},
@@ -178,9 +178,44 @@ export function useCellUpdateQueue({
 		[queuer],
 	);
 
+	const cancelCellUpdate = useCallback(
+		(rowId: string, columnId: string) => {
+			const cellKey = `${rowId}-${columnId}`;
+			const existingItems = queuer.peekPendingItems();
+			const filteredItems = existingItems.filter(
+				(item) => `${item.rowId}-${item.columnId}` !== cellKey,
+			);
+			
+			// Count how many updates we're canceling for this cell
+			const canceledCount = existingItems.filter(
+				(item) => `${item.rowId}-${item.columnId}` === cellKey,
+			).length;
+			
+			if (canceledCount > 0) {
+				// Clear and re-add all items except the canceled ones
+				queuer.clear();
+				for (const item of filteredItems) {
+					queuer.addItem(item);
+				}
+				
+				// Update pending count
+				pendingCountRef.current = Math.max(0, pendingCountRef.current - canceledCount);
+				setHasPendingChanges(pendingCountRef.current > 0);
+				
+				console.log(
+					`Canceled ${canceledCount} pending update(s) for cell ${cellKey}`,
+					"Remaining pending count:",
+					pendingCountRef.current,
+				);
+			}
+		},
+		[queuer],
+	);
+
 	return {
 		queueCellUpdate,
 		flushPendingUpdates,
+		cancelCellUpdate,
 		pendingUpdatesCount: pendingCountRef.current,
 		isProcessing: queuer.store.state.activeItems.length > 0,
 		hasPendingChanges,

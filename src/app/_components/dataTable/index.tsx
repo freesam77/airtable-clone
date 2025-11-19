@@ -546,6 +546,7 @@ export function DataTable({ tableId }: DataTableProps) {
 	const {
 		queueCellUpdate,
 		flushPendingUpdates,
+		cancelCellUpdate,
 		addRowMutation,
 		addColumnMutation,
 		deleteRowMutation,
@@ -1063,11 +1064,13 @@ export function DataTable({ tableId }: DataTableProps) {
 			) {
 				return;
 			}
+			// Cancel any pending updates for this cell to prevent conflicts
+			cancelCellUpdate(cell.rowId, cell.columnId);
 			initialEditValueRef.current =
 				initialValue !== undefined ? initialValue : null;
 			setEditingCell(cell);
 		},
-		[columnIndexLookup, rowIndexLookup],
+		[columnIndexLookup, rowIndexLookup, setEditingCell, cancelCellUpdate],
 	);
 
 	const handleCellPointerDown = useCallback(

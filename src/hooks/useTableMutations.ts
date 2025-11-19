@@ -31,7 +31,7 @@ export function useTableMutations({
 	const utils = api.useUtils();
 	const rowCountInput = { id: tableId };
 
-	const { queueCellUpdate, flushPendingUpdates, remapRowId } =
+	const { queueCellUpdate, flushPendingUpdates, remapRowId, cancelCellUpdate } =
 		useCellUpdateQueue({
 			tableId,
 			onOptimisticUpdate,
@@ -538,6 +538,7 @@ export function useTableMutations({
 		queueCellUpdate,
 		flushPendingUpdates,
 		remapRowId,
+		cancelCellUpdate,
 		addRowMutation,
 		addColumnMutation,
 		deleteRowMutation,

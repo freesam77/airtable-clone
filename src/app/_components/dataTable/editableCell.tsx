@@ -30,9 +30,12 @@ function EditableCellComponent({
 	const inputRef = useRef<HTMLInputElement>(null);
 	const committedRef = useRef(false);
 
+	// Update draft when value changes (for optimistic updates)
 	useEffect(() => {
-		setDraft(stringValue);
-	}, [stringValue]);
+		if (!isEditing) {
+			setDraft(stringValue);
+		}
+	}, [stringValue, isEditing]);
 
 	useEffect(() => {
 		if (!isEditing) return;
