@@ -1,6 +1,6 @@
 "use client";
 
-import { EyeOff, GripVertical, HelpCircle, Search } from "lucide-react";
+import { EyeOff, GripVertical, HelpCircle } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Button } from "~/components/ui/button";
 import {
@@ -71,23 +71,22 @@ export function HiddenFieldsDropdown({
 					aria-pressed={isActive}
 				>
 					<EyeOff className="size-4" />
-					<span className="text-sm">{buttonLabel}</span>
+					<span className="text-xs">{buttonLabel}</span>
 				</Button>
 			</DropdownMenuTrigger>
 			<DropdownMenuContent
 				align="end"
-				className="w-[320px] bg-white p-0 text-sm"
+				className="w-[320px] bg-white p-0 text-xs"
 			>
 				<div className="p-3">
-					<div className="relative mb-3">
-						<Search className="-translate-y-1/2 pointer-events-none absolute top-1/2 left-2 size-4 text-gray-400" />
+					<div className="relative mb-3 flex items-center justify-between border-b">
 						<Input
 							value={query}
 							onChange={(e) => setQuery(e.target.value)}
 							placeholder="Find a field"
-							className="h-9 w-full rounded-md bg-gray-50 pr-10 pl-8 text-sm"
+							className="h-9 w-full rounded-none px-0 text-xs! shadow-none"
 						/>
-						<HelpCircle className="-translate-y-1/2 pointer-events-none absolute top-1/2 right-3 size-4 text-gray-400" />
+						<HelpCircle className=" size-4 text-gray-400" />
 					</div>
 					<div className="max-h-64 space-y-1 overflow-auto">
 						{filteredColumns.length === 0 ? (
@@ -100,15 +99,16 @@ export function HiddenFieldsDropdown({
 								return (
 									<div
 										key={col.id}
-										className="flex items-center gap-2 rounded px-2 py-1 hover:bg-gray-50"
+										className="flex items-center gap-2 rounded py-1 text-xs hover:bg-gray-50"
 									>
+
 										<Switch
 											checked={!isHidden}
 											onCheckedChange={() => toggleColumn(col.id)}
 											aria-label={isHidden ? "Show field" : "Hide field"}
-											className="data-[state=checked]:bg-green-600 data-[state=unchecked]:bg-gray-300"
+											className="data-[state=checked]:bg-green-600 data-[state=unchecked]:bg-gray-300 scale-50"
 										/>
-										<span className="flex h-6 w-6 flex-none items-center justify-center rounded-full border border-gray-200 bg-gray-50 font-semibold text-gray-600 text-xs">
+										<span className="flex size-4 items-center justify-center rounded-full border border-gray-200 bg-gray-50 font-semibold text-gray-600">
 											{columnTypeSymbol(col.type)}
 										</span>
 										<span
@@ -126,12 +126,12 @@ export function HiddenFieldsDropdown({
 						)}
 					</div>
 				</div>
-				<div className="flex gap-2 border-t px-3 pt-2 pb-3">
+				<div className="flex gap-2 px-3 py-2 text-xs">
 					<button
 						type="button"
 						onClick={hideAll}
 						disabled={disableHideAll}
-						className="flex-1 rounded border border-gray-200 bg-gray-100 py-2 text-center text-gray-700 text-sm hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-60"
+						className="flex-1 rounded-xs bg-gray-100 py-1 text-center text-gray-700 hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-60"
 					>
 						Hide all
 					</button>
@@ -139,7 +139,7 @@ export function HiddenFieldsDropdown({
 						type="button"
 						onClick={showAll}
 						disabled={disableShowAll}
-						className="flex-1 rounded border border-gray-200 bg-gray-100 py-2 text-center text-gray-700 text-sm hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-60"
+						className="flex-1 rounded-xs bg-gray-100 py-1 text-center text-gray-700 hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-60"
 					>
 						Show all
 					</button>

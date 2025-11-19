@@ -1,13 +1,11 @@
 "use client";
 
 import {
-	ArrowUpDown,
 	ChevronDown,
-	ChevronUp,
-	FolderTree,
+	List,
 	Menu,
-	Palette,
-	Share2,
+	PaintBucket,
+	ExternalLink,
 	Sheet,
 } from "lucide-react";
 import { Button } from "~/components/ui/button";
@@ -17,7 +15,7 @@ import {
 	DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
 import type { ColumnType } from "~/types/column";
-import { SearchMenu } from "./SearchMenu";
+import { SearchMenu } from "./filter/SearchMenu";
 import type { FilterCondition } from "./filter/Filters";
 import { FiltersDropdown } from "./filter/FiltersDropdown";
 import { HiddenFieldsDropdown } from "./filter/HiddenFieldsDropdown";
@@ -86,7 +84,7 @@ export function ViewsHeader({
 					<DropdownMenuTrigger asChild>
 						<button
 							type="button"
-							className="flex items-center gap-2 rounded px-2 py-1 text-gray-700 text-sm hover:bg-gray-50"
+							className="flex items-center gap-2 rounded px-2 py-1 font-semibold text-gray-700 text-xs hover:bg-gray-50"
 						>
 							<Sheet className="size-4 text-blue-600" />
 							{viewName}
@@ -148,8 +146,8 @@ export function ViewsHeader({
 					size="sm"
 					className="cursor-pointer gap-2 px-2 hover:bg-gray-100"
 				>
-					<FolderTree className="size-4" />
-					<span className="text-sm">Group</span>
+					<List className="size-4" />
+					<span className="text-xs">Group</span>
 				</Button>
 				<SortsDropdown
 					columns={columns}
@@ -163,16 +161,16 @@ export function ViewsHeader({
 					size="sm"
 					className="cursor-pointer gap-2 px-2 hover:bg-gray-100"
 				>
-					<Palette className="size-4" />
-					<span className="text-sm">Color</span>
+					<PaintBucket className="size-4" />
+					<span className="text-xs">Color</span>
 				</Button>
 				<Button
 					variant="ghost"
 					size="sm"
 					className="cursor-pointer gap-2 px-2 hover:bg-gray-100"
 				>
-					<Share2 className="size-4" />
-					<span className="text-sm">Share and sync</span>
+					<ExternalLink className="size-4" />
+					<span className="text-xs">Share and sync</span>
 				</Button>
 				<SearchMenu
 					open={searchOpen}

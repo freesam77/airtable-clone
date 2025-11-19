@@ -47,7 +47,7 @@ export function SearchMenu({
 					<Search />
 				</Button>
 			</DropdownMenuTrigger>
-			<DropdownMenuContent align="end" className="w-full bg-white">
+			<DropdownMenuContent align="end" className="w-full rounded-t-none bg-white shadow-xs">
 				<div className="flex items-center gap-3">
 					<Input
 						id="table-search"
@@ -63,15 +63,17 @@ export function SearchMenu({
 							}
 						}}
 						placeholder="Find in view"
+                        className="text-xs! shadow-none outline-none"
 						autoFocus
 					/>
 					<div className="min-w-20 text-center text-gray-500 text-xs">
-						{matchesCount > 0 && `${activeMatchIndex + 1} / ${matchesCount}`}
+						{matchesCount > 0 && `${activeMatchIndex + 1} of ${matchesCount}`}
 					</div>
 					<div className="flex gap-1">
 						<Button
-							variant="outline"
+							variant="ghost"
 							size="icon"
+                            className="w-6 cursor-pointer"
 							onClick={gotoPrevMatch}
 							disabled={matchesCount === 0}
 							aria-label="Previous match"
@@ -79,8 +81,9 @@ export function SearchMenu({
 							<ChevronUp className="size-4" />
 						</Button>
 						<Button
-							variant="outline"
+							variant="ghost"
 							size="icon"
+                            className="w-6 cursor-pointer"
 							onClick={gotoNextMatch}
 							disabled={matchesCount === 0}
 							aria-label="Next match"
@@ -90,7 +93,7 @@ export function SearchMenu({
 					</div>
 					<Button
 						variant="ghost"
-						className="cursor-pointer"
+						className="cursor-pointer pl-0!"
 						onClick={handleClose}
 					>
 						<X />

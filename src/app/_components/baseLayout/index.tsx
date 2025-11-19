@@ -1,7 +1,10 @@
 ﻿"use client";
+import { Bell, Box, HelpCircle, LoaderCircle } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { auth } from "~/server/auth";
+import { useSession } from "next-auth/react";
 import { api } from "~/trpc/react";
 import { DataTable } from "../dataTable";
 import { TopNav } from "./topNav";
@@ -16,9 +19,21 @@ export function BaseLayout({
 	initialTableId,
 }: DashboardLayoutProps) {
 	const router = useRouter();
+	const { data: session } = useSession();
 	const [selectedBaseId, setSelectedBaseId] = useState<string | null>(null);
 	const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
 	const [newTableName, setNewTableName] = useState("");
+
+	// Get user initials like in dashboard layout
+	const getUserInitials = (name: string | null | undefined) => {
+		if (!name) return "U";
+		return name
+			.split(" ")
+			.map((n) => n[0])
+			.join("")
+			.toUpperCase()
+			.slice(0, 2)[0];
+	};
 
 	const { base } = api;
 

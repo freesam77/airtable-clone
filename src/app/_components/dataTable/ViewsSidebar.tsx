@@ -107,7 +107,7 @@ export function ViewsSidebar({
 								isActive ? "text-gray-900" : "text-gray-600 hover:bg-gray-100",
 							)}
 						>
-							<div className="flex items-center gap-2 px-2 py-0.5">
+							<div className="flex items-center gap-2 px-1 py-0.5">
 								<button
 									type="button"
 									className={cn(
@@ -116,7 +116,7 @@ export function ViewsSidebar({
 									onClick={() => onSelectView(view.id)}
 								>
 									<Sheet className="size-4 text-blue-600" />
-									<span className="flex-1 truncate text-sm">{view.name}</span>
+									<span className="flex-1 truncate text-xs font-semibold">{view.name}</span>
 								</button>
 								<div className="flex items-center gap-1">
 									<DropdownMenu>

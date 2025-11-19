@@ -1,6 +1,6 @@
 "use client";
 
-import { Filter, MoreHorizontal, Plus, Trash2 } from "lucide-react";
+import { ListFilter, MoreHorizontal, Plus, Trash2 } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import {
 	DropdownMenu,
@@ -89,35 +89,33 @@ export function FiltersDropdown({ columns, filters, onChange }: Props) {
 							: "hover:bg-gray-100",
 					)}
 				>
-					<Filter className={cn("size-4", isActive && "text-green-900")} />
-					<span className="max-w-[320px] truncate text-sm">{activeLabel}</span>
+					<ListFilter className={cn("size-4", isActive && "text-green-900")} />
+					<span className="max-w-[320px] truncate text-xs">{activeLabel}</span>
 				</Button>
 			</DropdownMenuTrigger>
-			<DropdownMenuContent align="end" className="w-[560px] bg-white p-0">
-				<div className="p-4">
+			<DropdownMenuContent align="end" className="bg-white p-0">
+				<div className="p-4 text-xs">
 					{filters.length === 0 ? (
-						<div className="flex items-start justify-between text-gray-500 text-sm">
+						<div className="flex items-start justify-between text-gray-500">
 							<span>No filter conditions are applied</span>
 						</div>
 					) : null}
-					<div className="space-y-2 py-2">
+					<div className="space-y-2 pb-1">
 						{filters.map((f, idx) => {
 							const ops = f.type === "TEXT" ? textOps : numOps;
 							const needsValue = !["is_empty", "is_not_empty"].includes(f.op);
 							return (
 								<div key={f.id} className="flex items-center">
 									{idx === 0 ? (
-										<span className="min-w-[52px] text-gray-700 text-sm">
-											Where
-										</span>
+										<span className="min-w-[52px] text-gray-700 ">Where</span>
 									) : (
-										<select className="h-8 rounded-none border border-gray-300 bg-white px-2 text-gray-700 text-sm">
+										<select className="h-8 rounded-none border border-gray-300 bg-white px-2 text-gray-700 ">
 											<option>and</option>
 											<option>or</option>
 										</select>
 									)}
 									<select
-										className="h-8 rounded-none border border-gray-300 bg-white px-2 text-sm"
+										className="h-8 rounded-none border border-gray-300 bg-white px-2 "
 										value={f.columnId}
 										onChange={(e) => {
 											const nextCol = columns.find(
@@ -138,7 +136,7 @@ export function FiltersDropdown({ columns, filters, onChange }: Props) {
 										))}
 									</select>
 									<select
-										className="h-8 rounded-none border border-gray-300 bg-white px-2 text-sm"
+										className="h-8 rounded-none border border-gray-300 bg-white px-2 "
 										value={f.op}
 										onChange={(e) =>
 											updateFilter(f.id, {
@@ -185,26 +183,23 @@ export function FiltersDropdown({ columns, filters, onChange }: Props) {
 							);
 						})}
 					</div>
-					<div className="flex items-center justify-between pt-2 text-sm">
+					<div className="flex items-center justify-between pt-2 text-xs">
 						<div className="flex items-center gap-4">
 							<button
 								type="button"
-								className="flex items-center gap-1 text-blue-600 hover:underline"
+								className="flex items-center gap-1 text-gray-700 hover:underline"
 								onClick={addCondition}
 							>
 								<Plus className="h-4 w-4" /> Add condition
 							</button>
 							<button
 								type="button"
-								className="text-blue-600 opacity-60"
+								className="text-gray-700 opacity-60"
 								disabled
 							>
 								+ Add condition group
 							</button>
 						</div>
-						<button type="button" className="text-gray-500 opacity-60" disabled>
-							Copy from another view
-						</button>
 					</div>
 				</div>
 			</DropdownMenuContent>
