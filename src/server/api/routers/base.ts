@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { columnTypeSchema } from "~/types/column";
+import { generateSampleRows } from "~/server/utils/dataGeneration";
 import { defaultViewSettings } from "./view";
 
 const minimalBaseInclude = {
@@ -53,7 +54,7 @@ export const baseRouter = createTRPCRouter({
 									name: "Grid view",
 									type: "grid",
 									position: 0,
-									settings: defaultViewSettings as Prisma.JsonObject,
+									settings: defaultViewSettings as unknown as Prisma.JsonObject,
 								},
 							},
 						},
@@ -222,7 +223,7 @@ export const baseRouter = createTRPCRouter({
 							name: "Grid view",
 							type: "grid",
 							position: 0,
-							settings: defaultViewSettings as Prisma.JsonObject,
+							settings: defaultViewSettings as unknown as Prisma.JsonObject,
 						},
 					},
 				},
@@ -233,19 +234,17 @@ export const baseRouter = createTRPCRouter({
 				},
 			});
 
-			// 2) Create an initial empty row so the table isn't blank
-			await ctx.db.row.create({
-				data: {
-					tableId: created.id,
-					position: 0,
-					cells: {
-						create: created.columns.map((col) => ({
-							columnId: col.id,
-							value: null,
-						})),
-					},
-				},
-			});
+			// 2) Generate sample data using faker.js
+			const sampleRowsData = generateSampleRows(created.columns, created.id);
+			
+			// Create the sample rows with cells
+			await Promise.all(
+				sampleRowsData.map((rowData) =>
+					ctx.db.row.create({
+						data: rowData,
+					})
+				)
+			);
 
 			// 3) Return the freshly created table with columns and rows populated
 			return ctx.db.table.findUniqueOrThrow({

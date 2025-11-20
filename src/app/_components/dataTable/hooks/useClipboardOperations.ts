@@ -2,6 +2,7 @@ import { useCallback } from "react";
 import type { CellHistoryChange } from "~/hooks/useSteps";
 import type { ColumnMeta, TableData } from "~/types/dataTable";
 import type { GridCell, SelectionRange } from "./useDataTableState";
+import { toHistoryValue } from "./useCellOperations";
 
 interface UseClipboardOperationsParams {
 	activeCell: GridCell | null;
@@ -30,12 +31,6 @@ interface UseClipboardOperationsParams {
 	setSelection: (selection: SelectionRange) => void;
 }
 
-const toHistoryValue = (
-	value: string | number | null | undefined,
-): string | null => {
-	if (value === null || value === undefined) return null;
-	return String(value);
-};
 
 export function useClipboardOperations({
 	activeCell,

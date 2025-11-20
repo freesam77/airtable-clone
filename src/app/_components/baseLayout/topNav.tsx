@@ -607,7 +607,11 @@ export const TopNav = ({
 						<DropdownMenuTrigger asChild>
 							<button
 								type="button"
-								className="ml-4 cursor-pointer border-gray-300 border-l pl-3 text-gray-600"
+								className={cn(
+									"cursor-pointer pl-3 text-gray-600",
+									selectedBase.tables[selectedBase.tables.length - 1]?.id !==
+										selectedTableId && "border-gray-300 border-l ",
+								)}
 							>
 								<ChevronDown size={14} />
 							</button>

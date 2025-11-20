@@ -287,7 +287,6 @@ export function useCellUpdateQueue({
 		flushPendingUpdates,
 		cancelCellUpdate,
 		cancelRowUpdates,
-		pendingUpdatesCount: pendingCountRef.current,
 		isProcessing: queuer.store.state.activeItems.length > 0,
 		hasPendingChanges,
 		remapRowId,

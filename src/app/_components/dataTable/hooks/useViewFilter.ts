@@ -7,7 +7,7 @@ import type { SortCondition } from "../components/filters/Sorts";
 import {
 	defaultViewSettings,
 	parseViewSettings,
-} from "../components/filters/viewSettings";
+} from "../components/filters/parseViewSettings";
 
 export type ViewRecord = RouterOutputs["view"]["listByTable"][number];
 type ViewList = RouterOutputs["view"]["listByTable"];

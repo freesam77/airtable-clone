@@ -4,6 +4,7 @@ import { z } from "zod";
 import { env } from "~/env";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { columnTypeSchema } from "~/types/column";
+import { generateCellValue, generateSampleRows } from "~/server/utils/dataGeneration";
 import { defaultViewSettings } from "./view";
 
 const BULK_QUEUE_NAME = env.SUPABASE_BULK_QUEUE_NAME ?? "bulk_update";
@@ -153,7 +154,8 @@ export const tableRouter = createTRPCRouter({
 				throw new Error("Base not found or access denied");
 			}
 
-			return ctx.db.table.create({
+				// Create the table with columns and views
+			const newTable = await ctx.db.table.create({
 				data: {
 					name: input.name,
 					description: input.description,
@@ -166,7 +168,7 @@ export const tableRouter = createTRPCRouter({
 							name: "Grid view",
 							type: "grid",
 							position: 0,
-							settings: defaultViewSettings as Prisma.JsonObject,
+							settings: defaultViewSettings as unknown as Prisma.JsonObject,
 						},
 					},
 				},
@@ -174,7 +176,34 @@ export const tableRouter = createTRPCRouter({
 					columns: {
 						orderBy: { position: "asc" },
 					},
-					rows: true,
+				},
+			});
+
+			// Generate sample data using faker.js
+			const sampleRowsData = generateSampleRows(newTable.columns, newTable.id);
+			
+			// Create the sample rows with cells (using individual creates for nested data)
+			await Promise.all(
+				sampleRowsData.map((rowData) =>
+					ctx.db.row.create({
+						data: rowData,
+					})
+				)
+			);
+
+			// Return the complete table with rows and cells
+			return ctx.db.table.findUniqueOrThrow({
+				where: { id: newTable.id },
+				include: {
+					columns: {
+						orderBy: { position: "asc" },
+					},
+					rows: {
+						include: {
+							cells: { include: { column: true } },
+						},
+						orderBy: { position: "asc" },
+					},
 				},
 			});
 		}),
@@ -788,29 +817,7 @@ export const tableRouter = createTRPCRouter({
 				};
 			}
 
-			const generateRandomValue = (column: { type: string; name: string }):
-				| string
-				| number => {
-				if (column.type === "NUMBER") {
-					if (column.name.toLowerCase().includes("age")) {
-						return faker.number.int({ min: 18, max: 98 });
-					}
-					return faker.number.int({ min: 1, max: 1000 });
-				}
-
-				// TEXT type
-				if (column.name.toLowerCase().includes("name")) {
-					return faker.person.fullName();
-				}
-				if (column.name.toLowerCase().includes("email")) {
-					return faker.internet.email({
-						firstName: faker.person.firstName(),
-						lastName: faker.person.lastName(),
-					});
-				}
-				// Generic text
-				return faker.lorem.word();
-			};
+			// Use the shared data generation utility
 
 			// Create rows with random data
 			const rowsToCreate = Array.from({ length: input.count }, (_, index) => {
@@ -820,7 +827,7 @@ export const tableRouter = createTRPCRouter({
 					position,
 					cells: {
 						create: table.columns.map((column) => {
-							const value = String(generateRandomValue(column));
+							const value = String(generateCellValue(column));
 							return {
 								columnId: column.id,
 								value,

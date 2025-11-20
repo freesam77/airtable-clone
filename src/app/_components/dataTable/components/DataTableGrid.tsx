@@ -13,8 +13,10 @@ import {
 	ContextMenuTrigger,
 } from "~/components/ui/context-menu";
 import { cn } from "~/lib/utils";
+import { rowMatchesQuery } from "~/lib/tableFilter";
 import type { ColumnMeta, TableData } from "~/types/dataTable";
 import type { GridCell } from "../hooks/useDataTableState";
+import { ColumnHeaderMenu } from "../ColumnHeaderMenu";
 import { ROW_HEIGHT } from "../utils/constants";
 
 interface DataTableGridProps {
@@ -119,8 +121,6 @@ const MemoHeaderContent = memo(
 	},
 );
 
-// Import the ColumnHeaderMenu component
-import { ColumnHeaderMenu } from "../ColumnHeaderMenu";
 
 export const DataTableGrid = memo(function DataTableGrid({
 	columnDefs,
@@ -411,5 +411,3 @@ export const DataTableGrid = memo(function DataTableGrid({
 	);
 });
 
-// Need to import this function
-import { rowMatchesQuery } from "~/lib/tableFilter";
