@@ -26,14 +26,19 @@ function EditableCellComponent({
 }: EditableCellProps) {
 	const stringValue =
 		value === null || value === undefined ? "" : String(value);
-
+	
 	const [draft, setDraft] = useState(stringValue);
 	const inputRef = useRef<HTMLInputElement>(null);
 	const committedRef = useRef(false);
 	const hasFocusedRef = useRef(false);
-	const pendingKeystrokesRef = useRef<string>("");
+	const isEditingRef = useRef(isEditing);
+	
+	// Track the editing state to prevent unnecessary updates during editing
+	useEffect(() => {
+		isEditingRef.current = isEditing;
+	}, [isEditing]);
 
-	// Update draft when value changes (for optimistic updates)
+	// Update draft when value changes, but only when not editing to avoid interrupting user input
 	useEffect(() => {
 		if (!isEditing) {
 			setDraft(stringValue);
@@ -43,29 +48,27 @@ function EditableCellComponent({
 
 	useEffect(() => {
 		if (!isEditing) return;
-
+		
 		// Focus and handle initial value immediately
 		if (!hasFocusedRef.current) {
 			hasFocusedRef.current = true;
-
+			
 			if (inputRef.current) {
 				inputRef.current.focus();
-
-				// If we have an initial value (user typed a character),
+				
+				// If we have an initial value (user typed a character), 
 				// immediately overwrite with just that character
 				if (initialValue !== undefined && initialValue !== null) {
-					// Directly set the value and update draft immediately
-					inputRef.current.value = initialValue;
-					setDraft(initialValue);
-
+					// Set the input value directly and update draft
+					const newValue = initialValue;
+					inputRef.current.value = newValue;
+					setDraft(newValue);
+					
 					// Position cursor at end to prevent selection
 					if (type !== "NUMBER") {
-						inputRef.current.setSelectionRange(
-							initialValue.length,
-							initialValue.length,
-						);
+						inputRef.current.setSelectionRange(newValue.length, newValue.length);
 					}
-
+					
 					onInitialValueConsumed?.();
 				} else {
 					// For Enter key editing, use the existing cell value
@@ -81,7 +84,7 @@ function EditableCellComponent({
 	}, [initialValue, isEditing, onInitialValueConsumed, stringValue, type]);
 
 	const commit = (nextValue: string) => {
-		if (committedRef.current) return;
+		if (committedRef.current || !isEditingRef.current) return;
 		committedRef.current = true;
 		onCommit(nextValue, value);
 	};
@@ -101,12 +104,16 @@ function EditableCellComponent({
 				}
 			}}
 			onBlur={(e) => {
-				if (!isEditing) return;
+				if (!isEditingRef.current) return;
 				commit(e.target.value);
 			}}
-			onChange={(e) => setDraft(e.target.value)}
+			onChange={(e) => {
+				if (isEditingRef.current) {
+					setDraft(e.target.value);
+				}
+			}}
 			onKeyDown={(e) => {
-				if (!isEditing) return;
+				if (!isEditingRef.current) return;
 				if (e.key === "Enter") {
 					e.preventDefault();
 					commit((e.target as HTMLInputElement).value);
@@ -134,5 +141,6 @@ export const EditableCell = memo(
 		prevProps.type === nextProps.type &&
 		prevProps.isEditing === nextProps.isEditing &&
 		prevProps.initialValue === nextProps.initialValue &&
+		prevProps.cellKey === nextProps.cellKey &&
 		String(prevProps.value ?? "") === String(nextProps.value ?? ""),
 );

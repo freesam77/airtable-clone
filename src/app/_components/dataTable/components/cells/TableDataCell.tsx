@@ -1,5 +1,5 @@
 import { type Cell, type RowData, flexRender } from "@tanstack/react-table";
-import { memo } from "react";
+import { memo, useMemo } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { cn } from "~/lib/utils";
 import type { TableData } from "~/types/dataTable";
@@ -65,6 +65,15 @@ export const TableDataCell = memo(function TableDataCell({
 		columnId: cell.column.id,
 	};
 
+	// Memoize the cell context to prevent unnecessary re-renders
+	// Only depend on essential stable identifiers
+	const cellValue = cell.getValue();
+	const cellContext = useMemo(() => cell.getContext(), [
+		cellKey, // More stable than cell.id
+		JSON.stringify(cellValue), // Serialize to handle object values
+		rowId // More stable than cell.row.original.id
+	]);
+
 	return (
 		<td
 			key={cell.id}
@@ -93,7 +102,7 @@ export const TableDataCell = memo(function TableDataCell({
 				</>
 			)}
 			<div className="truncate whitespace-nowrap overflow-hidden max-w-full">
-				{flexRender(cell.column.columnDef.cell, cell.getContext())}
+				{flexRender(cell.column.columnDef.cell, cellContext)}
 			</div>
 		</td>
 	);

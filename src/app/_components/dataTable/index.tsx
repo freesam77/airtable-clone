@@ -411,7 +411,7 @@ export function DataTable({ tableId }: DataTableProps) {
 				});
 			}
 
-			// Apply update optimistically + queue mutation
+			// Apply update optimistically + queue mutation with flushSync
 			flushSync(() => {
 				const payload = normalizedNext ?? "";
 				queueCellUpdate(rowId, columnId, payload);
@@ -556,12 +556,18 @@ export function DataTable({ tableId }: DataTableProps) {
 				!columnIndexLookup.has(cell.columnId)
 			)
 				return;
+			// Cancel any pending updates for this cell to prevent conflicts
 			cancelCellUpdate(cell.rowId, cell.columnId);
+			
+			// Don't apply optimistic update here for typed characters
+			// Let the EditableCell handle the initial display correctly
+			// The optimistic update will happen in onCommitEdit when editing finishes
+			
 			initialEditValueRef.current =
 				initialValue !== undefined ? initialValue : null;
 			setEditingCell(cell);
 		},
-		[rowIndexLookup, columnIndexLookup, setEditingCell, cancelCellUpdate],
+		[rowIndexLookup, columnIndexLookup, setEditingCell, cancelCellUpdate, handleOptimisticUpdate],
 	);
 
 	const {
@@ -724,19 +730,14 @@ export function DataTable({ tableId }: DataTableProps) {
 			onInitialValueConsumed: consumeInitialEditValue,
 		});
 	}, [
+		// Only include stable values, not function references
 		visibleColumns,
-		rowsWithOptimistic,
 		selectedRowIds,
 		showCheckboxes,
 		hoveredRowId,
 		editingCell,
-		getInitialEditValue,
-		consumeInitialEditValue,
-		onCommitEdit,
-		onCancelEdit,
-		onNavigate,
-		setSelectedRowIds,
-		setShowCheckboxes,
+		// Don't include the row data here as it causes constant re-renders
+		// The EditableCell memo should handle value changes
 	]);
 
 	const table = useReactTable({
