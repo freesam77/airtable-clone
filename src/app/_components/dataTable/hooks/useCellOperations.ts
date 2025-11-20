@@ -13,6 +13,7 @@ interface UseCellOperationsParams {
 	visibleColumns: ColumnMeta[];
 	rowIndexLookup: Map<string, number>;
 	columnIndexLookup: Map<string, number>;
+	totalRowCount?: number; // Total rows including viewport data
 	handleCellUpdate: (
 		rowId: string,
 		columnId: string,
@@ -41,6 +42,7 @@ export function useCellOperations({
 	visibleColumns,
 	rowIndexLookup,
 	columnIndexLookup,
+	totalRowCount,
 	handleCellUpdate,
 	recordUndoStep,
 	getCellByIndex,
@@ -198,7 +200,7 @@ export function useCellOperations({
 			const nextRowIndex = clamp(
 				currentRowIndex + deltaRow,
 				0,
-				Math.max(rowsWithOptimistic.length - 1, 0),
+				Math.max((totalRowCount || rowsWithOptimistic.length) - 1, 0),
 			);
 			const nextColIndex = clamp(
 				currentColIndex + deltaCol,
@@ -213,6 +215,7 @@ export function useCellOperations({
 		[
 			rowIndexLookup,
 			columnIndexLookup,
+			totalRowCount,
 			rowsWithOptimistic.length,
 			visibleColumns.length,
 			getCellByIndex,

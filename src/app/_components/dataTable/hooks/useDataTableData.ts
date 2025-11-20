@@ -9,6 +9,7 @@ import { api } from "~/trpc/react";
 import type { TableData } from "~/types/dataTable";
 import { MAX_CACHED_PAGES } from "../utils/constants";
 import { buildOptimisticRows } from "../utils/dataGenerationUtils";
+import { useViewportDataFetching } from "./useViewportDataFetching";
 
 interface UseDataTableDataParams {
 	tableId: string;
@@ -64,6 +65,7 @@ export function useDataTableData({
 		{
 			getNextPageParam: (lastPage) => lastPage.nextCursor,
 			getPreviousPageParam: (firstPage) => firstPage.prevCursor,
+			staleTime: 5 * 60 * 1000, // 5 minutes cache for metadata
 		},
 	);
 
@@ -88,6 +90,25 @@ export function useDataTableData({
 		() => rowsInfinite.data?.pages.flatMap((p) => p.items) ?? [],
 		[rowsInfinite.data],
 	);
+
+	// Viewport-specific data fetching for better UX when jumping around
+	const viewportFetching = useViewportDataFetching({
+		tableId,
+		totalRowCount: rowCountData?.count ?? 0,
+		existingData: data,
+	});
+
+	// Calculate total loaded count including viewport data
+	const totalLoadedRowCount = useMemo(() => {
+		const baseCount = data.length;
+		const viewportCount = viewportFetching.totalViewportRowsLoaded || 0;
+		
+		// Use the higher of the two counts
+		const maxCount = Math.max(baseCount, viewportCount);
+		
+		console.log(`Data count: baseCount=${baseCount}, viewportCount=${viewportCount}, using=${maxCount}`);
+		return maxCount;
+	}, [data.length, viewportFetching.totalViewportRowsLoaded]);
 
 	const columns = tableColumn?.columns || [];
 
@@ -198,5 +219,9 @@ export function useDataTableData({
 		rowsInfinite,
 		utils,
 		handleOptimisticUpdate,
+		viewportFetching,
+		isViewportLoading: viewportFetching.isLoading,
+		clearViewportCache: viewportFetching.clearViewportCache,
+		totalLoadedRowCount,
 	};
 }

@@ -5,6 +5,7 @@ import {
 	ArrowDown,
 	ArrowUp,
 	Copy,
+	GripVertical,
 	Plus,
 	Trash2,
 	WandSparkles,
@@ -113,6 +114,10 @@ export function DataTable({ tableId }: DataTableProps) {
 		rowsInfinite,
 		utils,
 		handleOptimisticUpdate,
+		viewportFetching,
+		isViewportLoading,
+		clearViewportCache,
+		totalLoadedRowCount,
 	} = useDataTableData({ tableId, pageSize });
 
 	// Table mutations
@@ -173,17 +178,49 @@ export function DataTable({ tableId }: DataTableProps) {
 	}, [viewRows, orderedColumns, searchValue]);
 
 	const optimisticRowLimit = 200;
+
+	// Combine display data with optimistic rows
 	const rowsWithOptimistic = useMemo(
 		() => [...displayData, ...optimisticRows.slice(0, optimisticRowLimit)],
 		[displayData, optimisticRows],
 	);
 
-	// Lookups
+	// Virtualization
+	const { rowVirtualizer, filteredRowsCount, loadedRowsCount } =
+		useDataTableVirtualization({
+			rowsWithOptimistic,
+			showCheckboxes,
+			scrollParentRef,
+			rowsInfinite,
+			setPageSize,
+			totalRowCount: rowCountData?.count,
+			totalLoadedRowCount,
+			viewportFetching,
+		});
+
+	// Lookups - Enhanced to include viewport data for full navigation support
 	const rowIndexLookup = useMemo(() => {
 		const map = new Map<string, number>();
+		
+		// Add all regular data rows
 		rowsWithOptimistic.forEach((row, index) => map.set(row.id, index));
+		
+		// Add viewport data rows for navigation support
+		if (viewportFetching && rowCountData?.count) {
+			// For viewport rows, we need to include them in the lookup
+			// This allows navigation to work across the entire virtual range
+			for (let i = 0; i < rowCountData.count; i++) {
+				if (!map.has(`row-${i}`)) { // Don't override existing rows
+					const viewportRow = viewportFetching.getRowAtIndex(i);
+					if (viewportRow) {
+						map.set(viewportRow.id, i);
+					}
+				}
+			}
+		}
+		
 		return map;
-	}, [rowsWithOptimistic]);
+	}, [rowsWithOptimistic, viewportFetching, rowCountData?.count]);
 
 	const columnIndexLookup = useMemo(() => {
 		const map = new Map<string, number>();
@@ -191,24 +228,75 @@ export function DataTable({ tableId }: DataTableProps) {
 		return map;
 	}, [visibleColumns]);
 
+	// Clean up selected rows that are no longer in the visible dataset
+	useEffect(() => {
+		if (selectedRowIds.size === 0) return;
+
+		const currentRowIds = new Set(rowsWithOptimistic.map((row) => row.id));
+		const selectedRowsToKeep = new Set<string>();
+
+		// Only keep selections for rows that are still in the current visible data
+		for (const rowId of selectedRowIds) {
+			if (currentRowIds.has(rowId)) {
+				selectedRowsToKeep.add(rowId);
+			}
+		}
+
+		// Update selected rows if any were removed
+		if (selectedRowsToKeep.size !== selectedRowIds.size) {
+			setSelectedRowIds(selectedRowsToKeep);
+
+			// If no rows left selected, exit checkbox mode
+			if (selectedRowsToKeep.size === 0) {
+				setShowCheckboxes(false);
+			}
+		}
+	}, [
+		rowsWithOptimistic,
+		selectedRowIds,
+		setSelectedRowIds,
+		setShowCheckboxes,
+	]);
+
 	const getCellByIndex = useCallback(
 		(rowIndex: number, columnIndex: number) => {
-			const row = rowsWithOptimistic[rowIndex];
 			const column = visibleColumns[columnIndex];
-			if (!row || !column) return null;
-			return { rowId: row.id, columnId: column.id };
+			if (!column) return null;
+			
+			// First try regular data
+			const row = rowsWithOptimistic[rowIndex];
+			if (row) {
+				return { rowId: row.id, columnId: column.id };
+			}
+			
+			// Then try viewport data
+			if (viewportFetching) {
+				const viewportRow = viewportFetching.getRowAtIndex(rowIndex);
+				if (viewportRow) {
+					return { rowId: viewportRow.id, columnId: column.id };
+				}
+			}
+			
+			return null;
 		},
-		[rowsWithOptimistic, visibleColumns],
+		[rowsWithOptimistic, visibleColumns, viewportFetching],
 	);
 
-	// Virtualization
-	const { rowVirtualizer, filteredRowsCount } = useDataTableVirtualization({
-		rowsWithOptimistic,
-		showCheckboxes,
-		scrollParentRef,
-		rowsInfinite,
-		setPageSize,
-	});
+	const getRowByIndex = useCallback(
+		(rowIndex: number) => {
+			// First try regular data
+			const row = rowsWithOptimistic[rowIndex];
+			if (row) return row;
+			
+			// Then try viewport data
+			if (viewportFetching) {
+				return viewportFetching.getRowAtIndex(rowIndex);
+			}
+			
+			return null;
+		},
+		[rowsWithOptimistic, viewportFetching],
+	);
 
 	const recordUndoStep = useCallback(
 		(changes: CellHistoryChange | CellHistoryChange[]) => {
@@ -284,6 +372,7 @@ export function DataTable({ tableId }: DataTableProps) {
 			visibleColumns,
 			rowIndexLookup,
 			columnIndexLookup,
+			totalRowCount: rowCountData?.count,
 			handleCellUpdate,
 			recordUndoStep,
 			getCellByIndex,
@@ -408,6 +497,7 @@ export function DataTable({ tableId }: DataTableProps) {
 		setSelectedRowIds,
 		filteredRowsCount,
 		rowVirtualizer,
+		clearViewportCache,
 	});
 
 	// Cell interactions
@@ -533,6 +623,7 @@ export function DataTable({ tableId }: DataTableProps) {
 			recordUndoStep,
 			getCellByIndex,
 			setSelection,
+			getRowByIndex,
 		});
 
 	// moveSelection wrapper for keyboard
@@ -763,17 +854,48 @@ export function DataTable({ tableId }: DataTableProps) {
 								<thead className="sticky top-0 z-30 border-gray-300 border-b bg-white">
 									{table.getHeaderGroups().map((headerGroup) => (
 										<tr key={headerGroup.id}>
-											{headerGroup.headers.map((header) => (
-												<TableHeaderCell
-													key={header.id}
-													header={header}
-													onRename={crudOperations.handleRenameColumn}
-													onDuplicate={crudOperations.handleDuplicateColumn}
-													onDelete={crudOperations.handleDeleteColumn}
-													disabledRename={renameColumnMutation.isPending}
-													disabledDuplicate={duplicateColumnMutation.isPending}
+											{/* Custom row number header with checkbox toggle */}
+											<th className="w-12 border-gray-200 border-b bg-white px-2 pt-2 text-center">
+												<input
+													type="checkbox"
+													className="size-4"
+													checked={
+														selectedRowIds.size === rowsWithOptimistic.length &&
+														rowsWithOptimistic.length > 0
+													}
+													onChange={(e) => {
+														if (e.target.checked) {
+															// Select all visible rows
+															setSelectedRowIds(
+																new Set(
+																	rowsWithOptimistic.map((row) => row.id),
+																),
+															);
+															setShowCheckboxes(true);
+														} else {
+															// Deselect all
+															setSelectedRowIds(new Set());
+															setShowCheckboxes(false);
+														}
+													}}
+													aria-label="Toggle all row selection"
 												/>
-											))}
+											</th>
+											{headerGroup.headers
+												.filter((header) => header.id !== "row-number")
+												.map((header) => (
+													<TableHeaderCell
+														key={header.id}
+														header={header}
+														onRename={crudOperations.handleRenameColumn}
+														onDuplicate={crudOperations.handleDuplicateColumn}
+														onDelete={crudOperations.handleDeleteColumn}
+														disabledRename={renameColumnMutation.isPending}
+														disabledDuplicate={
+															duplicateColumnMutation.isPending
+														}
+													/>
+												))}
 										</tr>
 									))}
 								</thead>
@@ -801,9 +923,105 @@ export function DataTable({ tableId }: DataTableProps) {
 													</tr>
 												)}
 												{virtualItems.map((virtualRow) => {
-													const row =
-														table.getRowModel().rows[virtualRow.index];
-													if (!row) return null;
+													let row = table.getRowModel().rows[virtualRow.index];
+
+													// Try viewport fetching if regular row data is not available
+													if (!row && viewportFetching) {
+														const viewportRow = viewportFetching.getRowAtIndex(
+															virtualRow.index,
+														);
+														if (viewportRow) {
+															// Create a fake table row structure for viewport-fetched data
+															row = {
+																original: viewportRow,
+																getVisibleCells: () => {
+																	return visibleColumns.map((col) => {
+																		const cell = viewportRow.cells.find(
+																			(c) => c.columnId === col.id,
+																		);
+																		const cellValue = cell?.value ?? null;
+
+																		// Find the actual column definition to get proper rendering
+																		const columnDef = columns.find((c) => c.id === col.id);
+																		const actualColumnDef = table.getColumn(col.id)?.columnDef;
+
+																		return {
+																			id: `${viewportRow.id}-${col.id}`,
+																			column: {
+																				id: col.id,
+																				columnDef: {
+																					id: col.id,
+																					meta: actualColumnDef?.meta || { className: "w-[150px]" },
+																					// Use the actual cell renderer for proper editing/display
+																					cell: actualColumnDef?.cell || (({ getValue }) => getValue()),
+																					header: actualColumnDef?.header || (() => col.name),
+																				},
+																			},
+																			getValue: () => cell || null, // Return the full cell object
+																			getContext: () => ({
+																				getValue: () => cell || null,
+																				row: { original: viewportRow },
+																				column: { 
+																					id: col.id, 
+																					columnDef: actualColumnDef || {}
+																				},
+																				cell: {
+																					getValue: () => cell || null,
+																					id: `${viewportRow.id}-${col.id}`,
+																				},
+																				table: {},
+																				renderValue: () => cellValue,
+																			}),
+																		};
+																	});
+																},
+															} as any;
+														}
+													}
+
+													// Handle placeholder rows for unloaded data
+													if (!row) {
+														const placeholderRowId = `placeholder-${virtualRow.index}`;
+														const isHovered = hoveredRowId === placeholderRowId;
+
+														return (
+															<tr
+																key={virtualRow.key}
+																data-index={virtualRow.index}
+																className={cn(
+																	"cursor-default transition-colors",
+																	isHovered && "bg-gray-50",
+																)}
+																style={{ height: ROW_HEIGHT }}
+																onMouseEnter={() =>
+																	setHoveredRowId(placeholderRowId)
+																}
+																onMouseLeave={() => setHoveredRowId(null)}
+															>
+																{/* Row number column - shows checkbox when in selection mode */}
+																<td className="w-12 border-gray-200 border-b px-2 py-2 text-center text-gray-500 text-xs">
+																	{showCheckboxes ? (
+																		<input
+																			type="checkbox"
+																			className="size-4"
+																			disabled
+																			aria-label={`Row ${virtualRow.index + 1} (loading)`}
+																		/>
+																	) : (
+																		virtualRow.index + 1
+																	)}
+																</td>
+																{visibleColumns.map((column) => (
+																	<td
+																		key={`${placeholderRowId}-${column.id}`}
+																		className="border-gray-200 border-r border-b px-3 py-2"
+																	>
+																		<div className="h-4 animate-pulse rounded bg-gray-200" />
+																	</td>
+																))}
+															</tr>
+														);
+													}
 
 													const rowId = row.original.id;
 													const isHovered = hoveredRowId === rowId;
@@ -821,69 +1039,108 @@ export function DataTable({ tableId }: DataTableProps) {
 																	onMouseEnter={() => setHoveredRowId(rowId)}
 																	onMouseLeave={() => setHoveredRowId(null)}
 																>
-																	{row.getVisibleCells().map((cell) => {
-																		const columnId = cell.column.id;
-																		const cellKey = `${rowId}:${columnId}`;
-																		const { fillPreview } = interactionState;
+																	{/* Row number column - shows checkbox when hovered or in selection mode */}
+																	<td className="w-12 border-gray-200 border-b px-2 py-2 text-center text-gray-500 text-xs">
+																		{showCheckboxes || isHovered ? (
+																			<div className="flex items-center justify-center gap-1">
+																				{isHovered && (
+																					<GripVertical className="absolute left-1 size-4 cursor-grab text-gray-400" />
+																				)}
+																				<input
+																					type="checkbox"
+																					className="size-4"
+																					checked={selectedRowIds.has(rowId)}
+																					onChange={(e) => {
+																						const newSelected = new Set(selectedRowIds);
+																						if (e.target.checked) {
+																							newSelected.add(rowId);
+																							setShowCheckboxes(true);
+																						} else {
+																							newSelected.delete(rowId);
+																							// If no rows selected, exit checkbox mode
+																							if (newSelected.size === 0) {
+																								setShowCheckboxes(false);
+																							}
+																						}
+																						setSelectedRowIds(newSelected);
+																					}}
+																					aria-label={`Select row ${virtualRow.index + 1}`}
+																				/>
+																			</div>
+																		) : (
+																			virtualRow.index + 1
+																		)}
+																	</td>
+																	{row
+																		.getVisibleCells()
+																		.filter(
+																			(cell) => cell.column.id !== "row-number",
+																		)
+																		.map((cell) => {
+																			const columnId = cell.column.id;
+																			const cellKey = `${rowId}:${columnId}`;
+																			const { fillPreview } = interactionState;
 
-																		const isSelectable =
-																			rowIndexLookup.has(rowId) &&
-																			columnIndexLookup.has(columnId);
+																			const isSelectable =
+																				rowIndexLookup.has(rowId) &&
+																				columnIndexLookup.has(columnId);
 
-																		const isCellActive =
-																			!!activeCell &&
-																			activeCell.rowId === rowId &&
-																			activeCell.columnId === columnId;
+																			const isCellActive =
+																				!!activeCell &&
+																				activeCell.rowId === rowId &&
+																				activeCell.columnId === columnId;
 
-																		const isInSelectionRange = (() => {
-																			if (!selection) return false;
-																			const bounds =
-																				getSelectionBounds(selection);
-																			if (!bounds) return false;
-																			const rowIndex =
-																				rowIndexLookup.get(rowId);
-																			const colIndex =
-																				columnIndexLookup.get(columnId);
-																			if (
-																				rowIndex === undefined ||
-																				colIndex === undefined
-																			)
-																				return false;
+																			const isInSelectionRange = (() => {
+																				if (!selection) return false;
+																				const bounds =
+																					getSelectionBounds(selection);
+																				if (!bounds) return false;
+																				const rowIndex =
+																					rowIndexLookup.get(rowId);
+																				const colIndex =
+																					columnIndexLookup.get(columnId);
+																				if (
+																					rowIndex === undefined ||
+																					colIndex === undefined
+																				)
+																					return false;
+																				return (
+																					rowIndex >= bounds.rowStart &&
+																					rowIndex <= bounds.rowEnd &&
+																					colIndex >= bounds.colStart &&
+																					colIndex <= bounds.colEnd
+																				);
+																			})();
+
+																			const isFillHighlighted =
+																				fillPreview?.columnId === columnId &&
+																				fillPreview.rows.includes(
+																					virtualRow.index,
+																				);
+
 																			return (
-																				rowIndex >= bounds.rowStart &&
-																				rowIndex <= bounds.rowEnd &&
-																				colIndex >= bounds.colStart &&
-																				colIndex <= bounds.colEnd
+																				<TableDataCell
+																					key={cellKey}
+																					cell={cell}
+																					cellKey={cellKey}
+																					rowId={rowId}
+																					isSelectable={isSelectable}
+																					isGridActive={isCellActive}
+																					isSelected={isInSelectionRange}
+																					isFillHighlighted={isFillHighlighted}
+																					isMatch={false}
+																					isActiveSearchCell={false}
+																					onPointerDown={handleCellPointerDown}
+																					onPointerEnter={
+																						handleCellPointerEnter
+																					}
+																					onDoubleClick={startEditing}
+																					onFillPointerDown={
+																						handleFillPointerDown
+																					}
+																				/>
 																			);
-																		})();
-
-																		const isFillHighlighted =
-																			fillPreview?.columnId === columnId &&
-																			fillPreview.rows.includes(
-																				virtualRow.index,
-																			);
-
-																		return (
-																			<TableDataCell
-																				key={cellKey}
-																				cell={cell}
-																				cellKey={cellKey}
-																				rowId={rowId}
-																				isSelectable={isSelectable}
-																				isGridActive={isCellActive}
-																				isSelected={isInSelectionRange}
-																				isFillHighlighted={isFillHighlighted}
-																				isMatch={false}
-																				isActiveSearchCell={false}
-																				onPointerDown={handleCellPointerDown}
-																				onPointerEnter={handleCellPointerEnter}
-																				onDoubleClick={startEditing}
-																				onFillPointerDown={
-																					handleFillPointerDown
-																				}
-																			/>
-																		);
-																	})}
+																		})}
 																</tr>
 															</ContextMenuTrigger>
 															<ContextMenuContent className="w-48 p-2">
@@ -1009,6 +1266,8 @@ export function DataTable({ tableId }: DataTableProps) {
 								(rowCountData?.count ?? rowsWithOptimistic.length) +
 								optimisticRows.length
 							}
+							loadedCount={loadedRowsCount}
+							isLoading={rowsInfinite.isFetchingNextPage || isViewportLoading}
 							showApproximate={
 								rowCountData === undefined && rowsInfinite.hasNextPage
 							}

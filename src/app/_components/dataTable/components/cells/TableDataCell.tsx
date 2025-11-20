@@ -69,7 +69,7 @@ export const TableDataCell = memo(function TableDataCell({
 		<td
 			key={cell.id}
 			className={cn(
-				"relative w-[150px] border-gray-200 border-r border-b px-2 text-gray-900 text-sm leading-none",
+				"relative w-[150px] border-gray-200 border-r border-b px-2 py-2 text-gray-900 text-sm",
 				cell.column.columnDef.meta?.className,
 				backgroundClass,
 			)}
@@ -92,7 +92,9 @@ export const TableDataCell = memo(function TableDataCell({
 					/>
 				</>
 			)}
-			{flexRender(cell.column.columnDef.cell, cell.getContext())}
+			<div className="truncate whitespace-nowrap overflow-hidden max-w-full">
+				{flexRender(cell.column.columnDef.cell, cell.getContext())}
+			</div>
 		</td>
 	);
 });

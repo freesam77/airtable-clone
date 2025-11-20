@@ -19,6 +19,7 @@ interface UseDataTableCrudParams {
 	setSelectedRowIds: React.Dispatch<React.SetStateAction<Set<string>>>;
 	filteredRowsCount: number;
 	rowVirtualizer: any;
+	clearViewportCache?: () => void;
 }
 
 export function useDataTableCrud({
@@ -38,6 +39,7 @@ export function useDataTableCrud({
 	setSelectedRowIds,
 	filteredRowsCount,
 	rowVirtualizer,
+	clearViewportCache,
 }: UseDataTableCrudParams) {
 	const handleAddColumn = useCallback(
 		(name: string, type: ColumnType) => {
@@ -95,12 +97,33 @@ export function useDataTableCrud({
 		async (clickedRowId: string) => {
 			const ids =
 				selectedRowIds.size > 0 ? Array.from(selectedRowIds) : [clickedRowId];
-			await Promise.all(
-				ids.map((id) => deleteRowMutation.mutateAsync({ rowId: id })),
-			);
+			
+			// Delete rows one by one and handle errors gracefully
+			const deletePromises = ids.map(async (id) => {
+				try {
+					await deleteRowMutation.mutateAsync({ rowId: id });
+					return { success: true, id };
+				} catch (error) {
+					console.warn(`Failed to delete row ${id}:`, error);
+					return { success: false, id, error };
+				}
+			});
+			
+			const results = await Promise.all(deletePromises);
+			const successCount = results.filter(r => r.success).length;
+			
+			if (successCount > 0) {
+				console.log(`Successfully deleted ${successCount} rows`);
+			}
+			
 			setSelectedRowIds(new Set());
 			utils.table.getTableColumnType.invalidate({ id: tableId });
 			utils.table.getInfiniteRows.invalidate(infiniteQueryInput);
+			utils.table.getRowCount.invalidate({ id: tableId });
+			// Also invalidate viewport fetching data if available
+			utils.table.getRowsByRange.invalidate();
+			// Clear viewport cache to force refetch
+			clearViewportCache?.();
 		},
 		[
 			selectedRowIds,

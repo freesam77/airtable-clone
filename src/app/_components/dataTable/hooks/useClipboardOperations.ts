@@ -29,6 +29,7 @@ interface UseClipboardOperationsParams {
 	recordUndoStep: (changes: CellHistoryChange | CellHistoryChange[]) => void;
 	getCellByIndex: (rowIndex: number, columnIndex: number) => GridCell | null;
 	setSelection: (selection: SelectionRange) => void;
+	getRowByIndex?: (rowIndex: number) => TableData | null; // Helper to get row from any source
 }
 
 
@@ -45,6 +46,7 @@ export function useClipboardOperations({
 	recordUndoStep,
 	getCellByIndex,
 	setSelection,
+	getRowByIndex,
 }: UseClipboardOperationsParams) {
 	const getCellDisplayValue = useCallback(
 		(row: TableData, columnId: string) =>
@@ -66,7 +68,8 @@ export function useClipboardOperations({
 			rowIndex <= bounds.rowEnd;
 			rowIndex++
 		) {
-			const row = rowsWithOptimistic[rowIndex];
+			// Use getRowByIndex if available, otherwise fall back to regular data
+			const row = getRowByIndex ? getRowByIndex(rowIndex) : rowsWithOptimistic[rowIndex];
 			if (!row) continue;
 			const values: string[] = [];
 			for (
@@ -94,6 +97,7 @@ export function useClipboardOperations({
 		getSelectionBounds,
 		selection,
 		visibleColumns,
+		getRowByIndex,
 	]);
 
 	const pasteClipboardData = useCallback(async () => {
@@ -130,13 +134,12 @@ export function useClipboardOperations({
 				values.forEach((cellValue, colOffset) => {
 					const targetRowIndex = startRowIndex + rowOffset;
 					const targetColIndex = startColIndex + colOffset;
-					if (
-						targetRowIndex >= rowsWithOptimistic.length ||
-						targetColIndex >= visibleColumns.length
-					) {
+					if (targetColIndex >= visibleColumns.length) {
 						return;
 					}
-					const targetRow = rowsWithOptimistic[targetRowIndex];
+					// Use getRowByIndex if available, otherwise fall back to regular data
+					const targetRow = getRowByIndex ? getRowByIndex(targetRowIndex) : 
+						(targetRowIndex < rowsWithOptimistic.length ? rowsWithOptimistic[targetRowIndex] : null);
 					const targetCol = visibleColumns[targetColIndex];
 					if (!targetRow || !targetCol) return;
 					const previousValue =
@@ -181,6 +184,7 @@ export function useClipboardOperations({
 		visibleColumns,
 		getSelectionBounds,
 		setSelection,
+		getRowByIndex,
 	]);
 
 	return {

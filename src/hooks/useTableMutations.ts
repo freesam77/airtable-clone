@@ -171,28 +171,8 @@ export function useTableMutations({
 				};
 			});
 
-			utils.table.getInfiniteRows.setInfiniteData(infiniteInput, (old) => {
-				if (!old) return old;
-				return {
-					...old,
-					pages: old.pages.map((page) => ({
-						...page,
-						items: page.items.map((row) => ({
-							...row,
-							cells: [
-								...row.cells,
-								{
-									id: `temp-cell-${Date.now()}-${row.id}`,
-									columnId: optimisticColumn.id,
-									rowId: row.id,
-									value: null,
-									column: optimisticColumn,
-								},
-							],
-						})),
-					})),
-				};
-			});
+			// Skip optimistic infinite rows update since we're using lazy cell loading
+			// The new column will be visible once the page is refreshed or the query is invalidated
 
 			return {
 				previousData: prevColumnData,
@@ -210,23 +190,7 @@ export function useTableMutations({
 					),
 				};
 			});
-			utils.table.getInfiniteRows.setInfiniteData(infiniteInput, (old) => {
-				if (!old) return old;
-				return {
-					...old,
-					pages: old.pages.map((page) => ({
-						...page,
-						items: page.items.map((row) => ({
-							...row,
-							cells: row.cells.map((cell) =>
-								resolveCellColumnId(cell) === context?.optimisticColumn.id
-									? { ...cell, column: result }
-									: cell,
-							),
-						})),
-					})),
-				};
-			});
+			// Skip optimistic infinite rows update for lazy cell loading
 		},
 		onError: (_err, _variables, context) => {
 			if (context?.previousData) {
@@ -319,22 +283,7 @@ export function useTableMutations({
 				};
 			});
 
-			// Optimistically remove cells for that column from each row
-			utils.table.getInfiniteRows.setInfiniteData(infiniteInput, (old) => {
-				if (!old) return old;
-				return {
-					...old,
-					pages: old.pages.map((page) => ({
-						...page,
-						items: page.items.map((row) => ({
-							...row,
-							cells: row.cells.filter(
-								(cell) => cell.columnId !== variables.colId,
-							),
-						})),
-					})),
-				};
-			});
+			// Skip optimistic infinite rows update for lazy cell loading
 
 			return {
 				previousColumns: prevColumnData,
@@ -381,37 +330,7 @@ export function useTableMutations({
 				};
 			});
 
-			// Also update embedded column meta in each row's cells
-			utils.table.getInfiniteRows.setInfiniteData(infiniteInput, (old) => {
-				if (!old) return old;
-				return {
-					...old,
-					pages: old.pages.map((page) => ({
-						...page,
-						items: page.items.map((row) => ({
-							...row,
-							cells: row.cells.map((cell) =>
-								cell.columnId === variables.colId
-									? {
-											...cell,
-											column: {
-												...((cell as RowCell).column ?? {
-													id: variables.colId,
-													name: variables.name,
-													type: "TEXT" as const,
-													required: false,
-													position: 0,
-													tableId,
-												}),
-												name: variables.name,
-											} as RowCell["column"],
-										}
-									: cell,
-							),
-						})),
-					})),
-				};
-			});
+			// Skip optimistic infinite rows update for lazy cell loading
 
 			return { prevColumnData, prevInfiniteRows } as const;
 		},
@@ -464,39 +383,13 @@ export function useTableMutations({
 					return { ...old, columns: [...old.columns, optimisticColumn] };
 				});
 
-				utils.table.getInfiniteRows.setInfiniteData(infiniteInput, (old) => {
-					if (!old) return old;
-					return {
-						...old,
-						pages: old.pages.map((page) => ({
-							...page,
-							items: page.items.map((row) => {
-								const src = row.cells.find(
-									(c) => c.columnId === variables.colId,
-								);
-								return {
-									...row,
-									cells: [
-										...row.cells,
-										{
-											id: `temp-cell-${Date.now()}-${row.id}`,
-											columnId: optimisticColumn.id,
-											rowId: row.id,
-											value: src?.value ?? null,
-											column: optimisticColumn,
-										},
-									],
-								};
-							}),
-						})),
-					};
-				});
+				// Skip optimistic infinite rows update for lazy cell loading
 			}
 
 			return { prevColumnData, prevInfiniteRows, optimisticColumn } as const;
 		},
 		onSuccess: (result, _variables, ctx) => {
-			// replace optimistic column meta with server one and update embedded cell meta
+			// Replace optimistic column meta with server one
 			utils.table.getTableColumnType.setData({ id: tableId }, (old) => {
 				if (!old || !ctx?.optimisticColumn) return old;
 				return {
@@ -506,23 +399,7 @@ export function useTableMutations({
 					),
 				};
 			});
-			utils.table.getInfiniteRows.setInfiniteData(infiniteInput, (old) => {
-				if (!old || !ctx?.optimisticColumn) return old;
-				return {
-					...old,
-					pages: old.pages.map((page) => ({
-						...page,
-						items: page.items.map((row) => ({
-							...row,
-							cells: row.cells.map((cell) =>
-								cell.columnId === ctx.optimisticColumn!.id
-									? { ...cell, column: result }
-									: cell,
-							),
-						})),
-					})),
-				};
-			});
+			// Skip infinite rows update for lazy cell loading
 		},
 		onError: (_err, _variables, ctx) => {
 			if (ctx?.prevColumnData)
@@ -582,34 +459,7 @@ export function useTableMutations({
 				}),
 			} as const;
 
-			// Optimistically update positions and insert new row
-			utils.table.getInfiniteRows.setInfiniteData(infiniteInput, (old) => {
-				if (!old) return old;
-				return {
-					...old,
-					pages: old.pages.map((page) => ({
-						...page,
-						items: [
-							...page.items
-								.map((row) =>
-									row.position >= variables.position
-										? { ...row, position: row.position + 1 }
-										: row,
-								)
-								.filter((row) => row.position < variables.position),
-							optimisticRow,
-							...page.items
-								.map((row) =>
-									row.position >= variables.position
-										? { ...row, position: row.position + 1 }
-										: row,
-								)
-								.filter((row) => row.position >= variables.position)
-								.sort((a, b) => a.position - b.position),
-						].sort((a, b) => a.position - b.position),
-					})),
-				};
-			});
+			// Skip optimistic infinite rows update for lazy cell loading
 
 			const prevRowCount = utils.table.getRowCount.getData(rowCountInput);
 			utils.table.getRowCount.setData(rowCountInput, (old) => {
@@ -659,59 +509,11 @@ export function useTableMutations({
 					id: tableId,
 				});
 
-				// Find the source row to duplicate
-				const sourceRow = prevInfiniteRows?.pages
-					.flatMap((p) => p.items)
-					.find((row) => row.id === variables.sourceRowId);
-
-				if (!sourceRow) {
-					throw new Error("Source row not found");
-				}
-
+				// Skip optimistic row creation for lazy cell loading
 				const optimisticRowId = `temp-dup-${Date.now()}`;
-				const now = new Date();
-				const optimisticRow = {
-					id: optimisticRowId,
-					position: variables.position,
-					createdAt: now,
-					updatedAt: now,
-					tableId,
-					cells: sourceRow.cells.map((cell) => ({
-						id: `temp-cell-${Date.now()}-${cell.columnId}`,
-						columnId: cell.columnId,
-						rowId: optimisticRowId,
-						value: cell.value,
-					})),
-				} as const;
+				const optimisticRow = { id: optimisticRowId };
 
-				// Optimistically update positions and insert duplicated row
-				utils.table.getInfiniteRows.setInfiniteData(infiniteInput, (old) => {
-					if (!old) return old;
-					return {
-						...old,
-						pages: old.pages.map((page) => ({
-							...page,
-							items: [
-								...page.items
-									.map((row) =>
-										row.position >= variables.position
-											? { ...row, position: row.position + 1 }
-											: row,
-									)
-									.filter((row) => row.position < variables.position),
-								optimisticRow,
-								...page.items
-									.map((row) =>
-										row.position >= variables.position
-											? { ...row, position: row.position + 1 }
-											: row,
-									)
-									.filter((row) => row.position >= variables.position)
-									.sort((a, b) => a.position - b.position),
-							].sort((a, b) => a.position - b.position),
-						})),
-					};
-				});
+				// Skip optimistic infinite rows update for lazy cell loading
 
 				const prevRowCount = utils.table.getRowCount.getData(rowCountInput);
 				utils.table.getRowCount.setData(rowCountInput, (old) => {

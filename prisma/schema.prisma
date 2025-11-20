@@ -57,7 +57,9 @@ model Column {
     table    Table      @relation(fields: [tableId], references: [id], onDelete: Cascade)
 
     @@unique([tableId, name])
+    @@unique([tableId, position], name: "uq_column_table_position")
     @@index([tableId, position])
+    @@index([position])
 }
 
 model Row {
@@ -69,7 +71,10 @@ model Row {
     cells     Cell[]
     table     Table    @relation(fields: [tableId], references: [id], onDelete: Cascade)
 
-    @@index([tableId, position, id], name: "idx_row_table_position_id")
+    @@unique([tableId, position, id], map: "uq_row_table_position_id")
+    @@index([tableId])
+    @@index([updatedAt])
+    @@index([createdAt])
 }
 
 model View {
@@ -97,6 +102,7 @@ model Cell {
     @@unique([columnId, rowId])
     @@index([columnId])
     @@index([rowId])
+    @@index([rowId, columnId], name: "cell_row_column_idx")
 }
 
 model Account {

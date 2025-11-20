@@ -51,13 +51,26 @@ export const tableRouter = createTRPCRouter({
 		.input(
 			z.object({
 				id: z.string(),
-				limit: z.number().nullish(),
-				cursor: z.string().nullish(),
+				limit: z.number().min(1).max(500).default(100),
+				cursor: z.union([
+					z.object({ position: z.number(), id: z.string() }),
+					z.string(), // Legacy support
+				]).nullish(),
 				direction: z.enum(["forward", "backward"]).default("forward"),
 			}),
 		)
 		.query(async ({ ctx, input }) => {
-			const limit = input.limit ?? 100;
+			// Optimized table ownership validation
+			const table = await ctx.db.table.findUnique({
+				where: { id: input.id },
+				select: { base: { select: { createdById: true } } },
+			});
+			
+			if (!table || table.base.createdById !== ctx.session.user.id) {
+				throw new Error("Table not found or access denied");
+			}
+
+			const limit = input.limit;
 			const forward = input.direction === "forward";
 
 			// Stable deterministic ordering using position then id as tiebreaker
@@ -65,63 +78,146 @@ export const tableRouter = createTRPCRouter({
 				? [{ position: "asc" }, { id: "asc" }]
 				: [{ position: "desc" }, { id: "desc" }];
 
+			// Handle legacy string cursor format vs new object cursor format
+			let cursorCondition: any = {};
+			let usePrismaCursor = false;
+
+			if (input.cursor) {
+				if (typeof input.cursor === 'string') {
+					// Legacy cursor - just the row ID, fall back to old manual logic
+					const cursorRow = await ctx.db.row.findUnique({
+						where: { id: input.cursor },
+						select: { position: true, id: true },
+					});
+					
+					if (cursorRow) {
+						if (forward) {
+							cursorCondition = {
+								OR: [
+									{ position: { gt: cursorRow.position } },
+									{ position: cursorRow.position, id: { gt: cursorRow.id } },
+								],
+							};
+						} else {
+							cursorCondition = {
+								OR: [
+									{ position: { lt: cursorRow.position } },
+									{ position: cursorRow.position, id: { lt: cursorRow.id } },
+								],
+							};
+						}
+					}
+				} else {
+					// New composite cursor format - use Prisma's native cursor
+					usePrismaCursor = true;
+				}
+			}
+
+			// Fetch rows with optimized query
 			const rows = await ctx.db.row.findMany({
 				where: {
 					tableId: input.id,
-					table: {
-						base: { createdById: ctx.session.user.id },
-					},
+					...(!usePrismaCursor ? cursorCondition : {}),
 				},
-				select: {
-					id: true,
-					position: true,
-					createdAt: true,
-					updatedAt: true,
-					tableId: true,
+				include: {
 					cells: {
-						select: {
-							id: true,
-							rowId: true,
-							columnId: true,
-							value: true,
+						include: {
+							column: true,
 						},
 					},
 				},
 				orderBy,
-				take: (forward ? 1 : -1) * (limit + 1),
-				...(input.cursor
+				...(usePrismaCursor && input.cursor && typeof input.cursor === 'object' 
 					? {
-							cursor: { id: input.cursor },
-							skip: 1,
-						}
+						cursor: {
+							tableId_position_id: {
+								tableId: input.id,
+								position: input.cursor.position,
+								id: input.cursor.id,
+							},
+						},
+						skip: 1,
+					}
 					: {}),
+				take: forward ? limit + 1 : -(limit + 1), // Proper backward pagination
 			});
 
-			let nextCursor: string | undefined = undefined;
-			let prevCursor: string | undefined = undefined;
+			let nextCursor: { position: number; id: string } | undefined = undefined;
+			let prevCursor: { position: number; id: string } | undefined = undefined;
 
 			let items = rows;
 			// If we fetched more than the page size, pop the extra and set cursors
-			const hasMore = rows.length > limit;
+			const hasMore = Math.abs(rows.length) > limit;
 			if (hasMore) {
-				const extra = items.pop();
 				if (forward) {
-					nextCursor = extra?.id;
+					const extra = items.pop()!;
+					nextCursor = { position: extra.position, id: extra.id };
 				} else {
-					prevCursor = extra?.id;
+					const extra = items.shift()!;
+					prevCursor = { position: extra.position, id: extra.id };
 				}
 			}
 
-			// For backward pagination, return items in ascending order for UI consistency
-			if (!forward) {
-				items = items.reverse();
-			}
+			// For backward pagination, items are already in correct order due to negative take
+			// No need to reverse
 
 			return {
 				items,
 				nextCursor,
 				prevCursor,
+				hasMore,
 			};
+		}),
+
+	// Lazy cell loading endpoint - fetch cells on demand for specific rows
+	getCellsByRowIds: protectedProcedure
+		.input(
+			z.object({
+				tableId: z.string(),
+				rowIds: z.array(z.string()).min(1).max(100), // Limit batch size
+			}),
+		)
+		.query(async ({ ctx, input }) => {
+			// Verify table ownership first
+			const table = await ctx.db.table.findFirst({
+				where: {
+					id: input.tableId,
+					base: { createdById: ctx.session.user.id },
+				},
+				select: { id: true },
+			});
+
+			if (!table) {
+				throw new Error("Table not found or access denied");
+			}
+
+			// Fetch cells for the requested rows - optimized query using indexes
+			const cells = await ctx.db.cell.findMany({
+				where: {
+					rowId: { in: input.rowIds },
+				},
+				select: {
+					id: true,
+					rowId: true,
+					columnId: true,
+					value: true,
+				},
+				orderBy: [
+					{ rowId: "asc" },
+					{ columnId: "asc" },
+				],
+			});
+
+			// Group cells by rowId for easier consumption
+			const cellsByRowId = cells.reduce<Record<string, Array<(typeof cells)[0]>>>((acc, cell) => {
+				if (!acc[cell.rowId]) {
+					acc[cell.rowId] = [];
+				}
+				acc[cell.rowId]!.push(cell);
+				return acc;
+			}, {});
+
+			return cellsByRowId;
 		}),
 
 	// Create a new table (now handled by base router createTable)
@@ -856,6 +952,70 @@ export const tableRouter = createTRPCRouter({
 				queued: false,
 				queueName: null,
 				messageId: null,
+			};
+		}),
+
+	// Get rows by offset range for viewport-specific fetching
+	getRowsByRange: protectedProcedure
+		.input(
+			z.object({
+				id: z.string(),
+				offset: z.number().min(0).default(0),
+				limit: z.number().min(1).max(500).default(100),
+			}),
+		)
+		.query(async ({ ctx, input }) => {
+			// Verify table ownership
+			const table = await ctx.db.table.findUnique({
+				where: { id: input.id },
+				select: { base: { select: { createdById: true } } },
+			});
+			
+			if (!table || table.base.createdById !== ctx.session.user.id) {
+				throw new Error("Table not found or access denied");
+			}
+
+			// Fetch rows using OFFSET/LIMIT for specific range
+			const rows = await ctx.db.row.findMany({
+				where: {
+					tableId: input.id,
+				},
+				include: {
+					cells: {
+						include: {
+							column: true,
+						},
+					},
+				},
+				orderBy: [
+					{ position: "asc" },
+					{ id: "asc" },
+				],
+				skip: input.offset,
+				take: input.limit,
+			});
+
+			// Transform to match expected format
+			const transformedRows = rows.map((row) => ({
+				id: row.id,
+				tableId: row.tableId,
+				position: row.position,
+				createdAt: row.createdAt,
+				updatedAt: row.updatedAt,
+				cells: row.cells.map((cell) => ({
+					id: cell.id,
+					columnId: cell.columnId,
+					value: cell.value,
+					rowId: cell.rowId,
+					column: cell.column,
+				})),
+			}));
+
+			return {
+				items: transformedRows,
+				offset: input.offset,
+				limit: input.limit,
+				hasMore: rows.length === input.limit,
 			};
 		}),
 });
