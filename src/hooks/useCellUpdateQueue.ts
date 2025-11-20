@@ -57,6 +57,22 @@ export function useCellUpdateQueue({
 						};
 
 						const mappedRowId = await resolveRowId(update.rowId);
+
+						// Check if this row still exists in the current cache before attempting update
+						const infiniteInput = { id: tableId, limit: 500 };
+						const infiniteData =
+							utils.table.getInfiniteRows.getInfiniteData(infiniteInput);
+						const rowExists = infiniteData?.pages
+							.flatMap((page) => page.items)
+							.some((row) => row.id === mappedRowId || row.id === update.rowId);
+
+						if (!rowExists && !mappedRowId.startsWith("temp-")) {
+							console.warn(
+								`Skipping cell update for deleted row: ${mappedRowId}`,
+							);
+							return; // Skip this update - row was deleted
+						}
+
 						await mutateRef.current({
 							rowId: mappedRowId,
 							columnId: update.columnId,
@@ -64,6 +80,21 @@ export function useCellUpdateQueue({
 							value: valueStr === "" ? null : valueStr,
 						});
 						invalidateRef.current({ id: tableId });
+					} catch (error: any) {
+						// Handle race condition where row was deleted
+						if (
+							error?.message?.includes("Row not found") ||
+							error?.message?.includes("access denied")
+						) {
+							console.warn(
+								`Row ${update.rowId} was deleted before cell update could complete:`,
+								error.message,
+							);
+							// Don't throw - just log the race condition and continue
+							return;
+						}
+						// Re-throw other errors that should be handled
+						console.error("Cell update failed:", error, update);
 					} finally {
 						// Decrement pending count when item finishes (success or error)
 						pendingCountRef.current = Math.max(0, pendingCountRef.current - 1);
@@ -82,8 +113,16 @@ export function useCellUpdateQueue({
 					concurrency: 1,
 					started: true,
 					wait: 0, // Changed from 500ms to 0ms for immediate processing
-					onError: (error, item) =>
-						console.error("Cell update failed:", error, item),
+					onError: (error: any, item) => {
+						// Error logging is handled in the try/catch block above
+						// This onError is just for unhandled cases
+						if (
+							!error?.message?.includes("Row not found") &&
+							!error?.message?.includes("access denied")
+						) {
+							console.error("Unhandled cell update error:", error, item);
+						}
+					},
 				},
 			),
 		// Keep the queue instance stable across renders. Recreate only when tableId changes.
@@ -207,10 +246,47 @@ export function useCellUpdateQueue({
 		[queuer],
 	);
 
+	const cancelRowUpdates = useCallback(
+		(rowId: string) => {
+			const existingItems = queuer.peekPendingItems();
+			const filteredItems = existingItems.filter(
+				(item) => item.rowId !== rowId,
+			);
+
+			// Count how many updates we're canceling for this row
+			const canceledCount = existingItems.filter(
+				(item) => item.rowId === rowId,
+			).length;
+
+			if (canceledCount > 0) {
+				// Clear and re-add all items except the canceled ones
+				queuer.clear();
+				for (const item of filteredItems) {
+					queuer.addItem(item);
+				}
+
+				// Update pending count
+				pendingCountRef.current = Math.max(
+					0,
+					pendingCountRef.current - canceledCount,
+				);
+				setHasPendingChanges(pendingCountRef.current > 0);
+
+				console.log(
+					`Canceled ${canceledCount} pending update(s) for deleted row ${rowId}`,
+					"Remaining pending count:",
+					pendingCountRef.current,
+				);
+			}
+		},
+		[queuer],
+	);
+
 	return {
 		queueCellUpdate,
 		flushPendingUpdates,
 		cancelCellUpdate,
+		cancelRowUpdates,
 		pendingUpdatesCount: pendingCountRef.current,
 		isProcessing: queuer.store.state.activeItems.length > 0,
 		hasPendingChanges,

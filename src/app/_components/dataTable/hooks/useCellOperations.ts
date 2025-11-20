@@ -1,7 +1,11 @@
 import { useCallback } from "react";
 import type { CellHistoryChange } from "~/hooks/useSteps";
 import type { ColumnMeta, TableData } from "~/types/dataTable";
-import type { FillPreview, GridCell, SelectionRange } from "./useDataTableState";
+import type {
+	FillPreview,
+	GridCell,
+	SelectionRange,
+} from "./useDataTableState";
 
 interface UseCellOperationsParams {
 	columns: ColumnMeta[];
@@ -9,7 +13,11 @@ interface UseCellOperationsParams {
 	visibleColumns: ColumnMeta[];
 	rowIndexLookup: Map<string, number>;
 	columnIndexLookup: Map<string, number>;
-	handleCellUpdate: (rowId: string, columnId: string, value: string | number | null) => void;
+	handleCellUpdate: (
+		rowId: string,
+		columnId: string,
+		value: string | number | null,
+	) => void;
 	recordUndoStep: (changes: CellHistoryChange | CellHistoryChange[]) => void;
 	getCellByIndex: (rowIndex: number, columnIndex: number) => GridCell | null;
 	setActiveCell: (cell: GridCell | null) => void;
@@ -163,7 +171,16 @@ export function useCellOperations({
 	);
 
 	const moveSelection = useCallback(
-		(deltaRow: number, deltaCol: number, extend: boolean, activeCell: GridCell | null, selectionRef: React.MutableRefObject<SelectionRange | null>, activeCellRef: React.MutableRefObject<GridCell | null>, selectCell: (cell: GridCell, options?: { extend?: boolean }) => void, rowVirtualizer: any) => {
+		(
+			deltaRow: number,
+			deltaCol: number,
+			extend: boolean,
+			activeCell: GridCell | null,
+			selectionRef: React.MutableRefObject<SelectionRange | null>,
+			activeCellRef: React.MutableRefObject<GridCell | null>,
+			selectCell: (cell: GridCell, options?: { extend?: boolean }) => void,
+			rowVirtualizer: any,
+		) => {
 			const baseCell = extend
 				? (selectionRef.current?.focus ?? activeCellRef.current)
 				: activeCellRef.current;

@@ -11,6 +11,8 @@ interface UseDataTableCrudParams {
 	deleteColumnMutation: any;
 	renameColumnMutation: any;
 	duplicateColumnMutation: any;
+	addRowAtPositionMutation: any;
+	duplicateRowAtPositionMutation: any;
 	utils: any;
 	infiniteQueryInput: any;
 	selectedRowIds: Set<string>;
@@ -28,6 +30,8 @@ export function useDataTableCrud({
 	deleteColumnMutation,
 	renameColumnMutation,
 	duplicateColumnMutation,
+	addRowAtPositionMutation,
+	duplicateRowAtPositionMutation,
 	utils,
 	infiniteQueryInput,
 	selectedRowIds,
@@ -109,6 +113,56 @@ export function useDataTableCrud({
 		],
 	);
 
+	const handleInsertRecordAbove = useCallback(
+		(clickedRowId: string, rowsWithOptimistic: any[]) => {
+			const clickedRow = rowsWithOptimistic.find(
+				(row) => row.id === clickedRowId,
+			);
+			if (!clickedRow) return;
+
+			const cells = columns.map((col) => ({ columnId: col.id, value: "" }));
+			addRowAtPositionMutation.mutate({
+				tableId,
+				position: clickedRow.position,
+				cells,
+			});
+		},
+		[addRowAtPositionMutation, columns, tableId],
+	);
+
+	const handleInsertRecordBelow = useCallback(
+		(clickedRowId: string, rowsWithOptimistic: any[]) => {
+			const clickedRow = rowsWithOptimistic.find(
+				(row) => row.id === clickedRowId,
+			);
+			if (!clickedRow) return;
+
+			const cells = columns.map((col) => ({ columnId: col.id, value: "" }));
+			addRowAtPositionMutation.mutate({
+				tableId,
+				position: clickedRow.position + 1,
+				cells,
+			});
+		},
+		[addRowAtPositionMutation, columns, tableId],
+	);
+
+	const handleDuplicateRecord = useCallback(
+		(clickedRowId: string, rowsWithOptimistic: any[]) => {
+			const clickedRow = rowsWithOptimistic.find(
+				(row) => row.id === clickedRowId,
+			);
+			if (!clickedRow) return;
+
+			duplicateRowAtPositionMutation.mutate({
+				tableId,
+				rowId: clickedRowId,
+				position: clickedRow.position + 1,
+			});
+		},
+		[duplicateRowAtPositionMutation, tableId],
+	);
+
 	const addRowButtonDisabled = addRowMutation.isPending || columns.length === 0;
 
 	return {
@@ -119,6 +173,9 @@ export function useDataTableCrud({
 		handleAddRow,
 		handleFloatingAddRow,
 		handleDeleteRows,
+		handleInsertRecordAbove,
+		handleInsertRecordBelow,
+		handleDuplicateRecord,
 		addRowButtonDisabled,
 	};
 }

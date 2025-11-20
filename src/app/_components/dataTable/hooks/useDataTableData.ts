@@ -1,21 +1,24 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { api } from "~/trpc/react";
-import type { TableData } from "~/types/dataTable";
-import { buildOptimisticRows } from "../utils/dataGenerationUtils";
-import { MAX_CACHED_PAGES } from "../utils/constants";
 import {
 	BULK_JOB_COMPLETED_EVENT,
 	BULK_JOB_STARTED_EVENT,
 	type BulkJobCompletedDetail,
 	type BulkJobStartDetail,
 } from "~/lib/bulkJobEvents";
+import { api } from "~/trpc/react";
+import type { TableData } from "~/types/dataTable";
+import { MAX_CACHED_PAGES } from "../utils/constants";
+import { buildOptimisticRows } from "../utils/dataGenerationUtils";
 
 interface UseDataTableDataParams {
 	tableId: string;
 	pageSize: number;
 }
 
-export function useDataTableData({ tableId, pageSize }: UseDataTableDataParams) {
+export function useDataTableData({
+	tableId,
+	pageSize,
+}: UseDataTableDataParams) {
 	const [optimisticRows, setOptimisticRows] = useState<TableData[]>([]);
 
 	const utils = api.useUtils();

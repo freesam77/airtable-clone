@@ -4,7 +4,10 @@ import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
 import { type RouterOutputs, api } from "~/trpc/react";
 import type { FilterCondition } from "../components/filters/Filters";
 import type { SortCondition } from "../components/filters/Sorts";
-import { defaultViewSettings, parseViewSettings } from "../components/filters/viewSettings";
+import {
+	defaultViewSettings,
+	parseViewSettings,
+} from "../components/filters/viewSettings";
 
 export type ViewRecord = RouterOutputs["view"]["listByTable"][number];
 type ViewList = RouterOutputs["view"]["listByTable"];

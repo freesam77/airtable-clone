@@ -237,6 +237,137 @@ export const tableRouter = createTRPCRouter({
 
 			return row;
 		}),
+	// Add a new row at a specific position
+	addRowAtPosition: protectedProcedure
+		.input(
+			z.object({
+				tableId: z.string(),
+				position: z.number().int().min(0),
+				cells: z.array(
+					z.object({
+						columnId: z.string(),
+						value: z.string().optional(),
+					}),
+				),
+			}),
+		)
+		.mutation(async ({ ctx, input }) => {
+			// First, verify the table belongs to the user
+			const table = await ctx.db.table.findFirst({
+				where: {
+					id: input.tableId,
+					base: {
+						createdById: ctx.session.user.id,
+					},
+				},
+			});
+
+			if (!table) {
+				throw new Error("Table not found or access denied");
+			}
+
+			// Use a transaction to ensure consistency
+			return await ctx.db.$transaction(async (tx) => {
+				// First, shift all rows at or after the target position down by 1
+				await tx.row.updateMany({
+					where: {
+						tableId: input.tableId,
+						position: { gte: input.position },
+					},
+					data: {
+						position: { increment: 1 },
+					},
+				});
+
+				// Create the new row at the specified position
+				const row = await tx.row.create({
+					data: {
+						tableId: input.tableId,
+						position: input.position,
+						cells: {
+							create: input.cells,
+						},
+					},
+					include: {
+						cells: {
+							include: {
+								column: true,
+							},
+						},
+					},
+				});
+
+				return row;
+			});
+		}),
+
+	// Duplicate a row at a specific position
+	duplicateRowAtPosition: protectedProcedure
+		.input(
+			z.object({
+				tableId: z.string(),
+				sourceRowId: z.string(),
+				position: z.number().int().min(0),
+			}),
+		)
+		.mutation(async ({ ctx, input }) => {
+			// First, verify the table and source row belong to the user
+			const sourceRow = await ctx.db.row.findFirst({
+				where: {
+					id: input.sourceRowId,
+					tableId: input.tableId,
+					table: {
+						base: {
+							createdById: ctx.session.user.id,
+						},
+					},
+				},
+				include: {
+					cells: true,
+				},
+			});
+
+			if (!sourceRow) {
+				throw new Error("Source row not found or access denied");
+			}
+
+			// Use a transaction to ensure consistency
+			return await ctx.db.$transaction(async (tx) => {
+				// First, shift all rows at or after the target position down by 1
+				await tx.row.updateMany({
+					where: {
+						tableId: input.tableId,
+						position: { gte: input.position },
+					},
+					data: {
+						position: { increment: 1 },
+					},
+				});
+
+				// Create the new row at the specified position with duplicated cells
+				const row = await tx.row.create({
+					data: {
+						tableId: input.tableId,
+						position: input.position,
+						cells: {
+							create: sourceRow.cells.map((cell) => ({
+								columnId: cell.columnId,
+								value: cell.value,
+							})),
+						},
+					},
+					include: {
+						cells: {
+							include: {
+								column: true,
+							},
+						},
+					},
+				});
+
+				return row;
+			});
+		}),
 
 	// Delete a table (and cascade its rows/columns/cells)
 	delete: protectedProcedure

@@ -9,7 +9,7 @@ import type { ColumnMeta, TableData } from "~/types/dataTable";
 
 const MAX_PAGE_SIZE = 500;
 
-const randomItem = <T,>(arr: readonly T[]): T => {
+const randomItem = <T>(arr: readonly T[]): T => {
 	if (arr.length === 0) {
 		throw new Error("randomItem requires a non-empty array");
 	}

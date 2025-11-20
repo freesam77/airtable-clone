@@ -45,7 +45,7 @@ export function useDataTableKeyboard({
 		},
 		[],
 	);
-    
+
 	const handleGridKeyDown = useCallback(
 		(event: ReactKeyboardEvent<HTMLDivElement>) => {
 			if (!activeCell) return;

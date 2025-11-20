@@ -1,7 +1,12 @@
-import { useCallback, useEffect, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { useCallback, useEffect, useState } from "react";
 import type { TableData } from "~/types/dataTable";
-import { ROW_HEIGHT, MIN_PAGE_SIZE, MAX_PAGE_SIZE, NEXT_PAGE_FETCH_THRESHOLD } from "../utils/constants";
+import {
+	MAX_PAGE_SIZE,
+	MIN_PAGE_SIZE,
+	NEXT_PAGE_FETCH_THRESHOLD,
+	ROW_HEIGHT,
+} from "../utils/constants";
 
 const clamp = (value: number, min: number, max: number) =>
 	Math.min(Math.max(value, min), max);

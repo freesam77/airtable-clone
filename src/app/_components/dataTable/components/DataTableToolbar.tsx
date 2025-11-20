@@ -1,8 +1,8 @@
 import { memo } from "react";
 import type { ColumnType } from "~/types/column";
+import type { ViewUpdatePatch } from "../hooks/useViewFilter";
 import type { FilterCondition } from "./filters/Filters";
 import type { SortCondition } from "./filters/Sorts";
-import type { ViewUpdatePatch } from "../hooks/useViewFilter";
 import { ViewsHeader } from "./views/ViewsHeader";
 
 interface DataTableToolbarProps {

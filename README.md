@@ -61,6 +61,7 @@ npm run db:studio    # Open Prisma Studio GUI
 - **Optimistic Updates**: Instant UI feedback for all operations
 - **Type Safety**: End-to-end TypeScript from database to UI
 - **Spreadsheet-like Editing**: Cell editing with keyboard shortcuts support
+- **Context Menus**: Right-click support for rows and columns with contextual actions
 
 ## Environment Configuration
 

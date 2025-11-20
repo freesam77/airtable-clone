@@ -25,16 +25,14 @@ import {
 } from "./utils/rowSelectionUtils";
 
 declare module "@tanstack/react-table" {
-  interface ColumnMeta<TData extends RowData, TValue> {
-    table?: string;
-    className?: string;
-    type?: string;
-    name?: string;
-    position?: number;
-  }
+	interface ColumnMeta<TData extends RowData, TValue> {
+		table?: string;
+		className?: string;
+		type?: string;
+		name?: string;
+		position?: number;
+	}
 }
-
-
 
 type RowNumberHeaderProps = {
 	displayDataIds: string[];
@@ -130,8 +128,7 @@ const RowNumberCell = memo(function RowNumberCell({
 const ColumnHeaderLabel = memo(function ColumnHeaderLabel({
 	col,
 }: {
-	col: any
-
+	col: any;
 }) {
 	return (
 		<div className="flex min-w-0 items-center">

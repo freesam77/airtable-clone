@@ -1,6 +1,10 @@
 import { useCallback, useRef } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
-import type { GridCell, SelectionRange, FillPreview } from "./useDataTableState";
+import type {
+	FillPreview,
+	GridCell,
+	SelectionRange,
+} from "./useDataTableState";
 
 interface UseCellInteractionsParams {
 	rowIndexLookup: Map<string, number>;
@@ -11,7 +15,10 @@ interface UseCellInteractionsParams {
 	setFillPreview: (preview: FillPreview | null) => void;
 	updateFillPreview: (origin: GridCell, target: GridCell) => void;
 	startEditing: (cell: GridCell | null, initialValue?: string) => void;
-	selectCell: (cell: GridCell, options?: { extend?: boolean; anchorOverride?: GridCell }) => void;
+	selectCell: (
+		cell: GridCell,
+		options?: { extend?: boolean; anchorOverride?: GridCell },
+	) => void;
 	scrollParentRef: React.RefObject<HTMLDivElement | null>;
 	selectionRef: React.MutableRefObject<SelectionRange | null>;
 	activeCellRef: React.MutableRefObject<GridCell | null>;
@@ -59,7 +66,14 @@ export function useCellInteractions({
 				startEditing(cell);
 			}
 		},
-		[selectCell, startEditing, scrollParentRef, setEditingCell, selectionRef, activeCellRef],
+		[
+			selectCell,
+			startEditing,
+			scrollParentRef,
+			setEditingCell,
+			selectionRef,
+			activeCellRef,
+		],
 	);
 
 	const handleCellPointerEnter = useCallback(
@@ -95,7 +109,13 @@ export function useCellInteractions({
 			setFillPreview(null);
 			setEditingCell(null);
 		},
-		[rowIndexLookup, columnIndexLookup, scrollParentRef, setFillPreview, setEditingCell],
+		[
+			rowIndexLookup,
+			columnIndexLookup,
+			scrollParentRef,
+			setFillPreview,
+			setEditingCell,
+		],
 	);
 
 	const finalizePointer = useCallback(() => {

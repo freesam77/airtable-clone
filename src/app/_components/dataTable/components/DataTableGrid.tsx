@@ -1,6 +1,11 @@
-import { memo } from "react";
-import { flexRender, useReactTable, getCoreRowModel, type Header as TableHeader } from "@tanstack/react-table";
+import {
+	type Header as TableHeader,
+	flexRender,
+	getCoreRowModel,
+	useReactTable,
+} from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { memo } from "react";
 import {
 	ContextMenu,
 	ContextMenuContent,
@@ -26,7 +31,11 @@ interface DataTableGridProps {
 	matchKeys: Set<string>;
 	activeMatch: any;
 	scrollParentRef: React.RefObject<HTMLDivElement | null>;
-	onCellPointerDown: (event: any, cell: GridCell, isSelectable: boolean) => void;
+	onCellPointerDown: (
+		event: any,
+		cell: GridCell,
+		isSelectable: boolean,
+	) => void;
 	onCellPointerEnter: (cell: GridCell, isSelectable: boolean) => void;
 	onDoubleClick: (cell: GridCell) => void;
 	onFillPointerDown: (event: any, cell: GridCell) => void;
@@ -206,34 +215,26 @@ export const DataTableGrid = memo(function DataTableGrid({
 												onDuplicate={onDuplicateColumn}
 												onDelete={onDeleteColumn}
 												disabledRename={renameColumnMutation.isPending}
-												disabledDuplicate={
-													duplicateColumnMutation.isPending
-												}
+												disabledDuplicate={duplicateColumnMutation.isPending}
 											/>
 										</ContextMenuTrigger>
 										{!header.isPlaceholder && !isRowNumber && (
 											<ContextMenuContent className="w-64 bg-white p-0">
 												<div className="p-2">
 													<ContextMenuItem
-														onClick={() =>
-															onRenameColumn(header.column.id)
-														}
+														onClick={() => onRenameColumn(header.column.id)}
 														className="w-full rounded px-2 py-2 text-left hover:bg-gray-50"
 													>
 														Rename column
 													</ContextMenuItem>
 													<ContextMenuItem
-														onClick={() =>
-															onDuplicateColumn(header.column.id)
-														}
+														onClick={() => onDuplicateColumn(header.column.id)}
 														className="w-full rounded px-2 py-2 text-left hover:bg-gray-50"
 													>
 														Duplicate column
 													</ContextMenuItem>
 													<ContextMenuItem
-														onClick={() =>
-															onDeleteColumn(header.column.id)
-														}
+														onClick={() => onDeleteColumn(header.column.id)}
 														className="w-full rounded px-2 py-2 text-left text-red-600 hover:bg-red-50"
 													>
 														Delete column
@@ -250,9 +251,7 @@ export const DataTableGrid = memo(function DataTableGrid({
 				<tbody>
 					{(() => {
 						const virtualItems = rowVirtualizer.getVirtualItems();
-						const paddingTop = virtualItems.length
-							? virtualItems[0]!.start
-							: 0;
+						const paddingTop = virtualItems.length ? virtualItems[0]!.start : 0;
 						const paddingBottom = virtualItems.length
 							? rowVirtualizer.getTotalSize() -
 								virtualItems[virtualItems.length - 1]!.end
@@ -279,8 +278,7 @@ export const DataTableGrid = memo(function DataTableGrid({
 													data-index={vItem.index}
 													className={cn(
 														"cursor-default transition-colors",
-														hoveredRowId === row?.original.id &&
-															"bg-gray-50",
+														hoveredRowId === row?.original.id && "bg-gray-50",
 													)}
 													style={{ height: ROW_HEIGHT }}
 													onMouseEnter={() => {
@@ -293,27 +291,21 @@ export const DataTableGrid = memo(function DataTableGrid({
 													{row?.getVisibleCells().map((cell) => {
 														const key = `${row?.original.id}|${cell.column.id}`;
 														const isMatch =
-															Boolean(searchValue) &&
-															matchKeys.has(key);
+															Boolean(searchValue) && matchKeys.has(key);
 														const isActiveSearchCell =
 															Boolean(activeMatch) &&
-															activeMatch?.rowId ===
-																row?.original.id &&
-															activeMatch?.columnId ===
-																cell.column.id;
+															activeMatch?.rowId === row?.original.id &&
+															activeMatch?.columnId === cell.column.id;
 														const rowId = row?.original.id;
 														const isSelectableCell =
 															Boolean(rowId) &&
 															columnIndexLookup.has(cell.column.id);
 														const isGridActive =
-															isSelectableCell &&
-															activeCellKey === key;
+															isSelectableCell && activeCellKey === key;
 														const isSelected =
-															isSelectableCell &&
-															selectedCellKeys.has(key);
+															isSelectableCell && selectedCellKeys.has(key);
 														const isFillHighlighted =
-															isSelectableCell &&
-															fillPreviewKeys.has(key);
+															isSelectableCell && fillPreviewKeys.has(key);
 														const backgroundClass = isFillHighlighted
 															? "bg-blue-100"
 															: hasRangeSelection && isSelected
@@ -328,8 +320,7 @@ export const DataTableGrid = memo(function DataTableGrid({
 																key={cell.id}
 																className={cn(
 																	"relative w-[150px] border-gray-200 border-r border-b px-2 text-gray-900 text-sm leading-none",
-																	cell.column.columnDef.meta
-																		?.className,
+																	cell.column.columnDef.meta?.className,
 																	backgroundClass,
 																)}
 																data-cell={key}
@@ -355,8 +346,7 @@ export const DataTableGrid = memo(function DataTableGrid({
 																	);
 																}}
 																onDoubleClick={(event) => {
-																	if (!rowId || !isSelectableCell)
-																		return;
+																	if (!rowId || !isSelectableCell) return;
 																	event.stopPropagation();
 																	onDoubleClick({
 																		rowId,
@@ -393,9 +383,7 @@ export const DataTableGrid = memo(function DataTableGrid({
 											{row && (
 												<ContextMenuContent className="w-48">
 													<ContextMenuItem
-														onClick={() =>
-															onDeleteRows(row?.original.id)
-														}
+														onClick={() => onDeleteRows(row?.original.id)}
 														className="text-red-600 focus:bg-red-50 focus:text-red-600"
 													>
 														Delete row

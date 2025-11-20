@@ -1,6 +1,6 @@
-import { memo, useMemo } from "react";
 import type { Header as TableHeader } from "@tanstack/react-table";
 import { flexRender } from "@tanstack/react-table";
+import { memo, useMemo } from "react";
 import {
 	ContextMenu,
 	ContextMenuContent,
@@ -42,10 +42,7 @@ export const TableHeaderCell = memo(
 						)}
 					>
 						<div
-							className={cn(
-								"flex items-center gap-2",
-								isRowNumber && "inline",
-							)}
+							className={cn("flex items-center gap-2", isRowNumber && "inline")}
 						>
 							{header.isPlaceholder
 								? null

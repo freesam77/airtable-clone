@@ -16,8 +16,15 @@ interface UseClipboardOperationsParams {
 		colStart: number;
 		colEnd: number;
 	} | null;
-	normalizeValueForColumn: (columnId: string, input: string | number | null | undefined) => string | null;
-	handleCellUpdate: (rowId: string, columnId: string, value: string | number | null) => void;
+	normalizeValueForColumn: (
+		columnId: string,
+		input: string | number | null | undefined,
+	) => string | null;
+	handleCellUpdate: (
+		rowId: string,
+		columnId: string,
+		value: string | number | null,
+	) => void;
 	recordUndoStep: (changes: CellHistoryChange | CellHistoryChange[]) => void;
 	getCellByIndex: (rowIndex: number, columnIndex: number) => GridCell | null;
 	setSelection: (selection: SelectionRange) => void;

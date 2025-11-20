@@ -1,5 +1,5 @@
+import { type Cell, type RowData, flexRender } from "@tanstack/react-table";
 import { memo } from "react";
-import { flexRender, type Cell, type RowData } from "@tanstack/react-table";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { cn } from "~/lib/utils";
 import type { TableData } from "~/types/dataTable";

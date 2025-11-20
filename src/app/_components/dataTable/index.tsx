@@ -1,9 +1,22 @@
 "use client";
 
+import { getCoreRowModel, useReactTable } from "@tanstack/react-table";
+import {
+	ArrowDown,
+	ArrowUp,
+	Copy,
+	Plus,
+	Trash2,
+	WandSparkles,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { useReactTable, getCoreRowModel } from "@tanstack/react-table";
-import { Plus, WandSparkles } from "lucide-react";
+import {
+	ContextMenu,
+	ContextMenuContent,
+	ContextMenuItem,
+	ContextMenuTrigger,
+} from "~/components/ui/context-menu";
 import { type CellHistoryChange, useSteps } from "~/hooks/useSteps";
 import { useTableMutations } from "~/hooks/useTableMutations";
 import { useTableSearchNavigation } from "~/hooks/useTableSearchNavigation";
@@ -11,39 +24,33 @@ import { detectOS } from "~/lib/detectOS";
 import { filterRowsByQuery, rowMatchesQuery } from "~/lib/tableFilter";
 import { cn } from "~/lib/utils";
 import type { ColumnType } from "~/types/column";
+
+import { createColumnDefs } from "./ColumnDefinitions";
+// Import our extracted components and hooks
+import { DataTableStatusBar } from "./components/DataTableStatusBar";
+import { DataTableToolbar } from "./components/DataTableToolbar";
+import { TableDataCell } from "./components/cells/TableDataCell";
+import { TableHeaderCell } from "./components/cells/TableHeaderCell";
+import { applyFilters } from "./components/filters/Filters";
+import { applySorts } from "./components/filters/Sorts";
+import { AddColumnDropdown } from "./components/toolbar/AddColumnDropdown";
+import { ViewsSidebar } from "./components/views/ViewsSidebar";
+import { useCellInteractions } from "./hooks/useCellInteractions";
+import { toHistoryValue, useCellOperations } from "./hooks/useCellOperations";
+import { useClipboardOperations } from "./hooks/useClipboardOperations";
+import { useDataTableCrud } from "./hooks/useDataTableCrud";
+import { useDataTableData } from "./hooks/useDataTableData";
+import { useDataTableKeyboard } from "./hooks/useDataTableKeyboard";
+import { type GridCell, useDataTableState } from "./hooks/useDataTableState";
+import { useDataTableVirtualization } from "./hooks/useDataTableVirtualization";
+import { useViewFilter } from "./hooks/useViewFilter";
+import { MAX_PAGE_SIZE, ROW_HEIGHT } from "./utils/constants";
 import {
 	Tooltip,
 	TooltipContent,
 	TooltipProvider,
 	TooltipTrigger,
 } from "~/components/ui/tooltip";
-import {
-	ContextMenu,
-	ContextMenuContent,
-	ContextMenuItem,
-	ContextMenuTrigger,
-} from "~/components/ui/context-menu";
-
-// Import our extracted components and hooks
-import { DataTableStatusBar } from "./components/DataTableStatusBar";
-import { DataTableToolbar } from "./components/DataTableToolbar";
-import { AddColumnDropdown } from "./components/toolbar/AddColumnDropdown";
-import { ViewsSidebar } from "./components/views/ViewsSidebar";
-import { TableHeaderCell } from "./components/cells/TableHeaderCell";
-import { createColumnDefs } from "./ColumnDefinitions";
-import { applyFilters } from "./components/filters/Filters";
-import { applySorts } from "./components/filters/Sorts";
-import { useViewFilter } from "./hooks/useViewFilter";
-import { useDataTableState, type GridCell } from "./hooks/useDataTableState";
-import { useDataTableKeyboard } from "./hooks/useDataTableKeyboard";
-import { useClipboardOperations } from "./hooks/useClipboardOperations";
-import { toHistoryValue, useCellOperations } from "./hooks/useCellOperations";
-import { useCellInteractions } from "./hooks/useCellInteractions";
-import { useDataTableCrud } from "./hooks/useDataTableCrud";
-import { useDataTableData } from "./hooks/useDataTableData";
-import { useDataTableVirtualization } from "./hooks/useDataTableVirtualization";
-import { MAX_PAGE_SIZE, ROW_HEIGHT } from "./utils/constants";
-import { TableDataCell } from "./components/cells/TableDataCell";
 
 // Types
 type Cell = {
@@ -119,6 +126,8 @@ export function DataTable({ tableId }: DataTableProps) {
 		deleteColumnMutation,
 		renameColumnMutation,
 		duplicateColumnMutation,
+		addRowAtPositionMutation,
+		duplicateRowAtPositionMutation,
 	} = useTableMutations({
 		tableId,
 		infiniteInput: infiniteQueryInput,
@@ -268,23 +277,20 @@ export function DataTable({ tableId }: DataTableProps) {
 	}, [handleCellUpdate, popRedoStep]);
 
 	// Cell operations
-	const {
-		normalizeValueForColumn,
-		updateFillPreview,
-		moveSelection,
-	} = useCellOperations({
-		columns,
-		rowsWithOptimistic,
-		visibleColumns,
-		rowIndexLookup,
-		columnIndexLookup,
-		handleCellUpdate,
-		recordUndoStep,
-		getCellByIndex,
-		setActiveCell,
-		setSelection,
-		setFillPreview,
-	});
+	const { normalizeValueForColumn, updateFillPreview, moveSelection } =
+		useCellOperations({
+			columns,
+			rowsWithOptimistic,
+			visibleColumns,
+			rowIndexLookup,
+			columnIndexLookup,
+			handleCellUpdate,
+			recordUndoStep,
+			getCellByIndex,
+			setActiveCell,
+			setSelection,
+			setFillPreview,
+		});
 
 	// Update refs when state changes
 	useEffect(() => {
@@ -394,6 +400,8 @@ export function DataTable({ tableId }: DataTableProps) {
 		deleteColumnMutation,
 		renameColumnMutation,
 		duplicateColumnMutation,
+		addRowAtPositionMutation,
+		duplicateRowAtPositionMutation,
 		utils,
 		infiniteQueryInput,
 		selectedRowIds,
@@ -429,6 +437,27 @@ export function DataTable({ tableId }: DataTableProps) {
 		],
 	);
 
+	// Position-aware context menu handlers
+	const handleInsertRecordAbove = useCallback(
+		(rowId: string) => {
+			crudOperations.handleInsertRecordAbove(rowId, rowsWithOptimistic);
+		},
+		[crudOperations, rowsWithOptimistic],
+	);
+
+	const handleInsertRecordBelow = useCallback(
+		(rowId: string) => {
+			crudOperations.handleInsertRecordBelow(rowId, rowsWithOptimistic);
+		},
+		[crudOperations, rowsWithOptimistic],
+	);
+
+	const handleDuplicateRecord = useCallback(
+		(rowId: string) => {
+			crudOperations.handleDuplicateRecord(rowId, rowsWithOptimistic);
+		},
+		[crudOperations, rowsWithOptimistic],
+	);
 	const startEditing = useCallback(
 		(cell: any, initialValue?: string) => {
 			if (
@@ -857,14 +886,38 @@ export function DataTable({ tableId }: DataTableProps) {
 																	})}
 																</tr>
 															</ContextMenuTrigger>
-															<ContextMenuContent>
+															<ContextMenuContent className="w-48 p-2">
+																<ContextMenuItem
+																	onClick={() => handleInsertRecordAbove(rowId)}
+																	className="flex cursor-pointer items-center gap-2 px-2 py-2 hover:bg-gray-100"
+																>
+																	<ArrowUp className="size-3" />
+																	Insert record above
+																</ContextMenuItem>
+																<ContextMenuItem
+																	onClick={() => handleInsertRecordBelow(rowId)}
+																	className="flex cursor-pointer items-center gap-2 px-2 py-2 hover:bg-gray-100"
+																>
+																	<ArrowDown className="size-3" />
+																	Insert record below
+																</ContextMenuItem>
+																<ContextMenuItem
+																	onClick={() => handleDuplicateRecord(rowId)}
+																	className="flex cursor-pointer items-center gap-2 px-2 py-2 hover:bg-gray-100"
+																>
+																	<Copy className="size-3" />
+																	Duplicate record
+																</ContextMenuItem>
 																<ContextMenuItem
 																	onClick={() =>
 																		crudOperations.handleDeleteRows(rowId)
 																	}
-																	disabled={selectedRowIds.size === 0 && !rowId}
+																	className="flex cursor-pointer items-center gap-2 px-2 py-2 hover:bg-gray-100"
 																>
-																	Delete selected rows
+																	<Trash2 className="size-3" />
+																	<span className="text-red-700">
+																		Delete record
+																	</span>
 																</ContextMenuItem>
 															</ContextMenuContent>
 														</ContextMenu>
@@ -883,37 +936,22 @@ export function DataTable({ tableId }: DataTableProps) {
 										);
 									})()}
 								</tbody>
-								{/* Add Row button row */}
 								<tfoot>
-									<tr className="border-gray-200 border-r border-b bg-white">
+									<tr className="bg-white">
 										{visibleColumns.map((col, index) => (
 											<td
 												key={col.id}
-												className={cn(
-													"w-full border-gray-200 text-gray-900 text-sm",
-												)}
+												className={cn(" w-full text-gray-900 text-sm")}
 												colSpan={visibleColumns.length + 1}
 											>
 												{index === 0 ? (
-													<TooltipProvider>
-														<Tooltip>
-															<TooltipTrigger asChild>
-																<button
-																	type="button"
-																	onClick={crudOperations.handleAddRow}
-																	className="flex size-8 w-full cursor-pointer items-center pl-8 text-gray-600 text-xl hover:bg-gray-50 hover:text-gray-800"
-																>
-																	+
-																</button>
-															</TooltipTrigger>
-															<TooltipContent>
-																<p>
-																	You can also insert a new record anywhere by
-																	pressing Shift-Enter
-																</p>
-															</TooltipContent>
-														</Tooltip>
-													</TooltipProvider>
+													<button
+														type="button"
+														onClick={crudOperations.handleAddRow}
+														className="flex size-8 w-full cursor-pointer items-center border-gray-200 border-r border-b pl-7.5 text-gray-600 text-xl hover:bg-gray-50 hover:text-gray-800"
+													>
+														+
+													</button>
 												) : null}
 											</td>
 										))}
@@ -922,7 +960,6 @@ export function DataTable({ tableId }: DataTableProps) {
 									</tr>
 								</tfoot>
 							</table>
-
 							<div className="fixed bottom-10 z-20 ml-3 flex items-center text-xs">
 								<TooltipProvider>
 									<Tooltip>
@@ -947,7 +984,7 @@ export function DataTable({ tableId }: DataTableProps) {
 									disabled
 								>
 									<WandSparkles className="size-3.5" />
-									Autofill 100
+									Add...
 								</button>
 							</div>
 
@@ -957,14 +994,16 @@ export function DataTable({ tableId }: DataTableProps) {
 								trigger={
 									<button
 										type="button"
-										className="sticky top-0 h-[40.5px] w-30 border-separate border-spacing-0 cursor-pointer border-r border-b bg-white text-gray-900 text-lg hover:bg-gray-100"
+										className="sticky top-0 w-30 cursor-pointer border-r border-b bg-white text-gray-900 text-lg hover:bg-gray-100"
 										aria-label="Add column"
+										style={{ height: `${ROW_HEIGHT + 3}px` }}
 									>
 										+
 									</button>
 								}
 							/>
 						</div>
+
 						<DataTableStatusBar
 							footerRowCount={
 								(rowCountData?.count ?? rowsWithOptimistic.length) +
