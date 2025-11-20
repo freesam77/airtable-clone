@@ -887,13 +887,14 @@ export function DataTable({ tableId }: DataTableProps) {
 													<TableHeaderCell
 														key={header.id}
 														header={header}
+														columnName={visibleColumns.find(col => col.id === header.column.id)?.name || header.column.id}
 														onRename={crudOperations.handleRenameColumn}
 														onDuplicate={crudOperations.handleDuplicateColumn}
 														onDelete={crudOperations.handleDeleteColumn}
+														onHide={crudOperations.handleHideField}
 														disabledRename={renameColumnMutation.isPending}
-														disabledDuplicate={
-															duplicateColumnMutation.isPending
-														}
+														disabledDuplicate={duplicateColumnMutation.isPending}
+														disabledDelete={deleteColumnMutation.isPending}
 													/>
 												))}
 										</tr>

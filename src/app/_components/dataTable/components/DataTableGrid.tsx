@@ -46,7 +46,7 @@ interface DataTableGridProps {
 	onRowMouseEnter: (rowId: string) => void;
 	onRowMouseLeave: () => void;
 	onDeleteRows: (rowId: string) => Promise<void>;
-	onRenameColumn: (id: string) => void;
+	onRenameColumn: (id: string, newName: string) => void;
 	onDuplicateColumn: (id: string) => void;
 	onDeleteColumn: (id: string) => void;
 	columnIndexLookup: Map<string, number>;
@@ -60,13 +60,15 @@ const MemoHeaderContent = memo(
 		onRename,
 		onDuplicate,
 		onDelete,
+		orderedColumns,
 		disabledRename,
 		disabledDuplicate,
 	}: {
 		header: TableHeader<TableData, unknown>;
-		onRename: (id: string) => void;
+		onRename: (id: string, newName: string) => void;
 		onDuplicate: (id: string) => void;
 		onDelete: (id: string) => void;
+		orderedColumns: ColumnMeta[];
 		disabledRename?: boolean;
 		disabledDuplicate?: boolean;
 	}) {
@@ -92,6 +94,7 @@ const MemoHeaderContent = memo(
 					{header.column.id !== "row-number" && (
 						<ColumnHeaderMenu
 							columnId={header.column.id}
+							columnName={orderedColumns.find(col => col.id === header.column.id)?.name || header.column.id}
 							onRename={onRename}
 							onDuplicate={onDuplicate}
 							onDelete={onDelete}
@@ -214,6 +217,7 @@ export const DataTableGrid = memo(function DataTableGrid({
 												onRename={onRenameColumn}
 												onDuplicate={onDuplicateColumn}
 												onDelete={onDeleteColumn}
+												orderedColumns={orderedColumns}
 												disabledRename={renameColumnMutation.isPending}
 												disabledDuplicate={duplicateColumnMutation.isPending}
 											/>
@@ -222,7 +226,10 @@ export const DataTableGrid = memo(function DataTableGrid({
 											<ContextMenuContent className="w-64 bg-white p-0">
 												<div className="p-2">
 													<ContextMenuItem
-														onClick={() => onRenameColumn(header.column.id)}
+														onClick={() => {
+															const name = prompt("Rename column", orderedColumns.find(col => col.id === header.column.id)?.name || "");
+															if (name?.trim()) onRenameColumn(header.column.id, name.trim());
+														}}
 														className="w-full rounded px-2 py-2 text-left hover:bg-gray-50"
 													>
 														Rename column

@@ -1,10 +1,9 @@
 ﻿"use client";
-import { Bell, Box, HelpCircle, LoaderCircle } from "lucide-react";
+import { Bell, HelpCircle, CircleDotDashed } from "lucide-react";
 import { useSession } from "next-auth/react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { auth } from "~/server/auth";
 import { api } from "~/trpc/react";
 import { DataTable } from "../dataTable";
 import { TopNav } from "./topNav";
@@ -129,15 +128,58 @@ export function BaseLayout({
 
 	return (
 		<div className="flex h-screen bg-gray-50">
-			<div className="relative z-50 flex w-16 shrink-0 flex-col items-center border-r bg-white pt-5">
-				<Image
-					src="/airtable-logo.svg"
-					className="h-6 cursor-pointer"
-					width={30}
-					height={10}
-					onClick={() => router.push("/dashboard")}
-					alt="Home"
-				/>
+			<div className="relative z-50 flex w-16 shrink-0 flex-col items-center justify-between border-r bg-white py-5">
+				{/* Top section - Logo and database icon */}
+				<div className="flex flex-col items-center space-y-4">
+					<Image
+						src="/airtable-logo.svg"
+						className="h-6 cursor-pointer"
+						width={30}
+						height={10}
+						onClick={() => router.push("/dashboard")}
+						alt="Home"
+					/>
+
+					<button
+						type="button"
+						className="flex items-center justify-center w-8 h-8 rounded hover:bg-gray-100"
+						onClick={() => router.push("/dashboard")}
+						title="Bases"
+					>
+						<Image src="/omni.png" alt="Omni" width={30} height={30} />
+					</button>
+				</div>
+
+				{/* Middle section - empty space */}
+				<div />
+
+				{/* Bottom section - User actions */}
+				<div className="flex flex-col items-center space-y-3">
+					<button
+						type="button"
+						className="flex items-center justify-center w-8 h-8 rounded hover:bg-gray-100 text-gray-600"
+						title="Help"
+					>
+						<HelpCircle className="w-4 h-4" />
+					</button>
+
+					<button
+						type="button"
+						className="flex items-center justify-center w-8 h-8 rounded hover:bg-gray-100 text-gray-600"
+						title="Notifications"
+					>
+						<Bell className="w-4 h-4" />
+					</button>
+
+					<button
+						type="button"
+						className="flex items-center justify-center w-7 h-7 rounded-full bg-sky-500 text-white text-sm font-medium"
+						onClick={() => router.push("/dashboard")}
+						title={session?.user?.name ?? "User"}
+					>
+						{getUserInitials(session?.user?.name)}
+					</button>
+				</div>
 			</div>
 			<div className="flex h-full w-full flex-col overflow-hidden">
 				{basesLoading ? (

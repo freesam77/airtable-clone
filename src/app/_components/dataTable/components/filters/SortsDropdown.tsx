@@ -323,16 +323,16 @@ export function SortsDropdown({
 										</div>
 									</div>
 
-									<div className="flex items-center justify-between pt-1">
-										<span className="font-medium text-gray-700 text-xs">
-											Automatically sort records
-										</span>
+									<div className="flex items-center gap-1 border-t bg-slate-100 p-2">
 										<Switch
 											checked={autoSort}
 											onCheckedChange={(checked) => onAutoSortChange(checked)}
 											aria-label="Toggle automatic sort"
-											className="data-[state=checked]:bg-green-600 data-[state=unchecked]:bg-gray-300"
+											className="data-[state=checked]:bg-green-600 data-[state=unchecked]:bg-gray-300 scale-60"
 										/>
+										<span className="text-gray-700 text-xs">
+											Automatically sort records
+										</span>
 									</div>
 								</div>
 							)}
@@ -428,18 +428,17 @@ export function SortsDropdown({
 								<Plus className="h-4 w-4" />
 								Add another sort
 							</button>
-
-							<div className="flex items-center justify-between pt-2">
-								<span className="font-medium text-gray-700 text-xs">
-									Automatically sort records
-								</span>
-								<Switch
-									checked={autoSort}
-									onCheckedChange={(checked) => onAutoSortChange(checked)}
-									aria-label="Toggle automatic sort"
-									className="data-[state=checked]:bg-green-600 data-[state=unchecked]:bg-gray-300"
-								/>
-							</div>
+						</div>
+						<div className="flex items-center gap-1 border-t bg-slate-100 p-2">
+							<Switch
+								checked={autoSort}
+								onCheckedChange={(checked) => onAutoSortChange(checked)}
+								aria-label="Toggle automatic sort"
+								className="data-[state=checked]:bg-green-600 data-[state=unchecked]:bg-gray-300 scale-60"
+							/>
+							<span className="text-gray-700 text-xs">
+								Automatically sort records
+							</span>
 						</div>
 					</div>
 				)}

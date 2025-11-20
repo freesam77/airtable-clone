@@ -1,15 +1,19 @@
 "use client";
 import {
-	Calendar,
 	ChevronDown,
 	ChevronRight,
-	Cloud,
-	Database,
 	ExternalLink,
-	FileSpreadsheet,
 	Folder,
 	MoreHorizontal,
 	Star,
+	Copy,
+	Trash2,
+	FileBarChart,
+	X,
+	Database,
+	FileSpreadsheet,
+	Calendar,
+	Cloud,
 } from "lucide-react";
 import { Check, Search } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -22,6 +26,7 @@ import {
 	DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
 import { Input } from "~/components/ui/input";
+import { Button } from "~/components/ui/button";
 import { showToast } from "~/components/ui/toast";
 import {
 	BULK_JOB_COMPLETED_EVENT,
@@ -187,6 +192,25 @@ export const TopNav = ({
 		},
 	});
 
+	// Clear table data - deletes all rows from the table
+	const clearTableData = api.table.clearTableData.useMutation({
+		onSuccess: async (result) => {
+			const tableName =
+				selectedBase.tables.find((t) => t.id === selectedTableId)?.name ??
+				"table";
+			showToast(
+				`Cleared ${result.deletedRows.toLocaleString()} rows from ${tableName}.`,
+				{ variant: "success" },
+			);
+			await utils.base.getAll.invalidate();
+		},
+		onError: (error) => {
+			showToast(error.message ?? "Failed to clear table data.", {
+				variant: "error",
+			});
+		},
+	});
+
 	const [editingName, setEditingName] = useState(false);
 	const [nameDraft, setNameDraft] = useState(selectedBase.name);
 	const [editingDesc, setEditingDesc] = useState(false);
@@ -197,6 +221,8 @@ export const TopNav = ({
 	const [tableMenuOpen, setTableMenuOpen] = useState(false);
 	const [tableSearch, setTableSearch] = useState("");
 	const [showAddInline, setShowAddInline] = useState(false);
+	const [isRenamingTable, setIsRenamingTable] = useState(false);
+	const [renameValue, setRenameValue] = useState("");
 	// Add or import dropdown state
 	const [importMenuOpen, setImportMenuOpen] = useState(false);
 	const [importInlineOpen, setImportInlineOpen] = useState(false);
@@ -279,6 +305,29 @@ export const TopNav = ({
 		}
 		updateBase.mutate({ id: selectedBase.id, description: descDraft });
 		setEditingDesc(false);
+	};
+
+	const handleRenameTable = () => {
+		const currentTable = selectedBase?.tables.find(
+			(t) => t.id === selectedTableId,
+		);
+		if (!currentTable) return;
+		setIsRenamingTable(true);
+		setRenameValue(currentTable.name);
+	};
+
+	const handleSaveRename = () => {
+		if (!selectedTableId || !renameValue.trim()) return;
+		renameTable.mutate({
+			id: selectedTableId,
+			name: renameValue.trim(),
+		});
+		setIsRenamingTable(false);
+	};
+
+	const handleCancelRename = () => {
+		setIsRenamingTable(false);
+		setRenameValue("");
 	};
 
 	const handleShare = async () => {
@@ -512,7 +561,7 @@ export const TopNav = ({
 			</div>
 
 			{/* Table tabs + switcher */}
-			<div className="flex h-[36px] items-center justify-between bg-blue-50">
+			<div className="flex h-9 items-center justify-between bg-blue-50">
 				<div className="flex items-center">
 					{selectedBase.tables.map((table, tableIndex) => {
 						const isActive = selectedTableId === table.id;
@@ -521,7 +570,7 @@ export const TopNav = ({
 							<div
 								key={table.id}
 								className={cn(
-									"flex items-center justify-between gap-2 rounded-tr-sm border-x px-3 py-2 font-medium text-sm",
+									"flex items-center justify-between gap-2 rounded-tr-sm border-x px-3 py-2.5 font-medium text-xs!",
 									isActive
 										? "-mb-0.5 -mt-px z-10 border-gray-300 bg-white text-gray-900"
 										: "border-transparent bg-transparent text-gray-600 hover:bg-slate-200 hover:text-gray-900",
@@ -549,43 +598,92 @@ export const TopNav = ({
 										</DropdownMenuTrigger>
 										<DropdownMenuContent
 											align="start"
-											className="w-64 bg-white p-0"
+											className="w-72 bg-white p-0"
 										>
-											<div className="p-2">
-												<button
-													type="button"
-													className="w-full cursor-pointer rounded px-2 py-2 text-left hover:bg-gray-50"
-													onClick={() => {
-														const name = prompt("Rename table", table.name);
-														if (name?.trim()) {
-															renameTable.mutate({
-																id: table.id,
-																name: name.trim(),
-															});
+											{isRenamingTable ? (
+												<div className="p-4">
+													<div className="text-gray-600 text-xs">
+														Please enter the table's name.
+													</div>
+													<Input
+														value={renameValue}
+														onChange={(e) => setRenameValue(e.target.value)}
+														onKeyDown={(e) => {
+															if (e.key === "Enter") handleSaveRename();
+															if (e.key === "Escape") handleCancelRename();
+														}}
+														autoFocus
+														className="mb-3 h-8 text-sm"
+														placeholder="Users"
+													/>
+													<div className="flex justify-end gap-2">
+														<Button
+															variant="ghost"
+															onClick={handleCancelRename}
+                                                            className="px-3 py-1 text-xs"
+                                                            size="sm"
+														>
+															Cancel
+														</Button>
+														<Button
+															onClick={handleSaveRename}
+															disabled={!renameValue.trim()}
+                                                            className="bg-blue-500 text-white text-xs"
+                                                            size="sm"
+														>
+															Save
+														</Button>
+													</div>
+												</div>
+											) : (
+												<div className="p-1">
+													<button
+														type="button"
+														className="flex w-full items-center gap-3 rounded px-3 py-2 text-left text-sm hover:bg-gray-50"
+														onClick={handleRenameTable}
+														disabled={renameTable.isPending}
+													>
+														<FileBarChart className="size-4" />
+														Rename table
+													</button>
+													<button
+														type="button"
+														className="flex w-full items-center gap-3 rounded px-3 py-2 text-left text-sm hover:bg-gray-50"
+														onClick={() =>
+															duplicateTable.mutate({ id: table.id })
 														}
-													}}
-													disabled={renameTable.isPending}
-												>
-													Rename table
-												</button>
-												<button
-													type="button"
-													className="w-full cursor-pointer rounded px-2 py-2 text-left hover:bg-gray-50"
-													onClick={() =>
-														duplicateTable.mutate({ id: table.id })
-													}
-													disabled={duplicateTable.isPending}
-												>
-													Duplicate table
-												</button>
-												<button
-													type="button"
-													className="w-full cursor-pointer rounded px-2 py-2 text-left text-red-600 hover:bg-red-50"
-													onClick={() => deleteTable.mutate({ id: table.id })}
-												>
-													Delete table
-												</button>
-											</div>
+														disabled={duplicateTable.isPending}
+													>
+														<Copy className="size-4" />
+														Duplicate table
+													</button>
+													<button
+														type="button"
+														className="flex w-full items-center gap-3 rounded px-3 py-2 text-left text-sm hover:bg-gray-50"
+														onClick={() => {
+															if (
+																window.confirm(
+																	"Are you sure you want to clear all data in this table? This action cannot be undone.",
+																)
+															) {
+																clearTableData.mutate({ tableId: table.id });
+															}
+														}}
+														disabled={clearTableData.isPending}
+													>
+														<X className="size-4" />
+														Clear data
+													</button>
+													<button
+														type="button"
+														className="flex w-full items-center gap-3 rounded px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+														onClick={() => deleteTable.mutate({ id: table.id })}
+													>
+														<Trash2 className="size-4" />
+														Delete table
+													</button>
+												</div>
+											)}
 										</DropdownMenuContent>
 									</DropdownMenu>
 								)}
@@ -804,7 +902,7 @@ export const TopNav = ({
 				</div>
 				<button
 					type="button"
-					className="flex cursor-pointer items-center gap-2 border-gray-300 pr-3 text-gray-600 text-sm"
+					className="flex cursor-pointer items-center gap-2 border-gray-300 pr-3 text-gray-600 text-xs!"
 				>
 					Tools
 					<ChevronDown size={14} />
@@ -854,12 +952,12 @@ const CreateTableInlineInput = ({
 					ref={inputRef}
 				/>
 			</div>
-			<div className="flex items-center gap-2 px-2 pb-2">
+			<div className="flex items-center gap-2 px-2 pb-2 text-xs">
 				<button
 					type="button"
 					onClick={handleCreateTable}
 					disabled={!newTableName.trim() || isPending}
-					className="rounded bg-blue-500 px-2 py-1 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
+					className="rounded bg-blue-500 px-2 py-1 text-white hover:bg-blue-700 disabled:opacity-50"
 				>
 					Add
 				</button>
@@ -869,7 +967,7 @@ const CreateTableInlineInput = ({
 						setNewTableName("");
 						onCancel();
 					}}
-					className="rounded bg-red-500 px-2 py-1 text-sm text-white hover:bg-red-700"
+					className="rounded bg-red-500 px-2 py-1 text-white hover:bg-red-700"
 				>
 					Cancel
 				</button>

@@ -49,17 +49,15 @@ export function useDataTableCrud({
 	);
 
 	const handleRenameColumn = useCallback(
-		(id: string) => {
-			const currentName = columns.find((c) => c.id === id)?.name ?? id;
-			const name = prompt("Rename column", currentName);
-			if (name?.trim()) {
+		(id: string, newName: string) => {
+			if (newName?.trim()) {
 				renameColumnMutation.mutate({
 					colId: id,
-					name: name.trim(),
+					name: newName.trim(),
 				});
 			}
 		},
-		[columns, renameColumnMutation],
+		[renameColumnMutation],
 	);
 
 	const handleDuplicateColumn = useCallback(
@@ -74,6 +72,88 @@ export function useDataTableCrud({
 			deleteColumnMutation.mutate({ colId: id });
 		},
 		[deleteColumnMutation],
+	);
+
+	const handleInsertColumnLeft = useCallback(
+		(id: string) => {
+			// For now, just add a new column (we'll enhance this later to handle positions)
+			addColumnMutation.mutate({ tableId, name: "New Field", type: "TEXT" });
+		},
+		[addColumnMutation, tableId],
+	);
+
+	const handleInsertColumnRight = useCallback(
+		(id: string) => {
+			// For now, just add a new column (we'll enhance this later to handle positions)
+			addColumnMutation.mutate({ tableId, name: "New Field", type: "TEXT" });
+		},
+		[addColumnMutation, tableId],
+	);
+
+	const handleCopyFieldUrl = useCallback(
+		(id: string) => {
+			// Create a URL for the field (placeholder implementation)
+			const url = `${window.location.origin}${window.location.pathname}?field=${id}`;
+			navigator.clipboard.writeText(url);
+			console.log('Field URL copied to clipboard');
+		},
+		[],
+	);
+
+	const handleEditDescription = useCallback(
+		(id: string) => {
+			// Placeholder - this would open a description editor
+			console.log('Edit description for column:', id);
+		},
+		[],
+	);
+
+	const handleEditPermissions = useCallback(
+		(id: string) => {
+			// Placeholder - this would open a permissions editor
+			console.log('Edit permissions for column:', id);
+		},
+		[],
+	);
+
+	const handleSortAZ = useCallback(
+		(id: string) => {
+			// Placeholder - this would implement sorting
+			console.log('Sort A->Z for column:', id);
+		},
+		[],
+	);
+
+	const handleSortZA = useCallback(
+		(id: string) => {
+			// Placeholder - this would implement sorting
+			console.log('Sort Z->A for column:', id);
+		},
+		[],
+	);
+
+	const handleFilter = useCallback(
+		(id: string) => {
+			// Placeholder - this would implement filtering
+			console.log('Filter by column:', id);
+		},
+		[],
+	);
+
+	const handleGroup = useCallback(
+		(id: string) => {
+			// Placeholder - this would implement grouping
+			console.log('Group by column:', id);
+		},
+		[],
+	);
+
+	const handleHideField = useCallback(
+		(id: string) => {
+			// Placeholder - this would hide the field
+			console.log('Hide field:', id);
+		},
+		[],
 	);
 
 	const handleAddRow = useCallback(() => {
@@ -193,6 +273,16 @@ export function useDataTableCrud({
 		handleRenameColumn,
 		handleDuplicateColumn,
 		handleDeleteColumn,
+		handleInsertColumnLeft,
+		handleInsertColumnRight,
+		handleCopyFieldUrl,
+		handleEditDescription,
+		handleEditPermissions,
+		handleSortAZ,
+		handleSortZA,
+		handleFilter,
+		handleGroup,
+		handleHideField,
 		handleAddRow,
 		handleFloatingAddRow,
 		handleDeleteRows,

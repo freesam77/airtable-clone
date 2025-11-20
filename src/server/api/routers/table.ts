@@ -955,6 +955,37 @@ export const tableRouter = createTRPCRouter({
 			};
 		}),
 
+	// Clear all data from a table (delete all rows)
+	clearTableData: protectedProcedure
+		.input(z.object({ tableId: z.string() }))
+		.mutation(async ({ ctx, input }) => {
+			// First verify the table belongs to the user
+			const table = await ctx.db.table.findFirst({
+				where: {
+					id: input.tableId,
+					base: {
+						createdById: ctx.session.user.id,
+					},
+				},
+			});
+
+			if (!table) {
+				throw new Error("Table not found or access denied");
+			}
+
+			// Delete all rows (cascade will handle cells)
+			const result = await ctx.db.row.deleteMany({
+				where: {
+					tableId: input.tableId,
+				},
+			});
+
+			return { 
+				success: true,
+				deletedRows: result.count
+			};
+		}),
+
 	// Get rows by offset range for viewport-specific fetching
 	getRowsByRange: protectedProcedure
 		.input(
